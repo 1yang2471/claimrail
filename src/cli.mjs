@@ -123,7 +123,29 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     }
 
     const verifications = await verifyAll(raw.value, ctx);
-    const d = decide(enrich(raw.value, { observations, verifications }), { humanPresent: !unattended });
+
+    // 规则四的代价数据必须由程序逐候选算出来。
+    // 只在证据不成立时才算（有证据的贵做法是知情决定），也省掉一半 git grep。
+    const optionsCosts = [];
+    for (const [i, fork] of raw.value.forks.entries()) {
+      if (verifications[i]?.ok) {
+        optionsCosts.push(null);
+        continue;
+      }
+      const opts = fork.options ?? [];
+      const targets = opts.map((o) => (typeof o === 'string' ? null : o?.target ?? null));
+      if (!opts.length || targets.some((t) => !t)) {
+        optionsCosts.push(null); // 不齐 → 不判，由 gate 报"未启用"，绝不拿半截数据下结论
+        continue;
+      }
+      const costs = {};
+      for (const o of opts) {
+        costs[o.label] = grade(await observe(o.target, { cwd, diffText: diff, changed: changedNow }));
+      }
+      optionsCosts.push(costs);
+    }
+
+    const d = decide(enrich(raw.value, { observations, verifications, optionsCosts }), { humanPresent: !unattended });
 
     return {
       code: d.action === 'proceed' ? 0 : 1,

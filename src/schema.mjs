@@ -59,11 +59,35 @@ function checkFork(fork, i) {
   if (!Array.isArray(fork.options) || fork.options.length < 2) {
     at('options.min', '分叉必须有至少 2 个候选；只有 1 个说明它不是分叉');
   } else {
+    // 候选可以是字符串，也可以是 { label, target }——带 target 才能逐候选算代价，
+    // 让"无证据却选了更贵的做法"这条规则用程序的数据而不是模型自填的数据判定。
+    const labels = [];
     for (const [n, opt] of fork.options.entries()) {
-      const err = badText(opt);
-      if (err) at(`options[${n}]`, err);
+      if (typeof opt === 'string') {
+        const err = badText(opt);
+        if (err) at(`options[${n}]`, err);
+        else labels.push(opt);
+        continue;
+      }
+      if (typeof opt !== 'object' || opt === null) {
+        at(`options[${n}].shape`, '候选只能是字符串或 { label, target }');
+        continue;
+      }
+      const err = badText(opt.label ?? '');
+      if (err) at(`options[${n}].label`, err);
+      else labels.push(opt.label);
+      if ('target' in opt) {
+        const t = opt.target;
+        if (typeof t !== 'object' || t === null || !t.file) {
+          at(`options[${n}].target`, 'target 必须是 { file, symbol }');
+        } else {
+          const te = badText(t.file);
+          if (te) at(`options[${n}].target.file`, te);
+        }
+      }
     }
-    if (!fork.options.includes(fork.picked)) at('picked.in-options', 'picked 必须在 options 里');
+    if (new Set(labels).size !== labels.length) at('options.distinct', '候选不能重复');
+    if (!labels.includes(fork.picked)) at('picked.in-options', 'picked 必须在 options 里');
   }
 
   if (fork.cost_if_wrong !== 'low' && fork.cost_if_wrong !== 'high') {
@@ -94,6 +118,13 @@ function checkFork(fork, i) {
     }
   }
 
+  // 白名单而不是黑名单：任何"模型自供、程序采信"的字段都是免检通道。
+  // options_cost 以前就在这里——第四条门规则的输入居然由被约束的一方填。
+  const ALLOWED = new Set(['fork', 'options', 'picked', 'evidence', 'target', 'cost_if_wrong', 'verified']);
+  for (const key of Object.keys(fork)) {
+    if (!ALLOWED.has(key)) at('field.unknown', `未知字段 "${key}" 不被接受：台账里只许申报下面这些字段，代价与证据都由程序算`);
+  }
+
   // 测量对象可缺省。缺省时 fanIn 必然取不到，cost 会判 high——
   // 于是"没有依据的审美分叉"自然会来问人，这正是我们要的行为。
   if ('target' in fork && fork.target !== null && fork.target !== undefined) {
@@ -105,16 +136,6 @@ function checkFork(fork, i) {
       if ('symbol' in fork.target) {
         const e2 = badText(fork.target.symbol);
         if (e2) at('target.symbol', `target.symbol ${e2}`);
-      }
-    }
-  }
-
-  if ('options_cost' in fork) {
-    const oc = fork.options_cost;
-    if (typeof oc !== 'object' || oc === null) at('options_cost.shape', '必须是候选到档位的映射');
-    else {
-      for (const [opt, grade] of Object.entries(oc)) {
-        if (grade !== 'low' && grade !== 'high') at(`options_cost.${opt}`, '档位只能 low 或 high');
       }
     }
   }

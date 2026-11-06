@@ -16,8 +16,8 @@ const fork = (over = {}) => ({
   ...over,
 });
 
-const run = (forks, { observations, verifications, humanPresent = true } = {}) =>
-  decide(enrich({ forks }, { observations, verifications }), { humanPresent });
+const run = (forks, { observations, verifications, optionsCosts, humanPresent = true } = {}) =>
+  decide(enrich({ forks }, { observations, verifications, optionsCosts }), { humanPresent });
 
 test('每条分叉都有可回验证据：不打断，直接放行', () => {
   const d = run([fork()], { observations: [LOW], verifications: [GOOD] });
@@ -58,35 +58,51 @@ test('模型只能往高报：申报 low 而程序算出 high，仍然按 high �
   assert.equal(d2.action, 'block');
 });
 
+const COSTS_EXPENSIVE_PICKED = { 覆盖式: 'low', '留 gutter': 'high' };
+const COSTS_BOTH_LOW = { 覆盖式: 'low', '留 gutter': 'low' };
+
 test('无证据却选了改起来更贵的候选——静默塌缩最典型的形状', () => {
-  const d = run([fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' }, picked: '留 gutter' })], {
-    observations: [LOW],
-    verifications: [NONE],
-  });
+  const d = run([fork()], { observations: [LOW], verifications: [NONE], optionsCosts: [COSTS_EXPENSIVE_PICKED] });
   assert.equal(d.violations.length, 1);
   assert.equal(d.action, 'block');
+  assert.match(render(d), /程序算出更便宜的候选是 low/);
 });
 
-test('有证据时选贵的做法是知情决定，不拦', () => {
-  const d = run([fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' }, picked: '留 gutter' })], {
-    observations: [LOW],
-    verifications: [GOOD],
-  });
+test('有证据时选贵的做法是知情决定，不拦也不报未启用', () => {
+  const d = run([fork()], { observations: [LOW], verifications: [GOOD], optionsCosts: [COSTS_EXPENSIVE_PICKED] });
   assert.equal(d.violations.length, 0);
+  assert.equal(d.metrics.rule4NotEnabled, 0);
   assert.equal(d.action, 'proceed');
 });
 
-test('候选代价数据不齐就不判——误拦一次的代价比漏拦一次高', () => {
-  const d = run([fork({ options_cost: { 覆盖式: 'low' } })], { observations: [LOW], verifications: [NONE] });
+test('候选代价算不出来不等于没事——当场报"规则四未启用"，让逃逸可统计', () => {
+  const d = run([fork()], { observations: [LOW], verifications: [NONE] });
   assert.equal(d.violations.length, 0);
-  assert.equal(d.action, 'proceed');
+  assert.equal(d.metrics.rule4NotEnabled, 1);
+  const text = render(d);
+  assert.match(text, /规则四未启用 1 条/);
+  assert.match(text, /覆盖式=缺 留 gutter=缺/);
+});
+
+test('候选标签对不上程序算出来的档位，同样按未启用处理', () => {
+  const d = run([fork()], { observations: [LOW], verifications: [NONE], optionsCosts: [{ a: 'low', b: 'low' }] });
+  assert.equal(d.metrics.rule4NotEnabled, 1, '映射不上就是没数据，不能当成"都便宜"');
+});
+
+test('部分候选有 target 也不判：半截数据比没数据更危险', () => {
+  const half = [fork({ options: [{ label: '覆盖式', target: { file: 'x.ts' } }, '留 gutter'] })];
+  const d = decide(enrich({ forks: half }, { observations: [LOW], verifications: [NONE] }), {});
+  assert.equal(d.metrics.rule4NotEnabled, 1);
+});
+
+test('模型在台账里自填的 options_cost 一律不采信（被约束的一方不能提供约束的输入）', () => {
+  const d = run([fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' } })], { observations: [LOW], verifications: [NONE] });
+  assert.equal(d.violations.length, 0, '自填的档位不该让规则判红');
+  assert.equal(d.metrics.rule4NotEnabled, 1, '程序没算出来，就报未启用');
 });
 
 test('同一条分叉既缺证据又选了贵做法，只算一次打断', () => {
-  const d = run([fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' }, picked: '留 gutter' })], {
-    observations: [HIGH],
-    verifications: [NONE],
-  });
+  const d = run([fork()], { observations: [HIGH], verifications: [NONE], optionsCosts: [COSTS_EXPENSIVE_PICKED] });
   assert.equal(d.questions.length, 1);
   assert.equal(d.violations.length, 1);
   assert.equal(d.metrics.interrupts, 1);
@@ -96,10 +112,10 @@ test('一屏呈现：需你定在前，未验证汇总在后，每条固定三�
   const text = render(
     run(
       [
-        fork({ fork: '信息架构要不要独立路由', options_cost: undefined }),
+        fork({ fork: '信息架构要不要独立路由' }),
         fork({ fork: '列表行高 token' }),
       ],
-      { observations: [HIGH, LOW], verifications: [NONE, NONE] },
+      { observations: [HIGH, LOW], verifications: [NONE, NONE], optionsCosts: [COSTS_BOTH_LOW, COSTS_BOTH_LOW] },
     ),
   );
   const lines = text.split('\n');

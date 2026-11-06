@@ -116,9 +116,31 @@ test('未知 kind 直接拒', () => {
   assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'vibe', ref: '感觉对' } })] })).ok, false);
 });
 
-test('候选代价映射只能填两档', () => {
-  const r = validateLedger(ledger({ forks: [fork({ options_cost: { 覆盖式: 'low', 留: 'sortof' } })] }));
-  assert.ok(r.errors.some((e) => e.rule.startsWith('options_cost')));
+test('自供字段一律拒收：代价与证据都由程序算', () => {
+  const r = validateLedger(ledger({ forks: [fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' } })] }));
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.rule === 'field.unknown' && /options_cost/.test(e.msg)), JSON.stringify(r.errors));
+
+  for (const bad of [{ confidence: 'high' }, { human_approved: true }, { rationale: '我觉得这样好' }]) {
+    const rr = validateLedger(ledger({ forks: [fork(bad)] }));
+    assert.equal(rr.ok, false, JSON.stringify(bad));
+    assert.ok(rr.errors.some((e) => e.rule === 'field.unknown'));
+  }
+});
+
+test('候选可以带自己的测量对象，形状不对就拒', () => {
+  const good = fork({
+    options: [
+      { label: '覆盖式', target: { file: 'src/Chat.tsx', symbol: 'overlay' } },
+      { label: '留 gutter', target: { file: 'src/Chat.tsx', symbol: 'gutter' } },
+    ],
+    picked: '留 gutter',
+  });
+  assert.equal(validateLedger(ledger({ forks: [good] })).ok, true);
+
+  assert.ok(validateLedger(ledger({ forks: [fork({ options: [{ label: 'a' }, { label: 'b', target: 'src/x.tsx' }], picked: 'a' })] })).errors.some((e) => e.rule === 'options[1].target'));
+  assert.ok(validateLedger(ledger({ forks: [fork({ options: ['a', 'a', 'b'], picked: 'a' })] })).errors.some((e) => e.rule === 'options.distinct'));
+  assert.ok(validateLedger(ledger({ forks: [fork({ options: ['a', 42], picked: 'a' })] })).errors.some((e) => e.rule === 'options[1].shape'));
 });
 
 test('测量对象合法时通过', () => {

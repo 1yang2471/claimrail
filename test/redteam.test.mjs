@@ -144,6 +144,52 @@ test('非 ASCII 路径必须参与时间戳计算（承重是 -z：git 在该格
     assert.ok(typeof newest === 'number' && newest >= future.getTime(), `中文名文件的 mtime 没被算进去：newest=${newest} < ${future.getTime()}（多半是 git 把路径八进制转义后 stat 失败被吞掉了）`);
   });
 });
+test('规则四的代价由程序逐候选算：选更贵的那个照样被拦，自填字段连台账都进不去', async () => {
+  await withRepo(async (dir) => {
+    // hot 被 40 个文件引用（≥FAN_IN_HIGH），cold 没人引用。两个候选各自带 target。
+    const refs = ['const x = hot;'];
+    for (let i = 0; i < 40; i++) refs.push(`import { hot } from './hot.mjs'; // ${i}`);
+    await writeFile(join(dir, 'src/hot.mjs'), 'export const hot = 1;\n');
+    await writeFile(join(dir, 'src/cold.mjs'), 'export const cold = 1;\n');
+    await writeFile(join(dir, 'src/refs.mjs'), refs.join('\n') + '\n');
+    await g(dir, ['add', '-A']);
+    await g(dir, ['commit', '-qm', '引用图']);
+
+    const OPTS = [
+      { label: 'hot 旁边', target: { file: 'src/hot.mjs', symbol: 'hot' } },
+      { label: 'cold 旁边', target: { file: 'src/cold.mjs', symbol: 'cold' } },
+    ];
+    const both = (picked) => [
+      {
+        fork: '这个新符号该放哪',
+        options: OPTS,
+        picked,
+        // 分叉级 target 跟着选中的候选走：否则引用数取不到 → 档位 high → 规则一先拦，
+        // 这条用例就测不到规则四的独立作用了
+        target: OPTS.find((o) => o.label === picked).target,
+        evidence: null,
+        cost_if_wrong: 'low',
+        verified: false,
+      },
+    ];
+
+    await ledger(dir, both('hot 旁边'));
+    const bad = await check({ cwd: dir });
+    assert.equal(bad.code, 1, bad.text);
+    assert.match(bad.text, /无证据却选了改起来更贵的候选/, bad.text);
+
+    await ledger(dir, both('cold 旁边'));
+    const good = await check({ cwd: dir });
+    assert.equal(good.code, 0, good.text);
+    assert.match(good.text, /未验证 1 条/, good.text);
+
+    // 自供字段现在连 schema 都过不了
+    await ledger(dir, [{ ...both('hot 旁边')[0], options_cost: { 'hot 旁边': 'low', 'cold 旁边': 'high' } }]);
+    const self = await check({ cwd: dir });
+    assert.match(self.text, /未知字段 "options_cost"/, self.text);
+  });
+});
+
 test('log 被删一行：所有既有引用当场报错，不静默改指', async () => {
   await withRepo(async (dir) => {
     await recordCmd({ cwd: dir, key: 'k1', what: '第一条原文' });
