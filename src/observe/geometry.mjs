@@ -97,7 +97,11 @@ export function scrollbarClearsText(page) {
       if (overlaps(strip, box(text.rect))) hit.push({ ...text, container: container.selector });
     }
   }
-  if (!hit.length) return pass('scrollbar-clears-text', `已核 ${(page.scrollContainers ?? []).filter(overlayStrip).length} 个滚动区`);
+  if (!hit.length) {
+    // 报"看过几个滚动区"，不是"有几个条带"——后者在经典滚动条/gutter 预留时为 0，
+    // 读起来像什么都没查，而实际结论是"看过，没有压在内容上的条带"
+    return pass('scrollbar-clears-text', `已核 ${(page.scrollContainers ?? []).length} 个滚动区，无压在内容上的条带`);
+  }
   return fail('scrollbar-clears-text', `覆盖式滚动条压住 ${hit.length} 处文本，首个：${hit[0].selector}（容器 ${hit[0].container}）`);
 }
 
