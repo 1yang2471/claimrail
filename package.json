@@ -4,6 +4,7 @@
   "description": "让 AI 的选择留下痕迹：决策台账 + 程序算代价 + 可回验证据",
   "type": "module",
   "engines": { "node": ">=20" },
+  "bin": { "forklight": "src/cli.mjs" },
   "scripts": {
     "test": "node --test"
   },

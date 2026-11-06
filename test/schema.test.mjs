@@ -100,3 +100,17 @@ test('候选代价映射只能填两档', () => {
   const r = validateLedger(ledger({ forks: [fork({ options_cost: { 覆盖式: 'low', 留: 'sortof' } })] }));
   assert.ok(r.errors.some((e) => e.rule.startsWith('options_cost')));
 });
+
+test('测量对象合法时通过', () => {
+  assert.equal(validateLedger(ledger({ forks: [fork({ target: { file: 'src/Chat.tsx', symbol: 'MessageList' } })] })).ok, true);
+});
+
+test('没有测量对象是合法状态，代价随后自然升 high 并来问人', () => {
+  assert.equal(validateLedger(ledger({ forks: [fork({ target: undefined })] })).ok, true);
+});
+
+test('测量对象形状不对就拒——宁可拒了重报，不要静默算错', () => {
+  assert.ok(validateLedger(ledger({ forks: [fork({ target: 'src/Chat.tsx' })] })).errors.some((e) => e.rule === 'target.shape'));
+  assert.ok(validateLedger(ledger({ forks: [fork({ target: { symbol: 'X' } })] })).errors.some((e) => e.rule === 'target.file'));
+  assert.ok(validateLedger(ledger({ forks: [fork({ target: { file: 'a.tsx', symbol: 'X\nY' } })] })).errors.some((e) => e.rule === 'target.symbol'));
+});

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "task_class": "ui-new",
+  "forks": [
+    {
+      "fork": "聊天滚动区：覆盖式滚动条还是留 gutter",
+      "options": ["覆盖式", "留 gutter"],
+      "picked": "留 gutter",
+      "evidence": { "kind": "repo", "ref": "src/cost.mjs:13", "asserts": ["export function grade"] },
+      "target": { "file": "src/observe/effects.mjs", "symbol": "EFFECT_KINDS" },
+      "cost_if_wrong": "low",
+      "verified": true
+    }
+  ]
+}

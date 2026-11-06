@@ -85,6 +85,21 @@ function checkFork(fork, i) {
     }
   }
 
+  // 测量对象可缺省。缺省时 fanIn 必然取不到，cost 会判 high——
+  // 于是"没有依据的审美分叉"自然会来问人，这正是我们要的行为。
+  if ('target' in fork && fork.target !== null && fork.target !== undefined) {
+    if (typeof fork.target !== 'object' || Array.isArray(fork.target)) {
+      at('target.shape', 'target 必须是 { file, symbol }');
+    } else {
+      const err = badText(fork.target.file ?? '');
+      if (err) at('target.file', `target.file ${err}`);
+      if ('symbol' in fork.target) {
+        const e2 = badText(fork.target.symbol);
+        if (e2) at('target.symbol', `target.symbol ${e2}`);
+      }
+    }
+  }
+
   if ('options_cost' in fork) {
     const oc = fork.options_cost;
     if (typeof oc !== 'object' || oc === null) at('options_cost.shape', '必须是候选到档位的映射');

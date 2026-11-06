@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "task_class": "ui-new",
+  "forks": [
+    {
+      "fork": "主视觉风格：跟随系统还是固定深色",
+      "options": ["跟随系统", "固定深色"],
+      "picked": "固定深色",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false
+    }
+  ]
+}

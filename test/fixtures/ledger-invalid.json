@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "task_class": "ui-new",
+  "forks": [
+    {
+      "fork": "卡片密度用哪一档",
+      "options": ["紧凑", "宽松"],
+      "picked": "宽松",
+      "evidence": { "kind": "repo", "ref": "src/cost.mjs" },
+      "cost_if_wrong": "medium",
+      "verified": true
+    }
+  ]
+}
