@@ -130,15 +130,12 @@ test('探针没跑（hasVisibleFocus 为 null）不许冒充看过焦点环', ()
   assert.match(r.detail, /未做焦点探测/);
 });
 
-test('部分元素探到了就按探到的判，说明里写清核了几个', () => {
-  const r = focusVisibleOk({
-    interactive: [
-      { selector: '.a', focusable: true, hasVisibleFocus: true },
-      { selector: '.b', focusable: true, hasVisibleFocus: null },
-    ],
-  });
-  assert.equal(r.ok, true);
-  assert.match(r.detail, /已核 1 个/);
+test('滚动容器正好停在条之上 → 不重叠就是绿', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 720 } })],
+    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
+  };
+  assert.equal(bottomNotCovered(page).ok, true);
 });
 
 // ---- 底部被遮 ----
@@ -162,10 +159,10 @@ test('滚动容器自己的 sticky 子元素不算遮挡', () => {
   assert.equal(bottomNotCovered(page).ok, true);
 });
 
-test('不属于该容器的固定条照样判红', () => {
+test('不属于该容器的贴底条照样判红', () => {
   const page = {
     scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
-    fixedRects: [{ selector: '.day', rect: { x: 0, y: 0, w: 400, h: 28 }, inside: 'body>div>.other' }],
+    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 }, inside: 'body>div>.other' }],
   };
   assert.equal(bottomNotCovered(page).ok, false);
 });
@@ -177,20 +174,14 @@ test('滚动区域伸进固定输入框底下 → 红（结构性，与滚到哪
   };
   const r = bottomNotCovered(page);
   assert.equal(r.ok, false);
-  assert.match(r.detail, /滚动区域与固定条重叠/);
+  assert.match(r.detail, /滚动区域被贴底的固定条压住/);
 });
 
-test('滚动容器停在输入框之上 → 绿', () => {
+test('内容比可视框长不是判据——贴底的条才是', () => {
+  // 旧用例把容器矩形写成 2000 高，那是内容高度；滚动容器的 rect 是可视框。
+  // 现在按真实几何：可视框 700 高，条贴在 640..700。
   const page = {
-    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 720 } })],
-    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
-  };
-  assert.equal(bottomNotCovered(page).ok, true);
-});
-
-test('末项在屏幕外不该被当成没盖住——曾经的漏判形状', () => {
-  const page = {
-    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 2000 }, lastChildRect: { x: 0, y: 1900, w: 400, h: 40 } })],
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 700 } })],
     fixedRects: [{ selector: '.composer', rect: { x: 0, y: 640, w: 400, h: 60 } }],
   };
   assert.equal(bottomNotCovered(page).ok, false);
@@ -212,6 +203,73 @@ test('一个健康的页面五项全绿', () => {
   const results = runChecks(page);
   assert.deepEqual(results.map((r) => r.id), CHECK_IDS);
   assert.deepEqual(results.filter((r) => !r.ok), []);
+});
+
+test('别的容器里的文本坐标撞上也不算压住', () => {
+  const page = {
+    scrollContainers: [container()],
+    texts: [rightBubble({ container: 'body>div>.sidebar' })],
+  };
+  assert.equal(scrollbarClearsText(page).ok, true);
+});
+
+test('同一容器内的文本才算数', () => {
+  const page = { scrollContainers: [container()], texts: [rightBubble({ container: '.msg-list' })] };
+  assert.equal(scrollbarClearsText(page).ok, false);
+});
+
+test('采集被截断改判"不作数"，不许拿半截数据宣布全绿', () => {
+  const page = { scrollContainers: [container()], texts: [rightBubble()], raw: { texts: 613, interactive: 5, scrollContainers: 1, fixedRects: 1 } };
+  const r = scrollbarClearsText(page);
+  assert.equal(r.ok, null);
+  assert.match(r.detail, /截断/);
+  assert.equal(contrastOk({ texts: [{ selector: '.a', color: '#111', background: '#fff' }], raw: { texts: 401 } }).ok, null);
+  assert.equal(touchTargetsOk({ interactive: [{ selector: '.b', rect: { w: 44, h: 44 } }], raw: { interactive: 121 } }).ok, null);
+});
+
+test('悬浮在滚动区中间的浮标与圆形 FAB 不算遮挡', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [
+      { selector: '.toast', rect: { x: 120, y: 600, w: 160, h: 32 } },
+      { selector: '.fab', rect: { x: 340, y: 700, w: 56, h: 56 } },
+    ],
+  };
+  assert.equal(bottomNotCovered(page).ok, true);
+});
+
+test('贴底且覆盖宽度足够的条才算遮挡', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
+  };
+  const r = bottomNotCovered(page);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /贴底的固定条/);
+});
+
+test('很窄但贴底的条不算遮挡（比如 2px 分隔线）', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [{ selector: '.rule', rect: { x: 0, y: 778, w: 60, h: 2 } }],
+  };
+  assert.equal(bottomNotCovered(page).ok, true);
+});
+
+test('焦点只探到一部分时判"不作数"，覆盖率不足不是全绿', () => {
+  const r = focusVisibleOk({
+    interactive: [
+      { selector: '.a', focusable: true, hasVisibleFocus: true },
+      { selector: '.b', focusable: true, hasVisibleFocus: null },
+    ],
+  });
+  assert.equal(r.ok, null);
+  assert.match(r.detail, /只覆盖 1\/2/);
+});
+
+test('百分号色值不作数，不按 0-255 硬算', () => {
+  assert.equal(contrastRatio('rgb(50%, 0%, 0%)', '#fff'), null);
+  assert.equal(contrastOk({ texts: [{ selector: '.x', color: 'rgb(50%, 0%, 0%)', background: 'rgb(255,255,255)' }] }).ok, null);
 });
 
 test('空数据不抛错，五项都在且全部不作数——采集失败绝不能变成五个绿', () => {

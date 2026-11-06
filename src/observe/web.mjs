@@ -13,6 +13,7 @@ export function collectInPage() {
   const fk = window.__fk;
   if (!fk) throw new Error('未注入 __fk 辅助函数：请经 forklight web（驱动层 addInitScript）打开页面');
   const sel = fk.sel;
+  const scrollOwner = fk.scrollOwner;
 
   const box = (el) => {
     const r = el.getBoundingClientRect();
@@ -37,6 +38,8 @@ export function collectInPage() {
 
   const scrollContainers = [];
   const fixedRects = [];
+  let containerTotal = 0;
+  let fixedTotal = 0;
   for (const el of document.querySelectorAll('*')) {
     if (!shown(el)) continue;
     const s = getComputedStyle(el);
@@ -44,16 +47,14 @@ export function collectInPage() {
     if (r.w <= 0 || r.h <= 0) continue;
 
     if (s.position === 'fixed' || s.position === 'sticky') {
+      fixedTotal += 1;
       // inside 记录它归属的滚动容器：容器自己的 sticky 子元素（日期分隔条那种）
       // 必然与容器矩形重叠，不标出来就会被当成"内容被固定条盖住"的假红。
-      let host = null;
-      for (let n = el.parentElement; n && !host; n = n.parentElement) {
-        if (/(auto|scroll)/.test(getComputedStyle(n).overflowY)) host = sel(n);
-      }
-      fixedRects.push({ selector: sel(el), rect: r, inside: host });
+      fixedRects.push({ selector: sel(el), rect: r, inside: scrollOwner(el) });
     }
     if (!/(auto|scroll)/.test(s.overflowY)) continue;
 
+    containerTotal += 1;
     scrollContainers.push({
       selector: sel(el),
       rect: r,
@@ -65,9 +66,10 @@ export function collectInPage() {
   }
 
   const texts = [];
+  let textTotal = 0;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
-  while ((node = walker.nextNode()) && texts.length < 400) {
+  while ((node = walker.nextNode())) {
     if (!node.nodeValue || !node.nodeValue.trim()) continue;
     const parent = node.parentElement;
     if (!parent || !shown(parent)) continue;
@@ -75,10 +77,14 @@ export function collectInPage() {
     range.selectNodeContents(node);
     const s = getComputedStyle(parent);
     const fs = parseFloat(s.fontSize) || 16;
+    const owner = scrollOwner(parent);
     for (const r of range.getClientRects()) {
       if (r.width < 2 || r.height < 2) continue;
+      textTotal += 1;
+      if (texts.length >= 400) continue; // 只计数不收录：截断要能被判定层看见
       texts.push({
         selector: sel(parent),
+        container: owner,
         rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
         color: s.color,
         background: bgOf(parent),
@@ -88,21 +94,32 @@ export function collectInPage() {
     }
   }
 
+  let interactiveTotal = 0;
   const interactive = [];
   for (const el of document.querySelectorAll('a,button,input,select,textarea,[role="button"],[role="link"],[tabindex]')) {
     if (!shown(el)) continue;
     const r = box(el);
     if (r.w <= 0 || r.h <= 0) continue;
     const focusable = !el.disabled && el.tabIndex >= 0 && el.getAttribute('aria-hidden') !== 'true';
+    interactiveTotal += 1;
+    if (interactive.length >= 120) continue;
     interactive.push({ selector: sel(el), rect: r, focusable, baseStyle: fk.styleSig(el), hasVisibleFocus: null });
   }
 
   return {
     viewport: { w: window.innerWidth, h: window.innerHeight },
-    scrollContainers: cap(scrollContainers, 60),
+    // raw 是截断前的总数。判定层遇到 raw > 实际条数时改判"不作数"而不是"全绿"，
+    // 否则第 401 条被滚动条压住的文本会因为 cap 而永远查不到。
+    raw: {
+      scrollContainers: containerTotal,
+      texts: textTotal,
+      interactive: interactiveTotal,
+      fixedRects: fixedTotal,
+    },
+    scrollContainers: scrollContainers.slice(0, 60),
     texts,
-    interactive: cap(interactive, 120),
-    fixedRects: cap(fixedRects, 40),
+    interactive,
+    fixedRects: fixedRects.slice(0, 40),
   };
 }
 
@@ -110,11 +127,15 @@ export const reportPathFor = (pngRef) => String(pngRef).replace(/\.png$/, '.repo
 
 // page 只需 evaluate()/screenshot() 两个方法，所以驱动可以是 Playwright、
 // 也可以是裸 CDP，而这一层仍然能用手写的假页面测。
-export async function renderPage(page, { outDir, name, label = '', focusSamples = null } = {}) {
+//
+// focusProbe 是回调而不是现成数据：必须先采到未聚焦基线样式，再走 Tab。
+// 顺序反过来（曾经就是反的）会让基线带着焦点，焦点检查一路判绿。
+export async function renderPage(page, { outDir, name, label = '', focusProbe = null, focusSamples = null } = {}) {
   await mkdir(outDir, { recursive: true });
   const data = await page.evaluate(collectInPage);
-  const interactive = focusSamples ? applyFocusProbe(data.interactive, focusSamples) : data.interactive;
   const png = join(outDir, `${name}.png`);
+  const samples = focusProbe ? await focusProbe() : focusSamples;
+  const interactive = samples ? applyFocusProbe(data.interactive, samples) : data.interactive;
   await page.screenshot({ path: png });
 
   const report = {
@@ -127,7 +148,8 @@ export async function renderPage(page, { outDir, name, label = '', focusSamples 
       texts: data.texts.length,
       interactive: data.interactive.length,
       fixedRects: data.fixedRects.length,
-      focusProbed: focusSamples ? focusSamples.length : 0,
+      focusProbed: samples ? samples.length : 0,
+      ...(data.raw ?? {}),
     },
     checks: runChecks({ ...data, interactive }),
   };

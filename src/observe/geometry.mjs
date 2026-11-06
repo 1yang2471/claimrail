@@ -1,14 +1,20 @@
-// 渲染后检查的判定逻辑。纯函数：进来的是一页里采到的矩形与颜色，出去的是红绿和一句话说明。
+// 渲染后检查的判定逻辑。纯函数：进来的是一页里采到的矩形与颜色，出去的是红/绿/不作数。
 //
-// 这一层刻意不含任何浏览器调用。它应该能用手写的矩形数据测透——
-// 也只有这样，"滚动条压在右对齐气泡上"才是可复现的断言，而不是又一次"我看着没问题"。
+// 这一层不含任何浏览器调用，所以能用手写矩形测透。
+//
+// 三条纪律，都是被实测教出来的：
+//   - 只在同一容器内比较。悬浮在右侧的浮标文字、别的容器里的 sticky 标题，
+//     都不该因为坐标撞上就算"滚动条压住了本页内容"。
+//   - 采集被截断时改判"不作数"，不许拿半截数据宣布全绿。
+//   - "遮挡"只认贴底、够宽的条。32px 高的 toast 和 FAB 浮在滚动区上不藏内容。
 
-const OVERLAY_BAR = 15; // 覆盖式滚动条的常见宽度；经典滚动条会占布局，那种情况不遮内容
+const OVERLAY_BAR = 15;
 const TOUCH_MIN = 44;
 const CONTRAST_NORMAL = 4.5;
 const CONTRAST_LARGE = 3;
 const LARGE_PX = 24;
 const LARGE_BOLD_PX = 18.66;
+const BAR_MIN_WIDTH_RATIO = 0.3; // 覆盖容器宽度不足三成的浮层不算"条"
 
 export const CHECK_IDS = [
   'scrollbar-clears-text',
@@ -21,6 +27,7 @@ export const CHECK_IDS = [
 function parseColor(input) {
   if (typeof input !== 'string') return null;
   const s = input.trim().toLowerCase();
+  if (s.includes('%')) return null; // 百分号色值按 0-255 算会得出错误比值，宁可不作数
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(s);
   if (hex) {
     const h = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1];
@@ -49,66 +56,74 @@ export function contrastRatio(fg, bg) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-const rect = (r) => ({ x: r.x, y: r.y, w: r.w ?? r.width ?? 0, h: r.h ?? r.height ?? 0 });
+const box = (r) => ({ x: r.x, y: r.y, w: r.w ?? r.width ?? 0, h: r.h ?? r.height ?? 0 });
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-
-// 条带只在"确实会画一条盖在内容上"时才存在。三种情况没有条带：
-// 经典滚动条占了布局宽度、scrollbar-width: none 根本不画、scrollbar-gutter: stable 预留了位。
-// 少判一种就漏掉用户的原始例子，多判一种就是假红——所以三种都要显式承认。
-function overlayStrip(container) {
-  const c = rect(container.rect);
-  if (!container.scrollableY || c.w <= 0 || c.h <= 0) return null;
-  if ((container.reservedX ?? 0) > 0) return null;
-  if (container.scrollbarStyle === 'none') return null;
-  if (String(container.gutter ?? '').includes('stable')) return null;
-  return { x: c.x + c.w - OVERLAY_BAR, y: c.y, w: OVERLAY_BAR, h: c.h };
-}
 
 const fail = (id, detail) => ({ id, ok: false, detail });
 const pass = (id, detail = '') => ({ id, ok: true, detail });
-// 第三态是必须的：采集器没拿到数据时判绿，等于允许"我没看见"冒充"没问题"。
-// 证据回验只认 ok === true，null 与 false 都过不去。
+// 第三态是必须的：采集器没拿到那一类数据时判绿，等于允许"我没看见"冒充"没问题"。
 const skip = (id, detail = '未采到可判定的数据，不作数') => ({ id, ok: null, detail });
 
 const nonEmpty = (list) => Array.isArray(list) && list.length > 0;
+const list = (items) => items.slice(0, 3).map((i) => i.selector ?? i.tag).join('、') + (items.length > 3 ? ` 等 ${items.length} 处` : '');
 
-const list = (items) => items.slice(0, 3).map((i) => i.selector || i.tag).join('、') + (items.length > 3 ? ` 等 ${items.length} 处` : '');
+// 采集截断必须显式承认：cap 掉的数据不参与判定，判了就报"不作数"
+function truncated(page, key) {
+  const raw = page.raw?.[key];
+  const got = page[key]?.length ?? 0;
+  return typeof raw === 'number' && raw > got;
+}
+
+function overlayStrip(container) {
+  const c = box(container.rect);
+  if (!container.scrollableY || c.w <= 0 || c.h <= 0) return null;
+  if ((container.reservedX ?? 0) > 0) return null; // 经典滚动条挤走布局宽度，不遮
+  if (container.scrollbarStyle === 'none') return null; // 根本不画条
+  if (String(container.gutter ?? '').includes('stable')) return null; // 已预留位
+  return { x: c.x + c.w - OVERLAY_BAR, y: c.y, w: OVERLAY_BAR, h: c.h, container: container.selector };
+}
 
 export function scrollbarClearsText(page) {
   if (!nonEmpty(page.scrollContainers)) return skip('scrollbar-clears-text', '页面里没有纵向滚动容器可查');
+  if (truncated(page, 'texts')) return skip('scrollbar-clears-text', `文本采集被截断（${page.raw.texts} > ${page.texts.length}），判不了`);
 
   const hit = [];
-  for (const container of page.scrollContainers ?? []) {
+  for (const container of page.scrollContainers) {
     const strip = overlayStrip(container);
     if (!strip) continue;
     for (const text of page.texts ?? []) {
-      if (overlaps(strip, rect(text.rect))) hit.push({ ...text, container: container.selector });
+      // 只比该容器自己的文本：右侧浮标、别的容器里的 sticky 标题都不算
+      if (text.container && text.container !== container.selector) continue;
+      if (overlaps(strip, box(text.rect))) hit.push({ ...text, container: container.selector });
     }
   }
-  if (!hit.length) return pass('scrollbar-clears-text');
+  if (!hit.length) return pass('scrollbar-clears-text', `已核 ${(page.scrollContainers ?? []).filter(overlayStrip).length} 个滚动区`);
   return fail('scrollbar-clears-text', `覆盖式滚动条压住 ${hit.length} 处文本，首个：${hit[0].selector}（容器 ${hit[0].container}）`);
 }
 
 export function touchTargetsOk(page) {
   if (!nonEmpty(page.interactive)) return skip('touch-targets-ok', '没采到可交互元素');
+  if (truncated(page, 'interactive')) return skip('touch-targets-ok', `可交互元素采集被截断（${page.raw.interactive} > ${page.interactive.length}），判不了`);
 
-  const small = (page.interactive ?? []).filter((el) => {
-    const r = rect(el.rect);
+  const small = page.interactive.filter((el) => {
+    const r = box(el.rect);
     if (r.w <= 0 || r.h <= 0) return false;
     return Math.min(r.w, r.h) < TOUCH_MIN;
   });
-  if (!small.length) return pass('touch-targets-ok');
+  if (!small.length) return pass('touch-targets-ok', `已核 ${page.interactive.length} 个`);
   return fail('touch-targets-ok', `${small.length} 个可点元素短边不足 ${TOUCH_MIN}px：${list(small)}`);
 }
 
 export function contrastOk(page) {
+  if (truncated(page, 'texts')) return skip('contrast-ok', `文本采集被截断（${page.raw.texts} > ${page.texts.length}），判不了`);
   const bad = [];
   let measured = 0;
   for (const t of page.texts ?? []) {
     const ratio = contrastRatio(t.color, t.background);
     if (ratio === null) continue;
     measured += 1;
-    const large = (t.fontSize ?? 16) >= LARGE_PX || ((t.fontSize ?? 16) >= LARGE_BOLD_PX && Boolean(t.bold));
+    const size = t.fontSize ?? 16;
+    const large = size >= LARGE_PX || (size >= LARGE_BOLD_PX && Boolean(t.bold));
     if (ratio < (large ? CONTRAST_LARGE : CONTRAST_NORMAL)) bad.push({ ...t, ratio });
   }
   if (measured === 0) return skip('contrast-ok', '没有可解析的正文颜色对');
@@ -121,36 +136,43 @@ export function focusVisibleOk(page) {
   const focusables = (page.interactive ?? []).filter((el) => el.focusable !== false);
   if (!focusables.length) return skip('focus-visible-ok', '没有可聚焦元素可查');
 
-  // hasVisibleFocus === null 表示探针没跑（当前驱动无法产生真实键盘焦点）。
-  // 这种降级必须留在"不作数"里：判绿就等于宣称看过焦点环。
+  // hasVisibleFocus === null 表示探针没跑或 Tab 没走到：不许冒充看过焦点环
   const measured = focusables.filter((el) => el.hasVisibleFocus === true || el.hasVisibleFocus === false);
   if (!measured.length) return skip('focus-visible-ok', `未做焦点探测（${focusables.length} 个可聚焦元素待真实键盘事件）`);
+  if (measured.length < focusables.length) {
+    return skip('focus-visible-ok', `焦点探测只覆盖 ${measured.length}/${focusables.length} 个，判不了`);
+  }
 
   const dark = measured.filter((el) => el.hasVisibleFocus === false);
   if (!dark.length) return pass('focus-visible-ok', `已核 ${measured.length} 个`);
   return fail('focus-visible-ok', `${dark.length} 个可聚焦元素聚焦时看不出变化：${list(dark)}`);
 }
 
+// "遮挡"的定义：贴容器底边、且横向覆盖够宽的一条。
+// 浮在滚动区中间的 toast、56px 的圆形 FAB、未读气泡都不藏内容，判红就是假红。
+function isBottomBar(bar, containerRect) {
+  const touchesBottom = bar.y + bar.h >= containerRect.y + containerRect.h - 1 && bar.y < containerRect.y + containerRect.h;
+  const wideEnough = bar.w >= containerRect.w * BAR_MIN_WIDTH_RATIO;
+  return touchesBottom && wideEnough;
+}
+
 export function bottomNotCovered(page) {
-  // 信号是结构性的：滚动容器自己的矩形伸进了固定/粘性条底下。
-  // 曾经用"最后一个内容项"来比，结果漏判——列表一溢出末项就在屏幕外，
-  // 永远不相交，而那恰恰是最典型的一种盖住。跟滚动到哪无关。
-  const containers = (page.scrollContainers ?? []).map((c) => ({ selector: c.selector, rect: rect(c.rect) }));
-  const fixed = (page.fixedRects ?? [])
-    .map((f) => ({ selector: f.selector, inside: f.inside, rect: rect(f?.rect ?? f) }))
+  const containers = (page.scrollContainers ?? []).map((c) => ({ selector: c.selector, rect: box(c.rect) })).filter((c) => c.rect.w > 0 && c.rect.h > 0);
+  const bars = (page.fixedRects ?? [])
+    .map((f) => ({ selector: f.selector, inside: f.inside, rect: box(f?.rect ?? f) }))
     .filter((f) => f.rect.w > 0 && f.rect.h > 0);
-  if (!fixed.length || !containers.length) return skip('bottom-not-covered', '缺少固定条或滚动容器，未判');
+  if (!bars.length || !containers.length) return skip('bottom-not-covered', '缺少固定条或滚动容器，未判');
 
   const hit = [];
   for (const c of containers) {
-    for (const f of fixed) {
-      // 容器自己的 sticky 子元素（日期分隔条那种）必然与容器重叠，那不是遮挡
-      if (f.inside && f.inside === c.selector) continue;
+    for (const f of bars) {
+      if (f.inside && f.inside === c.selector) continue; // 容器自己的 sticky 子元素（日期分隔条）不算遮挡
+      if (!isBottomBar(f.rect, c.rect)) continue;
       if (overlaps(c.rect, f.rect)) hit.push(f.selector ?? c.selector);
     }
   }
-  if (!hit.length) return pass('bottom-not-covered');
-  return fail('bottom-not-covered', `滚动区域与固定条重叠，内容会被盖住：${[...new Set(hit)].join('、')}`);
+  if (!hit.length) return pass('bottom-not-covered', `已核 ${bars.length} 个固定元素`);
+  return fail('bottom-not-covered', `滚动区域被贴底的固定条压住：${[...new Set(hit)].join('、')}`);
 }
 
 export function runChecks(page) {

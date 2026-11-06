@@ -195,7 +195,7 @@ export async function web({ url, state, viewport = '390x700,1280x800', out = joi
           outDir: join(cwd, out),
           name: shotName,
           label: `${url} @ ${vlabel}`,
-          focusSamples: session.focusSamples,
+          focusProbe: session.focusProbe,
         });
 
         const ref = join(out, `${shotName}.png`).replaceAll('\\', '/');

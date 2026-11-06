@@ -21,12 +21,17 @@
 | 副作用扫描单位是单文件新增行 | `src/observe/effects.mjs` 的 `addedCode` 返回数组、`scanDiff` 逐文件扫；认不出的 diff header 整段不归属。跨文件拼接会把两个无关文件缝成一条 `recursive-delete` |
 | 诚实申报不该被罚 | `effects.mjs` 的 `SELF_IGNORE` 含 `.forklight/`、`memory/`、`docs/`、`README/AGENTS.md`、测试与 fixtures、规则表自身 |
 | 前端检查默认跑多视口 | `src/cli.mjs` 的 `web` 默认 `390x700,1280x800`。注意：`--viewport` 可以覆盖成单个，所以这条是默认值约束，不是硬拦 |
+| 假红防线：容器作用域、贴底定义、截断不作数 | `src/observe/geometry.mjs`：文本按 `container` 归属比较；遮挡只认"贴底 + 覆盖宽度 ≥30%"的条；`raw > 实际条数` 时改判 `null`（`test/geometry.test.mjs`） |
+| 焦点签名按"能不能被看见"归一化 | `src/observe/driver.mjs` 的 `styleSig`：`outline-style:none` 或宽度为 0 时丢弃 outline 颜色/宽度。变异验证：取消归一化 → `test/browser.test.mjs` 红（`a{outline:none}` 又被判成"焦点可见"） |
+| 先采基线、再走 Tab，顺序不许倒 | `src/observe/driver.mjs` 交出 `focusProbe` 回调，`renderPage` 在 `evaluate(collectInPage)` 之后才调用它。倒过来会让"未聚焦基线"带着焦点，焦点检查一路判绿 |
+| 真浏览器路径必须有自动化覆盖 | `test/browser.test.mjs`（真 Chromium 打开对照页；没装 Playwright 则整文件 skip，不伪绿） |
 
 ## 改这些代码时的两条硬规矩
 
-1. **红队层必须跟着跑**：`node --test test/redteam.test.mjs`。它测的是这个产品存在的理由（模型能否不实做却拿到"已验证"）。以前 170 多个测试全是老实 ctx 的用例，结果外部审查当场复现出三条伪造路径——测试守的是正常请求，不是主张。
-2. **加一道拦之后要做变异验证**：把那处守卫改坏，测试必须变红；改回来必须绿。从来没报过错的守卫等于没加。已验证过：`mapGrepExit` 的 `unknown`、`ls-files -z`（承重是 `-z`，`core.quotepath=false` 只是冗余）、未跟踪并入扫描、log 行号自校验、先干后证、header fail-closed。
+1. **红队层与浏览器层必须跟着跑**：`node --test test/redteam.test.mjs test/browser.test.mjs`。前者测的是产品存在的理由（模型能否不实做却拿到"已验证"），后者测的是两百多个纯逻辑测试一行都没执行过的 DOM 采集代码。
+2. **加一道拦之后要做变异验证**：把那处守卫改坏，测试必须变红；改回来必须绿。从来没报过错的守卫等于没加。已验证：`mapGrepExit` 的 `unknown`、`ls-files -z`（承重是 `-z`，`core.quotepath=false` 只是冗余）、未跟踪并入扫描、log 行号自校验、先干后证、header fail-closed、自供字段拒收、逐候选真算、焦点签名归一化。
 3. **别在带未提交改动的文件上用 `git checkout --` / `git clean`**：这一条是踩过代价的——用 `git checkout` 复原一个被 sed 改过的文件时，把同一文件里未提交的正经改动一起打回了上个提交，靠重写才恢复。要复原就先 `cp` 出来再 `cp` 回去。
+4. **变异要先确认它真的生效**：有一次 sed 的匹配串没命中，测试"照样绿"被误当成守卫有效。先 grep 出那一行、改完看 diff、再跑，才叫验证。
 | 副作用扫描不许扫到规则表和测试数据 | `src/observe/effects.mjs` 的 `addedCode` 排除 test/fixtures/docs/规则表自身 |
 | 前端检查默认跑多视口 | `src/cli.mjs` 的 `web` 默认 `390x700,1280x800`。注意：`--viewport` 可以覆盖成单个，所以这条是默认值约束，不是硬拦 |
 | 偏好 log 只追加，规则是缓存 | `src/store.mjs` 坏行直接报错（行号是引用坐标，跳过一行会让所有 `log#n` 错位） |

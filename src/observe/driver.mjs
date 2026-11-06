@@ -17,18 +17,44 @@ export async function loadPlaywright() {
 
 // 采集器与焦点探针必须共用同一个 selector 函数，否则 Tab 探到的元素
 // 会因为两边算法不同而被判成"没探到"。所以它注入页面，而不是各写一份。
+//
+// sel 必须带兄弟序号：同 class 的兄弟气泡（聊天页一屏全是 .bubble）如果算出同一个
+// 字符串，focusSamples 的 Map 会互相覆盖——第一个探到、第二个跟着被判"焦点可见"，
+// 那是纯假绿；tabSamples 也会因为重名提前 break，少探一整片。
 export function installHelpers() {
   const sel = (el) => {
     if (el.id) return `#${el.id}`;
     const cls = typeof el.className === 'string' && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : '';
     const parent = el.parentElement ? sel(el.parentElement) : '';
-    return `${parent}>${el.tagName.toLowerCase()}${cls}`;
+    const tag = el.tagName.toLowerCase() + cls;
+    const same = el.parentElement ? [...el.parentElement.children].filter((c) => c.tagName === el.tagName && selName(c) === tag) : [];
+    const nth = same.length > 1 ? `:nth(${same.indexOf(el) + 1})` : '';
+    return `${parent}>${tag}${nth}`;
+  };
+  const selName = (el) => {
+    const cls = typeof el.className === 'string' && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : '';
+    return el.tagName.toLowerCase() + cls;
   };
   const styleSig = (el) => {
     const cs = getComputedStyle(el);
-    return [cs.outlineStyle, cs.outlineWidth, cs.outlineColor, cs.boxShadow, cs.backgroundColor, cs.borderColor, cs.textDecorationLine].join('|');
+    // 按"能不能被看见"归一化，不是按"属性字符串变没变"。
+    // outline-style: none 时 Chrome 聚焦仍会改 outline-color，那是看不见的变化——
+    // 拼进签名就会把 a{outline:none} 这种最典型的缺陷判成"焦点可见"（实测假绿）。
+    const outline =
+      cs.outlineStyle === 'none' || parseFloat(cs.outlineWidth) === 0
+        ? 'no-outline'
+        : `${cs.outlineStyle}/${cs.outlineWidth}/${cs.outlineColor}/${cs.outlineOffset}`;
+    const shadow = cs.boxShadow === 'none' ? 'no-shadow' : cs.boxShadow;
+    const transform = cs.transform === 'none' ? 'no-transform' : cs.transform;
+    return [outline, shadow, transform, cs.backgroundColor, cs.borderColor, cs.textDecorationLine].join('|');
   };
-  window.__fk = { sel, styleSig };
+  const scrollOwner = (el) => {
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      if (/(auto|scroll)/.test(getComputedStyle(n).overflowY)) return sel(n);
+    }
+    return null;
+  };
+  window.__fk = { sel, styleSig, scrollOwner };
 }
 
 // 真实键盘 Tab 走一圈：这是 :focus-visible 唯一会被触发的路径。
@@ -67,8 +93,9 @@ export async function openPage(browser, { url, state, viewport = '1280x800', tim
     await context.addInitScript(installHelpers);
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
-    const focusSamples = await tabSamples(page, tabMax);
-    return { page, focusSamples, context, viewport: `${width}x${height}` };
+    // 探针以回调交出：调用方必须先采未聚焦基线、再走 Tab。顺序反了（曾经就是这样）
+    // 会让基线带着焦点，焦点检查于是永远判绿。
+    return { page, context, viewport: `${width}x${height}`, focusProbe: () => tabSamples(page, tabMax) };
   } catch (err) {
     await context.close().catch(() => {});
     throw err;

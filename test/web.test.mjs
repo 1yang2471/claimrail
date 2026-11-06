@@ -61,7 +61,7 @@ test('报告里的红项直接点名动机缺陷', async () => {
     assert.equal(byId['scrollbar-clears-text'].ok, false);
     assert.match(byId['scrollbar-clears-text'].detail, /压住 1 处文本/);
     assert.equal(byId['bottom-not-covered'].ok, false);
-    assert.match(byId['bottom-not-covered'].detail, /滚动区域与固定条重叠/);
+    assert.match(byId['bottom-not-covered'].detail, /贴底的固定条/);
     assert.equal(byId['touch-targets-ok'].ok, false);
     assert.equal(byId['focus-visible-ok'].ok, null);
     assert.equal(byId['contrast-ok'].ok, true);
