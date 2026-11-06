@@ -104,7 +104,7 @@ forklight 不重写那份清单，把它当上游引用。我们的差异在两�
 | --- | --- | --- |
 | `ledger` | `record(forks)` / `read()` | schema 校验 + 版本 + 原子写；"禁止内联代码块"在这里 |
 | `cost` | `grade(Observation) → low \| high` | 纯函数，无 I/O；三输入 + null→high |
-| `evidence` | `verify(claim) → {ok, why}` | 按 kind 分派四档回验；时间戳新鲜度在这里 |
+| `evidence` | `verify(claim) → {ok, why}` | 按 kind 分派五档回验（repo/memory/render/precedent/web）；时间戳新鲜度与引文核实都在这里 |
 | `observe` | `observe(ctx) → Observation` | 唯一碰 git/依赖图/AST/渲染的地方；适配器落在这层 |
 | `gate` | `decide(ledger, grades, evidences) → block \| proceed \| halt` + 一屏渲染 | 呈现规则与阻塞规则都在这里 |
 | `memory` | `recordRejection(e)` / `rules()` / `invalidate(id)` | 两次升格 + 出处指针 + 可作废 |
@@ -147,14 +147,28 @@ forklight 不重写那份清单，把它当上游引用。我们的差异在两�
 
 `danger` 侧的现成接入点：工作区已有的破坏性操作守则（递归删除前 dry-run、路径展示、盘符根/系统目录硬拦截、`safe-remove.ps1`）作为 `irreversible` 的实现，不新写一套。
 
-### 证据四档
+### 证据五档（`precedent` 是盘问之后补入的一档，含一次排序纠正）
 
-顺序严格，够了就停：`repo → memory → render → web`。
+顺序：`repo → memory → render → precedent → web`，本地三档优先，够了就停。
 
-- `repo`：重读引用的 `file:line`，确认存在且确含声称的模式。
-- `memory`：确认 `log#n` / `rules#n` 存在。
+盘问阶段我把"外部调研"压到最后一档，理由是"好评率没有可核查量纲"。这个理由只对了一半，已在后续讨论中纠正：
+
+- `repo` 回答的是"这个库该怎么一致"，**回答不了"业界公认的好做法是什么"**；
+- 绿色项目没有仓库惯例可对齐，而"只对齐仓库既有水平"会把产出永久钉在平均值上；
+- 而"不许把最常见做法当好设计"这个主张，唯一的反作用力就来自仓库之外。
+
+所以 `precedent` 不是兜底档，是设计类任务在本地无依据时的**必走档**，且必须换成可核查的量：
+
+- `sources[]`：每条 `{url, quote}`，逐个回访须 200 且引文真出现在页面上；按注册域去重后 **≥3 个独立域名**（转载同一篇不算两票）。
+- 可选 `adoption: {repo, minStars}`：star 数从 `api.github.com` 读实测值，不接受任何转述。
+- **schema 端硬拦**：`ui-new` / `docs-new` / `api-design` 三类任务的证据若只给 `web`（单一网页转述），结构校验直接不过。设计决策不能靠一篇文章收场。
+
+其余四档维持原判：
+
+- `repo`：重读引用的 `file:line`，确认存在且确含声称的模式；引用本次刚写的行不算既有做法。
+- `memory`：只认 `log#n`，确认该行存在且内容与声称一致。
 - `render`：截图存在且 mtime 晚于最后一次相关代码改动，**并且同目录的度量报告里被断言的检查项必须严格为绿**。只有截图没有报告 = 看了图没判过，不成立；报告里全是不作数（null）= 采集器空转，也不成立。
-- `web`：回访 URL 返回 200 且内容含声称要点；默认需用户同意后才发请求（涉及项目名/内部信息）。
+- `web`：回访 URL 返回 200 且内容含声称要点；默认需用户同意后才发请求。
 
 `web` 排最后是因为它最慢、最不稳，且是唯一能编出"好评率"这种不存在度量的一档——在仓库里连被编造的机会都没有。
 

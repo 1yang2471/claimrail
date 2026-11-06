@@ -104,12 +104,14 @@ test('空格与中文文件名是合法路径，拒了只会逼人写假 ref', (
   );
 });
 
-test('web 证据必须给可回访 URL 和要点', () => {
-  assert.equal(
-    validateLedger(ledger({ forks: [fork({ evidence: { kind: 'web', ref: 'https://linear.app/docs', asserts: ['composer'] } })] })).ok,
-    true,
-  );
-  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'web', ref: 'linear 说的' } })] })).ok, false);
+test('web 证据必须给可回访 URL 和要点；设计类任务改用 precedent', () => {
+  const ok = (task_class, evidence) => validateLedger({ schema: 1, task_class, forks: [fork({ evidence })] }).ok;
+  assert.equal(ok('refactor', { kind: 'web', ref: 'https://linear.app/docs', asserts: ['composer spacing'] }), true);
+  assert.equal(ok('refactor', { kind: 'web', ref: 'linear 说的', asserts: ['composer spacing'] }), false);
+  assert.equal(ok('refactor', { kind: 'web', ref: 'https://x.dev' }), false, '不给要点就无法回验');
+
+  // ui-new 是设计类：单一网页转述不算依据（fixture 默认 task_class 就是它）
+  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'web', ref: 'https://x.dev', asserts: ['composer spacing'] } })] })).ok, false);
 });
 
 test('未知 kind 直接拒', () => {

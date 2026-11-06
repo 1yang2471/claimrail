@@ -33,6 +33,10 @@
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |
 | 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（真站实测：三个 index.html 收敛同名，前一份证据被后一份覆盖） |
 
+| 设计类任务不许拿"一篇文章这么说"当好设计依据 | `src/schema.mjs` 的 `evidence.design-needs-precedent`：`ui-new`/`docs-new`/`api-design` 的 `kind: 'web'` 直接拒；必须给 `precedent`（`test/precedent.test.mjs`，变异验证：改成 `if (false)` → 红） |
+| "业界收敛"必须可回访 | `src/evidence.mjs` 的 `verifyPrecedent`：逐个 URL 回访 200 + 引文出现在页面原文 + 按注册域去重 ≥3（`MIN_SOURCES`，变异验证：降到 1 → 红 3 条）；`adoption` 的 star 数从 GitHub API 读，不达门槛或返回非 JSON 都判失败 |
+| 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的 `field.unknown` 与 `evidence.field.unknown`：只认白名单键。`confidence`/`rationale`/`options_cost` 都进不去 |
+
 ## 已知的检出边界（别把"未判"当"没问题"）
 
 - `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率极低（真站 7/111）。这类页面对比度没报红不代表合格，是**判不了**；要判得靠截图像素采样（v2）。

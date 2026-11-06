@@ -1,11 +1,12 @@
 // 证据回验。这一层就是整个产品的主张所在：模型说"我验证过了"，只有这里能判断真假。
 // 所以每个 kind 都必须按"调用方在试图蒙混过关"来写，而不是按"调用方会老实填"。
 //
-// 四种编造方式，各自要有各自的拦法：
-//   repo   引用本次刚写下的代码，冒充"仓库里本来就有这个做法"
-//   memory 引用一条不存在（或已错位）的否决记录
-//   render 手写一张报告冒充判过；或拿旧图充新检查
-//   web    编一个 URL，或编一个"好评率高"这种没有量纲的数字
+// 五种编造方式，各自要有各自的拦法：
+//   repo      引用本次刚写下的代码，冒充"仓库里本来就有这个做法"
+//   memory    引用一条不存在（或已错位）的否决记录
+//   render    手写一张报告冒充判过；或拿旧图充新检查
+//   precedent 编"业界都这么做"：条数凑够但同域转载、引文那页上根本没有、采纳度张口就来
+//   web       编一个 URL，或编一个"好评率高"这种没有量纲的数字
 
 // 与 observe/geometry.mjs 的 CHECK_IDS 同集合。写两遍是有意的：evidence 不该依赖
 // 浏览器层，否则纯逻辑测试要拖进 Playwright。test/redteam.test.mjs 钉住两边一致。
@@ -43,10 +44,111 @@ function parseRepoRef(ref) {
 
 const basename = (ref) => String(ref).split(/[\\/]/).pop().replace(/\.png$/i, '');
 
+// 业界收敛（precedent）。这一档存在理由是产品的核心主张：AI 不该把"自己见得最多的做法"
+// 当成"人类最喜欢的设计"。但它不能靠模型口头宣称——所以两个可核查条件：
+//   1. ≥MIN_SOURCES 个独立域名，每个都要回访 200 且原文里真的出现那句引文
+//   2. 可选采纳度：GitHub API 的 stargazers_count 是程序读来的数字，不是转述
+// 同一篇文章被三个博客转载不算三个来源：按注册域去重。
+const MIN_SOURCES = 3;
+const MIN_QUOTE = 12;
+
+const registrable = (url) => {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    const parts = host.split('.');
+    if (parts.length <= 2) return host;
+    // 两段公共后缀（co.uk / com.cn 之类）取三段，粗但够用
+    const tail = parts.slice(-2).join('.');
+    const twoLevel = ['co.uk', 'com.cn', 'co.jp', 'com.br', 'com.au', 'org.uk', 'ac.cn', 'ne.jp'];
+    return twoLevel.includes(tail) ? parts.slice(-3).join('.') : tail;
+  } catch {
+    return null;
+  }
+};
+
+const norm = (s) => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+
+async function verifyPrecedent(evidence, ctx) {
+  const sources = Array.isArray(evidence.sources) ? evidence.sources : [];
+  if (sources.length < MIN_SOURCES) return { ok: false, why: `业界收敛需要 ≥${MIN_SOURCES} 个独立来源，给了 ${sources.length} 个` };
+
+  const hosts = new Set();
+  const confirmed = [];
+  const problems = [];
+
+  for (const s of sources) {
+    const host = registrable(s.url);
+    if (!host) {
+      problems.push(`URL 不合法：${s.url}`);
+      continue;
+    }
+    hosts.add(host);
+
+    let res = null;
+    try {
+      res = await ctx.fetch(s.url);
+    } catch (err) {
+      problems.push(`${s.url} 回访失败：${err.message}`);
+      continue;
+    }
+    if (!res || res.status !== 200) {
+      problems.push(`${s.url} 回访 ${res?.status ?? '无响应'}`);
+      continue;
+    }
+    const hay = norm(res.text ?? '');
+    const needle = norm(s.quote);
+    if (needle.length < MIN_QUOTE) {
+      problems.push(`${s.url} 的引文太短，不足以证明它真的在说这件事`);
+      continue;
+    }
+    if (!hay.includes(needle)) {
+      problems.push(`${s.url} 里找不到那句引文`);
+      continue;
+    }
+    confirmed.push({ host, url: s.url });
+  }
+
+  const distinct = new Set(confirmed.map((c) => c.host));
+  if (distinct.size < MIN_SOURCES) {
+    return { ok: false, why: `只有 ${distinct.size} 个独立域名确认了该说法（需 ≥${MIN_SOURCES}）；问题：${problems.slice(0, 2).join('；') || '其余来源互相同域'}` };
+  }
+
+  if (evidence.adoption) {
+    const { repo, minStars } = evidence.adoption;
+    let res = null;
+    try {
+      res = await ctx.fetch(`https://api.github.com/repos/${String(repo).replace(/^\/+/, '')}`);
+    } catch (err) {
+      return { ok: false, why: `采纳度读不到（${repo}）：${err.message}` };
+    }
+    if (!res || res.status !== 200) return { ok: false, why: `采纳度读不到（${repo} → ${res?.status ?? '无响应'}）` };
+    let info;
+    try {
+      info = JSON.parse(res.text);
+    } catch {
+      return { ok: false, why: `采纳度返回的不是 JSON（${repo}）` };
+    }
+    const stars = Number(info?.stargazers_count);
+    if (!Number.isFinite(stars)) return { ok: false, why: `${repo} 没有 stargazers_count 字段，采纳度无从核实` };
+    if (stars < Number(minStars)) {
+      return { ok: false, why: `采纳度不达标：${repo} 实际 ${stars} star，声称门槛 ${minStars}` };
+    }
+    return { ok: true, why: `${distinct.size} 个独立域名引文核实 + ${repo} 实测 ${stars} star` };
+  }
+
+  return { ok: true, why: `${distinct.size} 个独立域名引文核实：${[...distinct].slice(0, 4).join('、')}` };
+}
+
 export async function verify(evidence, ctx) {
   if (!evidence) return { ok: false, why: 'evidence 为空' };
 
   const { kind, ref, asserts = [] } = evidence;
+
+  if (kind === 'precedent') {
+    if (!ctx.allowNet) return { ok: false, why: '未获同意，不得外发查询' };
+    if (!ctx.fetch) return { ok: false, why: '缺少回访能力，precedent 档无法核实' };
+    return verifyPrecedent(evidence, ctx);
+  }
 
   if (kind === 'repo') {
     const weak = assertShape(asserts);

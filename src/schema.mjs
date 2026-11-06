@@ -17,7 +17,7 @@ export const TASK_CLASSES = [
   'rename',
 ];
 
-export const EVIDENCE_KINDS = ['repo', 'memory', 'render', 'web'];
+export const EVIDENCE_KINDS = ['repo', 'memory', 'render', 'precedent', 'web'];
 
 // 允许空格与中文路径——"聊天 页面.tsx"这类文件真实存在，正则拒了它等于逼模型
 // 写一条假 ref 来凑数，那比误拦更糟。但禁止以 ./ 或 ../ 开头：render 的 ref 会被
@@ -39,6 +39,10 @@ const ASSERTS_REQUIRED = ['repo', 'render', 'web'];
 
 const MAX_TEXT = 120; // 一屏清单要三秒读完；800 字符的单行"清单"没人读
 
+// 设计类任务：产出形态由人的偏好决定，"最常见"不等于"最好"。
+// 这几类不允许用单一网页转述收场（见 checkFork 里的 design-needs-precedent）。
+export const DESIGN_CLASSES = ['ui-new', 'docs-new', 'api-design'];
+
 function badText(value) {
   if (typeof value !== 'string' || value.trim() === '') return '必须是非空单行文本';
   if (value.includes('```')) return '禁止内联代码块';
@@ -47,7 +51,37 @@ function badText(value) {
   return null;
 }
 
-function checkFork(fork, i) {
+// 业界收敛的形状校验。真正能不能算"收敛"由 evidence.verify 回访决定，
+// 这里只保证申报本身是可核查的：≥3 个来源、每条带引文、采纳度给门槛。
+function checkPrecedent(evidence) {
+  const errs = [];
+  const sources = evidence.sources;
+  if (!Array.isArray(sources) || sources.length < 3) {
+    errs.push(['precedent.sources', `precedent 需要 ≥3 个来源（程序会按域名去重后核实），给了 ${Array.isArray(sources) ? sources.length : '无'}`]);
+    return errs;
+  }
+  for (const [i, s] of sources.entries()) {
+    if (typeof s !== 'object' || s === null) {
+      errs.push([`precedent.sources[${i}]`, '来源必须是 { url, quote }']);
+      continue;
+    }
+    if (!/^https?:\/\/\S+$/.test(String(s.url ?? ''))) errs.push([`precedent.sources[${i}].url`, '来源 URL 不合法']);
+    if (typeof s.quote !== 'string' || s.quote.trim().length < 12) {
+      errs.push([`precedent.sources[${i}].quote`, '引文少于 12 字符，无法证明那页真的在说这件事']);
+    }
+  }
+  if (evidence.adoption !== undefined) {
+    const a = evidence.adoption;
+    if (typeof a !== 'object' || a === null || typeof a.repo !== 'string' || !Number.isFinite(Number(a.minStars))) {
+      errs.push(['precedent.adoption', 'adoption 需要 { repo: "owner/name", minStars: 数字 }，star 数由 GitHub API 实测']);
+    } else if (Number(a.minStars) < 1) {
+      errs.push(['precedent.adoption.minStars', '门槛必须 ≥1，填 0 等于没核实']);
+    }
+  }
+  return errs;
+}
+
+function checkFork(fork, i, taskClass) {
   const errors = [];
   const at = (rule, msg) => errors.push({ path: `forks[${i}]`, rule, msg });
 
@@ -102,18 +136,32 @@ function checkFork(fork, i) {
   } else if (typeof evidence !== 'object' || evidence === null) {
     at('evidence.shape', 'evidence 必须是 null 或对象');
   } else {
+    const ALLOWED_EV = new Set(['kind', 'ref', 'asserts', 'sources', 'adoption']);
+    for (const key of Object.keys(evidence)) {
+      if (!ALLOWED_EV.has(key)) at('evidence.field.unknown', `evidence 里的未知字段 "${key}" 不被接受：只认 kind/ref/asserts/sources/adoption`);
+    }
+    // 设计类分叉不许靠单一网页转述收场。这一条是产品主张的直接落实：
+    // "业界公认的好做法"必须是多来源收敛，而不是"我搜到一篇文章这么说"。
+    if (DESIGN_CLASSES.includes(taskClass) && evidence.kind === 'web') {
+      at('evidence.design-needs-precedent', `${taskClass} 是设计类任务：单一网页转述不算依据，要么给仓库既有做法（repo），要么给业界收敛（precedent，≥3 独立域名）`);
+    }
     if (!EVIDENCE_KINDS.includes(evidence.kind)) {
       at('evidence.kind', `kind 必须是 ${EVIDENCE_KINDS.join('|')}`);
+    } else if (evidence.kind === 'precedent') {
+      const errs = checkPrecedent(evidence);
+      for (const [rule, msg] of errs) at(rule, msg);
     } else if (!REF_PATTERNS[evidence.kind].test(String(evidence.ref ?? ''))) {
       at('evidence.ref', `${evidence.kind} 的 ref 格式不符：${evidence.ref ?? '(空)'}`);
     }
-    const need = ASSERTS_REQUIRED.includes(evidence.kind);
-    if (!Array.isArray(evidence.asserts) || evidence.asserts.length === 0) {
-      if (need) at('evidence.asserts', `${evidence.kind} 证据必须写明声称要点，否则无从回验`);
-    } else {
-      for (const [n, a] of evidence.asserts.entries()) {
-        const err = badText(a);
-        if (err) at(`evidence.asserts[${n}]`, err);
+    if (evidence.kind !== 'precedent') {
+      const need = ASSERTS_REQUIRED.includes(evidence.kind);
+      if (!Array.isArray(evidence.asserts) || evidence.asserts.length === 0) {
+        if (need) at('evidence.asserts', `${evidence.kind} 证据必须写明声称要点，否则无从回验`);
+      } else {
+        for (const [n, a] of evidence.asserts.entries()) {
+          const err = badText(a);
+          if (err) at(`evidence.asserts[${n}]`, err);
+        }
       }
     }
   }
@@ -160,7 +208,7 @@ export function validateLedger(ledger) {
     if (err) top('no_fork_reason', `申报无分叉时必须写明原因：${err ?? ''}`);
   }
 
-  for (const [i, fork] of ledger.forks.entries()) errors.push(...checkFork(fork, i));
+  for (const [i, fork] of ledger.forks.entries()) errors.push(...checkFork(fork, i, ledger.task_class));
 
   return { ok: errors.length === 0, errors };
 }
