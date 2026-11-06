@@ -23,16 +23,35 @@ export function collectInPage() {
     const s = getComputedStyle(el);
     return s.display !== 'none' && s.visibility !== 'hidden' && Number(s.opacity || 1) !== 0;
   };
+  // 背景要按层合成，不能只取第一个非透明值。
+  // 真站实测教训：`code` 用 rgba(0,0,0,.05) 铺在灰底上，旧实现把 5% 透明当成纯黑，
+  // 于是 103 处文本里 76 处报对比度不足，最低 1.53——全是假红。
+  // 另外两条纪律：碰到 background-image/渐变就返回 null（图片无法采样），
+  // 最底层仍半透明也返回 null（真实背景未知，不许兜底成白色）。
   const bgOf = (el) => {
+    const layers = [];
     for (let n = el; n; n = n.parentElement) {
-      const c = getComputedStyle(n).backgroundColor;
-      const m = /rgba?\(([^)]+)\)/.exec(c);
+      const cs = getComputedStyle(n);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
+      const m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor);
       if (!m) continue;
-      const parts = m[1].split(/[,\s/]+/).filter(Boolean);
-      if (parts.length >= 4 && Number(parts[3]) === 0) continue; // 全透明层不算背景
-      return c;
+      const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+      if (p.length < 3 || p.slice(0, 3).some(Number.isNaN)) continue;
+      const a = p.length >= 4 ? p[3] : 1;
+      if (a === 0) continue;
+      layers.push({ rgb: p.slice(0, 3), a });
+      if (a === 1) break; // 已经不透明，下面再有什么都看不见
     }
-    return 'rgb(255, 255, 255)';
+    if (!layers.length) return null;
+    const bottom = layers[layers.length - 1];
+    if (bottom.a < 1) return null;
+
+    let acc = bottom.rgb;
+    for (let i = layers.length - 2; i >= 0; i--) {
+      const L = layers[i];
+      acc = [0, 1, 2].map((k) => Math.round(L.a * L.rgb[k] + (1 - L.a) * acc[k]));
+    }
+    return `rgb(${acc[0]}, ${acc[1]}, ${acc[2]})`;
   };
   const cap = (list, n) => (list.length > n ? list.slice(0, n) : list);
 
@@ -100,10 +119,14 @@ export function collectInPage() {
     if (!shown(el)) continue;
     const r = box(el);
     if (r.w <= 0 || r.h <= 0) continue;
+    const s = getComputedStyle(el);
     const focusable = !el.disabled && el.tabIndex >= 0 && el.getAttribute('aria-hidden') !== 'true';
+    // 行内文字链接不是控件。44px 是给按钮/输入框的标准，套在正文链接上会一次性
+    // 造出十几个假红（真站上那 16 处里就有语言切换和正文链接）
+    const inline = /^(inline|contents)/.test(s.display) && !['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(el.tagName);
     interactiveTotal += 1;
     if (interactive.length >= 120) continue;
-    interactive.push({ selector: sel(el), rect: r, focusable, baseStyle: fk.styleSig(el), hasVisibleFocus: null });
+    interactive.push({ selector: sel(el), rect: r, focusable, inline, baseStyle: fk.styleSig(el), hasVisibleFocus: null });
   }
 
   return {

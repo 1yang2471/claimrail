@@ -25,6 +25,19 @@
 | 焦点签名按"能不能被看见"归一化 | `src/observe/driver.mjs` 的 `styleSig`：`outline-style:none` 或宽度为 0 时丢弃 outline 颜色/宽度。变异验证：取消归一化 → `test/browser.test.mjs` 红（`a{outline:none}` 又被判成"焦点可见"） |
 | 先采基线、再走 Tab，顺序不许倒 | `src/observe/driver.mjs` 交出 `focusProbe` 回调，`renderPage` 在 `evaluate(collectInPage)` 之后才调用它。倒过来会让"未聚焦基线"带着焦点，焦点检查一路判绿 |
 | 真浏览器路径必须有自动化覆盖 | `test/browser.test.mjs`（真 Chromium 打开对照页；没装 Playwright 则整文件 skip，不伪绿） |
+| 副作用扫描不许扫到规则表和测试数据 | `src/observe/effects.mjs` 的 `addedCode` 排除 test/fixtures/docs/规则表自身 |
+| 前端检查默认跑多视口 | `src/cli.mjs` 的 `web` 默认 `390x700,1280x800`。注意：`--viewport` 可以覆盖成单个，所以这条是默认值约束，不是硬拦 |
+| 偏好 log 只追加，规则是缓存 | `src/store.mjs` 坏行直接报错（行号是引用坐标，跳过一行会让所有 `log#n` 错位） |
+| 采不到真值时不许兜底猜测 | `web.mjs` 的 `bgOf`：渐变/图片背景、最底层半透明一律 `null`（真站实测：兜底白色一次造 83 处假红） |
+| 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`；背景自己半透明则未知（真站实测：`rgba(0,0,0,.05)` 被当纯黑，76/103 假红） |
+| 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |
+| 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（真站实测：三个 index.html 收敛同名，前一份证据被后一份覆盖） |
+
+## 已知的检出边界（别把"未判"当"没问题"）
+
+- `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率极低（真站 7/111）。这类页面对比度没报红不代表合格，是**判不了**；要判得靠截图像素采样（v2）。
+- 非 git 目录里三个代价输入全部取不到 → 一切按 high。forklight 在 git 之外基本失明，这是边界不是特性。
+- 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。
 
 ## 改这些代码时的硬规矩
 
@@ -32,9 +45,7 @@
 2. **加一道拦之后要做变异验证**：把那处守卫改坏，测试必须变红；改回来必须绿。从来没报过错的守卫等于没加。已验证：`mapGrepExit` 的 `unknown`、`ls-files -z`（承重是 `-z`，`core.quotepath=false` 只是冗余）、未跟踪并入扫描、log 行号自校验、先干后证、header fail-closed、自供字段拒收、逐候选真算、焦点签名归一化。
 3. **别在带未提交改动的文件上用 `git checkout --` / `git clean`**：这一条是踩过代价的——用 `git checkout` 复原一个被 sed 改过的文件时，把同一文件里未提交的正经改动一起打回了上个提交，靠重写才恢复。要复原就先 `cp` 出来再 `cp` 回去。
 4. **变异要先确认它真的生效**：有一次 sed 的匹配串没命中，测试"照样绿"被误当成守卫有效。先 grep 出那一行、改完看 diff、再跑，才叫验证。
-| 副作用扫描不许扫到规则表和测试数据 | `src/observe/effects.mjs` 的 `addedCode` 排除 test/fixtures/docs/规则表自身 |
-| 前端检查默认跑多视口 | `src/cli.mjs` 的 `web` 默认 `390x700,1280x800`。注意：`--viewport` 可以覆盖成单个，所以这条是默认值约束，不是硬拦 |
-| 偏好 log 只追加，规则是缓存 | `src/store.mjs` 坏行直接报错（行号是引用坐标，跳过一行会让所有 `log#n` 错位） |
+5. **文档改动也要看渲染结构**：往 markdown 表格里插段落时，锚点落在表中途会把后续行甩到别的章节下面（本轮真实发生过一次，靠复读才发现）。
 
 ## 为什么这些规则长这样
 

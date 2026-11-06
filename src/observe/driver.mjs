@@ -1,6 +1,8 @@
 // 唯一碰浏览器的地方，刻意做薄：判定在 geometry、合并逻辑在 focus、采集在 web，
 // 那三层都已有测试。驱动只负责把页面开起来、把真实键盘事件发出去。
 
+import { createHash } from 'node:crypto';
+
 let cached;
 
 export async function loadPlaywright() {
@@ -102,7 +104,12 @@ export async function openPage(browser, { url, state, viewport = '1280x800', tim
   }
 }
 
+// 名字必须带 URL 指纹。曾经只取末段：/chat、/chat/、/chat.html 以及不同目录下的同名
+// index.html 全收敛成同一个文件名——多页跑一次就互相覆盖，前一份证据被后一份偷换。
+// 这不是洁癖问题：覆盖掉的报告仍然能被台账引用。
 export const nameFromUrl = (url) => {
   const tail = String(url).split(/[?#]/)[0].split(/[\\/]/).filter(Boolean).pop() ?? 'page';
-  return tail.replace(/\.[a-z0-9]+$/i, '').replace(/[^-\w]/g, '_') || 'page';
+  const slug = tail.replace(/\.[a-z0-9]+$/i, '').replace(/[^-\w]/g, '_') || 'page';
+  const digest = createHash('sha1').update(String(url)).digest('base64url').slice(0, 8);
+  return `${slug}-${digest}`;
 };

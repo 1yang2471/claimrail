@@ -24,21 +24,28 @@ export const CHECK_IDS = [
   'bottom-not-covered',
 ];
 
-function parseColor(input) {
+// 返回 { rgb:[r,g,b], a } 而不是丢掉了 alpha：
+// 半透明的前景或背景都必须先合成再算比值，否则 rgba(0,0,0,.05) 会被当成纯黑。
+function parseRgba(input) {
   if (typeof input !== 'string') return null;
   const s = input.trim().toLowerCase();
-  if (s.includes('%')) return null; // 百分号色值按 0-255 算会得出错误比值，宁可不作数
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(s);
+  if (s.includes('%')) return null; // 百分号色值不硬算，宁可不作数
+  if (s === 'transparent') return { rgb: [0, 0, 0], a: 0 };
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(s);
   if (hex) {
-    const h = hex[1].length === 3 ? [...hex[1]].map((c) => c + c).join('') : hex[1];
-    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    let h = hex[1];
+    if (h.length === 3) h = [...h].map((c) => c + c).join('') + 'ff';
+    if (h.length === 6) h += 'ff';
+    return { rgb: [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)), a: parseInt(h.slice(6, 8), 16) / 255 };
   }
   const rgb = /rgba?\(([^)]+)\)/.exec(s);
   if (!rgb) return null;
   const parts = rgb[1].split(/[,\s/]+/).filter(Boolean).map(Number);
   if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
-  return parts.slice(0, 3);
+  return { rgb: parts.slice(0, 3), a: parts.length >= 4 ? parts[3] : 1 };
 }
+
+const over = (fg, bg) => [0, 1, 2].map((k) => Math.round(fg.a * fg.rgb[k] + (1 - fg.a) * bg.rgb[k]));
 
 const relLum = ([r, g, b]) => {
   const f = (v) => {
@@ -49,10 +56,12 @@ const relLum = ([r, g, b]) => {
 };
 
 export function contrastRatio(fg, bg) {
-  const a = parseColor(fg);
-  const b = parseColor(bg);
-  if (!a || !b) return null;
-  const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+  const f = parseRgba(fg);
+  const b = parseRgba(bg);
+  if (!f || !b) return null;
+  if (b.a < 1) return null; // 背景本身还不透明，真实底色未知
+  const solid = f.a < 1 ? { rgb: over(f, b), a: 1 } : f;
+  const [hi, lo] = [relLum(solid.rgb), relLum(b.rgb)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
 }
 
@@ -106,34 +115,42 @@ export function scrollbarClearsText(page) {
 }
 
 export function touchTargetsOk(page) {
-  if (!nonEmpty(page.interactive)) return skip('touch-targets-ok', '没采到可交互元素');
+  // 行内文字链接不参与：这条标准是给控件的，不是给正文里的 a 标签的
+  const controls = (page.interactive ?? []).filter((el) => !el.inline);
+  if (!controls.length) return skip('touch-targets-ok', '没采到可交互控件（行内链接不参与本项）');
   if (truncated(page, 'interactive')) return skip('touch-targets-ok', `可交互元素采集被截断（${page.raw.interactive} > ${page.interactive.length}），判不了`);
 
-  const small = page.interactive.filter((el) => {
+  const small = controls.filter((el) => {
     const r = box(el.rect);
     if (r.w <= 0 || r.h <= 0) return false;
     return Math.min(r.w, r.h) < TOUCH_MIN;
   });
-  if (!small.length) return pass('touch-targets-ok', `已核 ${page.interactive.length} 个`);
-  return fail('touch-targets-ok', `${small.length} 个可点元素短边不足 ${TOUCH_MIN}px：${list(small)}`);
+  if (!small.length) return pass('touch-targets-ok', `已核 ${controls.length} 个控件`);
+  return fail('touch-targets-ok', `${small.length} 个可点控件短边不足 ${TOUCH_MIN}px：${list(small)}`);
 }
 
 export function contrastOk(page) {
   if (truncated(page, 'texts')) return skip('contrast-ok', `文本采集被截断（${page.raw.texts} > ${page.texts.length}），判不了`);
   const bad = [];
   let measured = 0;
+  let unmeasurable = 0;
   for (const t of page.texts ?? []) {
     const ratio = contrastRatio(t.color, t.background);
-    if (ratio === null) continue;
+    if (ratio === null) {
+      // 背景来自渐变/图片，或色值写法不认识：这一处没判过，既不算绿也不算红
+      unmeasurable += 1;
+      continue;
+    }
     measured += 1;
     const size = t.fontSize ?? 16;
     const large = size >= LARGE_PX || (size >= LARGE_BOLD_PX && Boolean(t.bold));
     if (ratio < (large ? CONTRAST_LARGE : CONTRAST_NORMAL)) bad.push({ ...t, ratio });
   }
-  if (measured === 0) return skip('contrast-ok', '没有可解析的正文颜色对');
-  if (!bad.length) return pass('contrast-ok', `已核 ${measured} 处`);
+  if (measured === 0) return skip('contrast-ok', `${unmeasurable} 处文本采不到实色背景（渐变或图片），判不了`);
+  const note = unmeasurable ? `，另有 ${unmeasurable} 处采不到实色背景未判` : '';
+  if (!bad.length) return pass('contrast-ok', `已核 ${measured} 处${note}`);
   const worst = bad.reduce((a, b) => (b.ratio < a.ratio ? b : a));
-  return fail('contrast-ok', `${bad.length} 处正文对比度不足 4.5:1，最低 ${worst.ratio.toFixed(2)}（${worst.selector}）`);
+  return fail('contrast-ok', `${bad.length}/${measured} 处正文对比度不足 4.5:1，最低 ${worst.ratio.toFixed(2)}（${worst.selector}）${note}`);
 }
 
 export function focusVisibleOk(page) {

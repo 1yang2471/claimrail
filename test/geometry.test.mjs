@@ -267,6 +267,67 @@ test('焦点只探到一部分时判"不作数"，覆盖率不足不是全绿', 
   assert.match(r.detail, /只覆盖 1\/2/);
 });
 
+test('采不到实色背景（渐变/图片）就未判，绝不许产生红', () => {
+  // 真站实测教训：白字药丸标签的可见底色来自 background-image，
+  // 采样 backgroundColor 得到透明，旧实现兜底成白色 → 83 处 1.00 假红
+  const allUnknown = { texts: [{ selector: '.pill', color: '#ffffff', background: null }] };
+  assert.equal(contrastOk(allUnknown).ok, null);
+  assert.match(contrastOk(allUnknown).detail, /渐变或图片/);
+
+  const mixed = {
+    texts: [
+      { selector: '.a', color: '#111111', background: '#ffffff' },
+      { selector: '.b', color: '#111111', background: '#ffffff' },
+      { selector: '.pill', color: '#ffffff', background: null },
+    ],
+  };
+  assert.match(contrastOk(mixed).detail, /已核 2 处，另有 1 处采不到实色背景未判/);
+
+  const oneBad = {
+    texts: [
+      { selector: '.a', color: '#888888', background: '#ffffff', fontSize: 13 },
+      { selector: '.pill', color: '#ffffff', background: null },
+    ],
+  };
+  const r = contrastOk(oneBad);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /1\/1 处/);
+});
+
+test('正文里的行内链接不按控件标准考核', () => {
+  // 真站实测教训：语言切换与正文链接被算成"触摸目标过小"，一次造出十几个假红
+  const page = {
+    interactive: [
+      { selector: '.doc-link', rect: { w: 60, h: 18 }, inline: true },
+      { selector: '.lang-zh', rect: { w: 34, h: 20 }, inline: true },
+      { selector: '#send', rect: { w: 44, h: 44 } },
+    ],
+  };
+  const r = touchTargetsOk(page);
+  assert.equal(r.ok, true);
+  assert.match(r.detail, /已核 1 个控件/);
+
+  const onlyInline = { interactive: [{ selector: '.link', rect: { w: 40, h: 16 }, inline: true }] };
+  assert.equal(touchTargetsOk(onlyInline).ok, null);
+});
+test('半透明必须合成后再算，不许把 5% 黑当成纯黑', () => {
+  // 真站实测的假红形状：code 元素背景 rgba(0,0,0,.05) 铺在白卡上
+  const composited = 'rgb(242, 242, 242)';
+  assert.ok(contrastRatio('rgb(28, 28, 28)', composited) > 12);
+  assert.equal(contrastRatio('rgb(28, 28, 28)', 'rgba(0, 0, 0, 0.05)'), null, '背景自己半透明 → 未知，不许硬算');
+
+  // 50% 黑压在白上 = rgb(128,128,128) → 约 3.95，确实不足 4.5，该判红
+  const r = contrastOk({ texts: [{ selector: '.ghost', color: 'rgba(0,0,0,0.5)', background: 'rgb(255,255,255)', fontSize: 14 }] });
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /3\.9\d/);
+
+  // #767676 带 alpha 0x80（=128/255）压白 → 合成值要按算式给，别写死
+  const half = 0x80 / 255;
+  const comp = Math.round(half * 0x76 + (1 - half) * 255);
+  assert.ok(Math.abs(contrastRatio('#76767680', '#ffffff') - contrastRatio(`rgb(${comp},${comp},${comp})`, '#ffffff')) < 1e-9);
+  assert.notEqual(contrastRatio('#76767680', '#ffffff'), contrastRatio('#767676', '#ffffff'), '忽略 alpha 就会算出这个错值');
+});
+
 test('百分号色值不作数，不按 0-255 硬算', () => {
   assert.equal(contrastRatio('rgb(50%, 0%, 0%)', '#fff'), null);
   assert.equal(contrastOk({ texts: [{ selector: '.x', color: 'rgb(50%, 0%, 0%)', background: 'rgb(255,255,255)' }] }).ok, null);
