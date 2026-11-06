@@ -58,11 +58,42 @@ export async function diffAgainstHead(cwd) {
   return r.code === 0 ? r.stdout : null;
 }
 
+// baseline 由 init 记录。没有它，"先把改动 commit 掉再 check"就能让
+// `git diff HEAD` 输出空串，副作用扫描与档位计算双双失明——审查报告点名的绕道之二。
+export async function resolveRef(cwd, ref) {
+  if (!ref) return null;
+  const r = await gitRaw(['rev-parse', '--verify', `${ref}^{commit}`], cwd);
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+export async function diffSince(cwd, base) {
+  const args = base ? ['diff', base, '--no-color'] : ['diff', 'HEAD', '--no-color'];
+  const r = await gitRaw(args, cwd);
+  return r.code === 0 || r.code === 1 ? r.stdout : null;
+}
+
+// 纯 rename / copy 在 diff 里可能一行内容都不带（similarity 100%）。
+// 把 docs/ 里的删库脚本搬进 src/ 就该被当成"开始会被执行的东西"来扫，
+// 所以这些落地路径的全文要并进扫描对象。是否豁免交给 effects 的 ignore 判定。
+async function renamedTargets(cwd, base) {
+  const args = ['diff', '--name-status', '-M', '-C', base ?? 'HEAD'];
+  const r = await gitRaw(args, cwd);
+  if (r.code !== 0 && r.code !== 1) return [];
+  const out = [];
+  for (const line of r.stdout.split('\n')) {
+    const m = /^(R|C)\d*\t(.+?)\t(.+)$/.exec(line.trim());
+    if (m) out.push(toPosix(m[3]));
+  }
+  return [...new Set(out)];
+}
+
 // -U0 只要变更行，行号精确；未跟踪文件不进 diff，必须单列。
-export async function changedLines(cwd) {
-  const [diffRes, statusRes] = await Promise.all([
-    gitRaw(['diff', 'HEAD', '--no-color', '-U0'], cwd),
+export async function changedLines(cwd, base = null) {
+  const diffArgs = base ? ['diff', base, '--no-color', '-U0'] : ['diff', 'HEAD', '--no-color', '-U0'];
+  const [diffRes, statusRes, renames] = await Promise.all([
+    gitRaw(diffArgs, cwd),
     gitRaw(['status', '--porcelain=v1', '-z', '--untracked-files=all'], cwd),
+    renamedTargets(cwd, base),
   ]);
   if (diffRes.code !== 0 && diffRes.code !== 1) return null;
   if (statusRes.code !== 0) return null;
@@ -71,9 +102,9 @@ export async function changedLines(cwd) {
   if (diffRes.code === 0 || diffRes.stdout) {
     let file = null;
     for (const line of diffRes.stdout.split(/\r?\n/)) {
-      const h = /^diff --git a\/.+? b\/(.+)$/.exec(line);
+      const h = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
       if (h) {
-        file = h[1];
+        file = h[2];
         continue;
       }
       const at = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
@@ -86,7 +117,7 @@ export async function changedLines(cwd) {
     }
   }
 
-  // 未跟踪：新写的文件根本没进 diff，曾经因此既扫不到副作用、也不推后时间戳
+  // 未跟踪：新写的文件根本没进 diff
   const untracked = [];
   for (const entry of splitZ(statusRes.stdout)) {
     if (!entry.startsWith('??')) continue;
@@ -94,7 +125,7 @@ export async function changedLines(cwd) {
     if (p) untracked.push(p);
   }
 
-  return { ranges, untracked };
+  return { ranges, untracked, renamed: renames };
 }
 
 export const isChangedLine = (changed, file, from, to) => {
@@ -114,7 +145,9 @@ const MAX_SCAN_BYTES = 4 * 1024 * 1024;
 export function worktreeScanText(diffText, changed, cwd) {
   let text = String(diffText ?? '');
   let budget = MAX_SCAN_BYTES;
-  for (const p of changed?.untracked ?? []) {
+  // 未跟踪的新文件 + 纯 rename/copy 的落地文件：两者都不带在 diff 的新增行里，
+  // 却都是真正会被执行的东西
+  for (const p of [...(changed?.untracked ?? []), ...(changed?.renamed ?? [])]) {
     if (budget <= 0) break;
     try {
       const body = readFileSync(join(cwd, p), 'utf8').slice(0, budget);

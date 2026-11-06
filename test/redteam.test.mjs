@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile, readFile, mkdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { check, init, recordCmd, invalidateCmd, rulesCmd } from '../src/cli.mjs';
 
@@ -190,6 +191,70 @@ test('规则四的代价由程序逐候选算：选更贵的那个照样被拦�
   });
 });
 
+const here = dirname(fileURLToPath(import.meta.url));
+
+// 素材取自仓库自带的 test/effects.test.mjs（里面本来就有那些命令形状的用例文本），
+// 测试代码自己一个新造危险命令字符串都不写，断言只认 kind 名。
+const dangerMaterial = async (dir, rel) => {
+  const { cp } = await import('node:fs/promises');
+  await cp(join(here, 'effects.test.mjs'), join(dir, rel));
+};
+
+test('绕道洞一：先把改动 commit 掉再 check，副作用照样看得见', async () => {
+  await withRepo(async (dir) => {
+    await dangerMaterial(dir, 'src/helper.mjs');
+    await g(dir, ['add', '-A']);
+    await g(dir, ['commit', '-qm', '已经提交，工作区干净']);
+
+    await ledger(dir, [fork({ target: { file: 'src/helper.mjs', symbol: 'helper' } })]);
+    const r = await check({ cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /recursive-delete/, r.text);
+  });
+});
+
+test('绕道洞二：纯 rename（相对起点只有一行 rename，无内容行）也要扫落地文件', async () => {
+  // 关键顺序：危险文件必须在 baseline 之前就存在并已提交。
+  // 否则相对起点它算"新增文件"，diff 自带全文，这条用例就什么都没测到（我第一版就是这样）。
+  const dir = await mkdtemp(join(tmpdir(), 'fk-ren-'));
+  try {
+    g(dir, ['init', '-q']);
+    g(dir, ['config', 'user.email', 't@t']);
+    g(dir, ['config', 'user.name', 't']);
+    await mkdir(join(dir, 'docs'), { recursive: true });
+    await mkdir(join(dir, 'src'), { recursive: true });
+    await writeFile(join(dir, 'src/base.mjs'), 'export const a = 1;\n');
+    await dangerMaterial(dir, join('docs', 'notes-copy.mjs'));
+    await g(dir, ['add', '-A']);
+    await g(dir, ['commit', '-qm', 'docs 里的素材早于起点']);
+
+    await init({ cwd: dir }); // baseline = 现在，之后只有 mv
+
+    await g(dir, ['mv', 'docs/notes-copy.mjs', 'src/notes-copy.mjs']);
+    await g(dir, ['commit', '-qm', '搬进执行区']);
+
+    // 先确认这个 diff 里真的只有 rename、没有内容行
+    const raw = g(dir, ['diff', (await readFile(join(dir, '.forklight', 'baseline'), 'utf8')).trim(), '--no-color']);
+    assert.match(raw, /rename from docs\/notes-copy\.mjs/, raw.slice(0, 400));
+    assert.equal(raw.includes('+rm -rf'), false, 'diff 里居然带了内容行，这条用例测不到纯 rename');
+
+    await ledger(dir, [fork({ target: { file: 'src/notes-copy.mjs', symbol: 'nothing' } })]);
+    const r = await check({ cwd: dir });
+    assert.match(r.text, /recursive-delete/, r.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('没有 baseline 时不许静默缩小扫描范围，要当场说明', async () => {
+  await withRepo(async (dir) => {
+    const { rm: rmf } = await import('node:fs/promises');
+    await rmf(join(dir, '.forklight', 'baseline'), { force: true });
+    await ledger(dir, [], { no_fork_reason: '本次只动了 baseline 文件，没有设计分叉' });
+    const r = await check({ cwd: dir, diffText: null });
+    assert.match(r.text, /没有 baseline/, r.text);
+  });
+});
 test('log 被删一行：所有既有引用当场报错，不静默改指', async () => {
   await withRepo(async (dir) => {
     await recordCmd({ cwd: dir, key: 'k1', what: '第一条原文' });

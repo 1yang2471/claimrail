@@ -10,12 +10,30 @@ import { grade } from './cost.mjs';
 import { verifyAll } from './evidence.mjs';
 import { enrich, decide, render } from './gate.mjs';
 import { observe, whyUnknown } from './observe/index.mjs';
-import { newestTrackedMtime, diffAgainstHead, changedLines, isChangedLine } from './observe/git.mjs';
+import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince } from './observe/git.mjs';
 import { renderPage } from './observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from './observe/driver.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
 
 export const LEDGER_PATH = join('.forklight', 'decisions.json');
+const BASELINE_PATH = join('.forklight', 'baseline');
+
+// init 记下 HEAD 作为起点。没有它，"先把改动 commit 掉再 check"就能让
+// `git diff HEAD` 输出空串，副作用扫描与档位计算一起失明。
+async function writeBaseline(cwd) {
+  const sha = await resolveRef(cwd, 'HEAD');
+  await writeFile(join(cwd, BASELINE_PATH), `${sha ?? ''}\n`, 'utf8');
+  return sha;
+}
+
+async function readBaseline(cwd) {
+  try {
+    const sha = (await readFile(join(cwd, BASELINE_PATH), 'utf8')).trim();
+    return sha ? await resolveRef(cwd, sha) : null;
+  } catch {
+    return null;
+  }
+}
 
 const NOTICE = `数据去向：
   .forklight/decisions.json  进 git（它是给你 review 的东西）
@@ -48,7 +66,20 @@ export async function init({ cwd = process.cwd() } = {}) {
   const add = ['memory/', '.forklight/shots/', '*.png'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
-  return { code: 0, text: `${created ? '已建' : '已存在，不动'} ${LEDGER_PATH}\n补进 .gitignore：${add.join('、') || '（无新增）'}\n\n${NOTICE}` };
+  // baseline 只在没有的时候写：重复 init 不许把起点往前推，那等于把已提交的改动洗白
+  const hasBase = existsSync(join(cwd, BASELINE_PATH));
+  const base = hasBase ? await readBaseline(cwd) : await writeBaseline(cwd);
+
+  return {
+    code: 0,
+    text: [
+      `${created ? '已建' : '已存在，不动'} ${LEDGER_PATH}`,
+      `补进 .gitignore：${add.join('、') || '（无新增）'}`,
+      base ? `起点记在 ${BASELINE_PATH}：${base.slice(0, 8)}（之后 commit 掉的改动照样会被 check 看到）` : '没找到 HEAD：本次任务请尽早 check，改动一旦提交就无法确定起点',
+      '',
+      NOTICE,
+    ].join('\n'),
+  };
 }
 
 function makeCtx({ cwd, allowNet, changed }) {
@@ -103,15 +134,20 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
   }
 
   try {
-    const changedNow = changed ?? (await changedLines(cwd));
+    // 起点优先用 baseline；拿不到就退回 HEAD，并在输出里说明这次的扫描范围小了
+    const base = await readBaseline(cwd);
+    const changedNow = changed ?? (await changedLines(cwd, base));
     const ctx = makeCtx({ cwd, allowNet, changed: changedNow });
     ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
-    const diff = diffText ?? (await diffAgainstHead(cwd));
+    const diff = diffText ?? (await diffSince(cwd, base));
+    const overrides = [];
+    if (!base && diffText === null) {
+      overrides.push('⚠ 没有 baseline（没跑过 forklight init，或仓库当时没有提交）：本次只比较 HEAD 之后的改动，已提交的内容扫不到');
+    }
 
     const observations = [];
-    const overrides = [];
     for (const fork of raw.value.forks) {
-      const obs = await observe(fork.target, { cwd, diffText: diff, changed: changedNow });
+      const obs = await observe(fork.target, { cwd, diffText: diff, changed: changedNow, base });
       observations.push(obs);
       // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
       if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {

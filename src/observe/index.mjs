@@ -1,22 +1,24 @@
 import { publishedFrom } from './published.mjs';
 import { scanDiff } from './effects.mjs';
-import { tagPointsAtHead, headOnRemote, grepCount, diffAgainstHead, changedLines, worktreeScanText } from './git.mjs';
+import { tagPointsAtHead, headOnRemote, grepCount, diffSince, changedLines, worktreeScanText } from './git.mjs';
 
 // Observation：cost.grade 唯一的输入。三个值都必须从仓库里读出来，
 // 这一层是整套协议里唯一接触真实世界的地方。读不出来就交 null，
 // 由 cost 按 high 处理——"读不到"永远不许降级成乐观值。
-export async function observe(target, { cwd, diffText = null, changed = null, declaredPublished = [] } = {}) {
+//
+// base 是 init 记下的起点。不传就退回 `HEAD`，那意味着"先 commit 再 check"
+// 会让改动看起来是空的——所以调用方必须显式传，缺了要报出来而不是静默降级。
+export async function observe(target, { cwd, diffText = null, changed = null, base = null, declaredPublished = [] } = {}) {
   const [tagNames, onRemote, changedNow] = await Promise.all([
     tagPointsAtHead(cwd),
     headOnRemote(cwd),
-    changed ?? changedLines(cwd),
+    changed ?? changedLines(cwd, base),
   ]);
 
   const published = publishedFrom({ tagNames, onRemote, declared: declaredPublished });
 
-  const rawDiff = diffText ?? (await diffAgainstHead(cwd));
-  // 未跟踪的文件不在 `git diff HEAD` 里：新写一个删库脚本，曾经既扫不到、
-  // 也不推后截图时间戳。这里把它并进扫描对象。
+  const rawDiff = diffText ?? (await diffSince(cwd, base));
+  // 未跟踪文件与纯 rename 的落地文件都不在 diff 的新增行里：一并并进扫描对象。
   const irreversible =
     rawDiff === null || rawDiff === undefined
       ? null
