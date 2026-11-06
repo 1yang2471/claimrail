@@ -11,8 +11,9 @@ export async function observe(target, { cwd, diffText, declaredPublished = [] } 
     declared: declaredPublished,
   });
 
-  const diff = diffText ?? (await diffAgainstHead(cwd)) ?? '';
-  const irreversible = scanEffects(addedCode(diff));
+  // 读不到 diff 必须是"未知"，不能当"没有副作用"：降级成空字符串等于把门开着。
+  const rawDiff = diffText ?? (await diffAgainstHead(cwd));
+  const irreversible = rawDiff === null || rawDiff === undefined ? null : scanEffects(addedCode(rawDiff));
 
   // 没给测量对象就不硬猜：fanIn 取不到 → 按 high 处理 → 会来问人。
   // 审美类分叉正好落在这里，而它们本来就该被问。

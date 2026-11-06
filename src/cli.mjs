@@ -13,9 +13,9 @@ import { observe, whyUnknown } from './observe/index.mjs';
 import { newestTrackedMtime, diffAgainstHead } from './observe/git.mjs';
 import { renderPage } from './observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from './observe/driver.mjs';
+import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
 
 export const LEDGER_PATH = join('.forklight', 'decisions.json');
-export const LOG_PATH = join('memory', 'log.jsonl');
 
 const NOTICE = `数据去向：
   .forklight/decisions.json  进 git（它是给你 review 的东西）
@@ -66,13 +66,11 @@ function makeCtx({ cwd, allowNet }) {
     logEntry: async (ref) => {
       const n = Number(/#(\d+)$/.exec(ref)?.[1]);
       if (!Number.isFinite(n)) return null;
-      try {
-        const lines = (await readFile(join(cwd, LOG_PATH), 'utf8')).split('\n').filter(Boolean);
-        const entry = JSON.parse(lines[n - 1]);
-        return [entry.what, entry.why].filter(Boolean).join(' → ');
-      } catch {
-        return null;
-      }
+      // 走 store.readLog：log 里有坏行时必须报错，不能把"读坏了"谎报成"这条记录不存在"——
+      // 后者会让整份偏好 log 坏掉之后，所有 memory 档证据都安静地失效。
+      const entry = (await readLog(cwd))[n - 1];
+      if (!entry) return null;
+      return [entry.what, entry.why].filter(Boolean).join(' → ');
     },
     statFile: async (p) => {
       try {
@@ -99,36 +97,42 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     return { code: 1, text: ['台账结构不合规，后续检查没开始：', ...v.errors.map((e) => `  ${e.path} · ${e.msg}`)].join('\n') };
   }
 
-  const ctx = makeCtx({ cwd, allowNet });
-  ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
-  const diff = diffText ?? (await diffAgainstHead(cwd)) ?? '';
+  try {
+    const ctx = makeCtx({ cwd, allowNet });
+    ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
+    const diff = diffText ?? (await diffAgainstHead(cwd));
 
-  const observations = [];
-  const overrides = [];
-  for (const fork of raw.value.forks) {
-    const obs = await observe(fork.target, { cwd, diffText: diff });
-    observations.push(obs);
-    // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
-    if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {
-      const missing = whyUnknown(obs);
-      const hit = [...obs.published ?? [], ...obs.irreversible ?? []];
-      const reason = missing.length ? missing.join('；') : `已发布或有副作用：${hit.join('、')}`;
-      overrides.push(`${fork.fork}：申报 low → 程序 high（${reason}）`);
+    const observations = [];
+    const overrides = [];
+    for (const fork of raw.value.forks) {
+      const obs = await observe(fork.target, { cwd, diffText: diff });
+      observations.push(obs);
+      // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
+      if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {
+        const missing = whyUnknown(obs);
+        const hit = [...obs.published ?? [], ...obs.irreversible ?? []];
+        const reason = missing.length ? missing.join('；') : `已发布或有副作用：${hit.join('、')}`;
+        overrides.push(`${fork.fork}：申报 low → 程序 high（${reason}）`);
+      }
     }
+
+    const verifications = await verifyAll(raw.value, ctx);
+    const d = decide(enrich(raw.value, { observations, verifications }), { humanPresent: !unattended });
+
+    return {
+      code: d.action === 'proceed' ? 0 : 1,
+      text: [
+        `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
+        ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),
+        render(d),
+        d.action === 'proceed' ? '✓ 可以交付' : `✗ 交付被拦住（${d.action}）`,
+      ].join('\n'),
+    };
+  } catch (err) {
+    // check 是全函数：log 损坏、读不到文件这类必须报非零并说清原因，
+    // 不能抛出去让"跑坏了"和"跑过且通过"混成同一种沉默
+    return { code: 1, text: `检查没跑完：${err.message}` };
   }
-
-  const verifications = await verifyAll(raw.value, ctx);
-  const d = decide(enrich(raw.value, { observations, verifications }), { humanPresent: !unattended });
-
-  return {
-    code: d.action === 'proceed' ? 0 : 1,
-    text: [
-      `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
-      ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),
-      render(d),
-      d.action === 'proceed' ? '✓ 可以交付' : `✗ 交付被拦住（${d.action}）`,
-    ].join('\n'),
-  };
 }
 
 export async function web({ url, state, viewport = '390x700,1280x800', out = join('.forklight', 'shots'), name, cwd = process.cwd() } = {}) {
@@ -193,7 +197,61 @@ export async function web({ url, state, viewport = '390x700,1280x800', out = joi
   }
 }
 
-const COMMANDS = ['init', 'check', 'web'];
+export async function recordCmd({ cwd = process.cwd(), key, what, why, anchor = false } = {}) {
+  if (!key || !what) {
+    return { code: 1, text: '用法：forklight record --key <类别> --what <要什么> [--why <为什么>] [--anchor]' };
+  }
+  try {
+    if (anchor) {
+      const { n } = await recordAnchor(cwd, { key, what, why });
+      return { code: 0, text: `参照物记为 log#${n}。正向锚点不参与升格，它只用于点名"照这个做"。` };
+    }
+    const r = await record(cwd, { key, what, why });
+    const lines = [`记为 log#${r.n}，key "${key}" 累计命中 ${r.hits} 次`, `现行规则 ${r.rules.length} 条`];
+    if (r.hits < 2) lines.push('还没升格——同一条否决要命中满两次才写进规则，一次随口的吐槽不该被永久固化');
+    else if (r.promoted) lines.push(`已升格：${r.promoted.rule}  [来源: ${r.promoted.sources.join(',')}]`, `推翻它：forklight invalidate ${key}`);
+    else lines.push(`这条命中满两次了，但被你用 forklight invalidate ${key} 废过，不会自动复活`);
+    return { code: 0, text: lines.join('\n') };
+  } catch (err) {
+    return { code: 1, text: `没记上：${err.message}` };
+  }
+}
+
+export async function rulesCmd({ cwd = process.cwd() } = {}) {
+  try {
+    const [list, entries, denied, text] = await Promise.all([rulesList(cwd), readLog(cwd), readDenied(cwd), rulesText(cwd)]);
+    const rejections = entries.filter((e) => (e.kind ?? 'rejection') === 'rejection').length;
+    return {
+      code: 0,
+      text: [
+        `现行规则 ${list.length} 条 · 原始否决 ${rejections} 条 · 参照物 ${entries.length - rejections} 条 · 已废 ${denied.length} 个 key`,
+        text || '（还没有一条命中满两次，所以现在只有记录、没有规则）',
+        ...list.map((r) => `  · 推翻它：forklight invalidate ${r.key}`),
+      ].join('\n'),
+    };
+  } catch (err) {
+    return { code: 1, text: `读不出来：${err.message}` };
+  }
+}
+
+export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
+  if (!key) return { code: 1, text: '用法：forklight invalidate <key 或 r:key>' };
+  try {
+    const { removed, remaining } = await invalidateRule(cwd, key);
+    return {
+      code: 0,
+      text: [
+        `已废掉 ${removed.length} 条：${removed.map((r) => r.rule).join('；')}`,
+        `原始 log 一条没动，禁用名单写在 memory/denied.json——所以它不会因新的命中自动长回来`,
+        `现行规则剩 ${remaining.length} 条`,
+      ].join('\n'),
+    };
+  } catch (err) {
+    return { code: 1, text: err.message };
+  }
+}
+
+const COMMANDS = ['init', 'check', 'web', 'record', 'rules', 'invalidate'];
 
 function parse(argv) {
   const cmd = COMMANDS.includes(argv[0]) ? argv[0] : 'check';
@@ -208,6 +266,10 @@ function parse(argv) {
     viewport: '390x700,1280x800',
     out: join('.forklight', 'shots'),
     name: undefined,
+    key: undefined,
+    what: undefined,
+    why: undefined,
+    anchor: false,
   };
   let ledgerGiven = false;
   for (let i = opts.start; i < argv.length; i++) {
@@ -223,14 +285,32 @@ function parse(argv) {
     else if (a === '--viewport') flags.viewport = argv[++i];
     else if (a === '--out') flags.out = argv[++i];
     else if (a === '--name') flags.name = argv[++i];
-    else if (!a.startsWith('--') && !ledgerGiven && cmd === 'check') flags.ledger = a; // 位置参数就当台账路径
+    else if (a === '--key') flags.key = argv[++i];
+    else if (a === '--what') flags.what = argv[++i];
+    else if (a === '--why') flags.why = argv[++i];
+    else if (a === '--anchor') flags.anchor = true;
+    else if (!a.startsWith('--')) {
+      // check 的位置参数是台账，invalidate 的位置参数是被废的 key，两者不重叠
+      if (cmd === 'check' && !ledgerGiven) {
+        flags.ledger = a;
+        ledgerGiven = true;
+      } else if (cmd === 'invalidate' && !flags.key) flags.key = a;
+    }
   }
   return { ...opts, flags };
 }
 
+const HANDLERS = { init, check, web, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd };
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { cmd, flags } = parse(process.argv.slice(2));
-  const res = cmd === 'init' ? await init(flags) : cmd === 'web' ? await web(flags) : await check(flags);
+  let res;
+  try {
+    res = await HANDLERS[cmd](flags);
+  } catch (err) {
+    // 兜底：log 损坏、权限问题这类必须报非零，不能静默当成"跑过了"
+    res = { code: 1, text: `没跑成：${err.message}` };
+  }
   console.log(res.text);
   process.exitCode = res.code;
 }

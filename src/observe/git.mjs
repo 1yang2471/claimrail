@@ -54,11 +54,22 @@ function sumCounts(stdout, self) {
   return total;
 }
 
+// 退出码归类必须是可测的纯函数。曾经的写法是 `if (code > 1) return null`，
+// 于是 git 不存在（spawn 失败，我们标成 -1）漏进 fall-through，
+// 被当成"0 处引用"——读不到降级成乐观值，门就从这里开。
+export function mapGrepExit(code, stdout) {
+  if (code === 0) return 'matches';
+  if (code === 1 && String(stdout ?? '').trim() === '') return 'none';
+  // 128 不在仓库、-1 缺 git 或启动失败、2/3 pathspec 报错、1 但有输出=异常
+  return 'unknown';
+}
+
 export async function grepCount(term, excludeFile, cwd, { fixed = false } = {}) {
   const args = ['grep', '-w', '-c', ...(fixed ? ['-F'] : []), '-e', term, '--', '.', ...(excludeFile ? [`:(exclude)${excludeFile}`] : [])];
   const r = await gitRaw(args, cwd);
-  if (r.code === 1 && r.stdout.trim() === '') return 0; // 干净的零，不是未知
-  if (r.code > 1) return null;
+  const kind = mapGrepExit(r.code, r.stdout);
+  if (kind === 'none') return 0; // 干净的零
+  if (kind === 'unknown') return null;
   return sumCounts(r.stdout, excludeFile);
 }
 
