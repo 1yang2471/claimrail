@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- 与坏页内容一致，只改缺陷本身，这样红绿差才有可比性：
+     1) scrollbar-gutter: stable 给条带预留位置 + 右内边距 → 文字不被压
+     2) composer 进 flex 流，列表不再延伸到它底下
+     3) 可点目标 ≥44px
+     4) 正文 #1c1c1c @15px
+     5) :focus-visible 有可见样式
+     容器内的 .day 仍是 sticky，用来验证"自己的 sticky 子元素"不算遮挡。 -->
+<meta charset="utf-8" />
+<title>聊天（修好后）</title>
+<style>
+  body { margin: 0; font: 15px/1.6 system-ui; color: #1c1c1c; background: #fff; }
+  .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .msg-list {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 12px 20px 16px 12px;
+  }
+  .row { margin: 10px 0; }
+  .me { margin-left: auto; width: fit-content; background: #eef4ff; padding: 8px 12px; border-radius: 10px 0 0 10px; }
+  .day { position: sticky; top: 0; background: #fff; padding: 2px 8px; }
+  .composer { position: sticky; bottom: 0; flex: none; height: 64px; background: #fff; border-top: 1px solid #d5d5d5; display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+  #send { width: 44px; height: 44px; }
+  input { height: 44px; min-width: 44px; }
+  a { min-height: 44px; display: inline-flex; align-items: center; }
+  :focus-visible { outline: 3px solid #0a64d8; outline-offset: 2px; }
+</style>
+<div class="wrap">
+  <div class="msg-list" id="msgs">
+    <div class="day">今天</div>
+    <p class="row"><a href="#x">会话设置</a></p>
+    <div class="row"> Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua quisque vestibulum.</div>
+    <div class="row me">我自己的消息，右对齐一直贴到容器的最右边</div>
+    <div class="row"> Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.</div>
+    <div class="row me">这一条也是右对齐贴边，最后一个字会被条带吃掉</div>
+    <div class="row"> Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.</div>
+    <div class="row me">右对齐的消息总是被滚动条压住</div>
+    <div class="row"> Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque.</div>
+    <div class="row me">又一条贴右边缘的气泡</div>
+    <div class="row"> Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos.</div>
+    <div class="row me">倒数第三条</div>
+    <div class="row"> Neque porro quisquam est qui dolorem ipsum quia dolor sit amet consectetur adipisci velit sed quia non numquam eius modi.</div>
+    <div class="row me">倒数第二条</div>
+    <div class="row"> At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti.</div>
+    <div class="row me">最后一条消息，落在固定输入框底下</div>
+    <div class="row"> Itaque earum rerum hic tenetur a sapiente delectus ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis.</div>
+  </div>
+  <div class="composer" id="composer">
+    <input aria-label="消息输入框" />
+    <button id="send" aria-label="发送"></button>
+  </div>
+</div>

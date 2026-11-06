@@ -2,3 +2,4 @@
 node_modules/
 memory/
 *.png
+.forklight/shots/

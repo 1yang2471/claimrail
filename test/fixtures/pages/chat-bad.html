@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- 埋雷任务的坏页。缺陷形状就是用户举的那个例子，且在这个运行时（覆盖式滚动条，
+     实测 offsetWidth - clientWidth === 0 且 scrollbar-width: auto）确实会触发：
+     1) 列表默认 overflow-y: auto、右对齐气泡贴右边且没有预留滚动条带 → 条带压在文字上
+     2) composer 用 fixed 叠在全高的列表上，滚动区域与它重叠 → 底部内容被盖
+     3) 发送按钮 28px、输入框 30px
+     4) 正文 #888 on #fff @13px
+     5) a { outline: none } 且无替代样式
+     代码每一行都合法。这是刻意设计的。 -->
+<meta charset="utf-8" />
+<title>聊天（坏页）</title>
+<style>
+  body { margin: 0; font: 13px/1.5 system-ui; color: #888; background: #fff; }
+  .msg-list { position: absolute; inset: 0; overflow-y: auto; padding: 8px 0; }
+  .row { margin: 10px 8px; }
+  .me { margin-left: auto; background: #f2f7ff; padding: 6px 10px; border-radius: 10px 0 0 10px; text-align: right; }
+  .day { position: sticky; top: 0; background: #fff; padding: 2px 8px; }
+  .composer { position: fixed; left: 0; right: 0; bottom: 0; height: 64px; background: #fff; border-top: 1px solid #ddd; display: flex; align-items: center; gap: 8px; padding: 0 8px; }
+  #send { width: 28px; height: 28px; }
+  input { height: 30px; }
+  a { outline: none; }
+</style>
+<div class="msg-list" id="msgs">
+  <div class="day">今天</div>
+  <p class="row"><a href="#x">会话设置</a></p>
+  <div class="row"> Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua quisque vestibulum.</div>
+  <div class="row me">我自己的消息，右对齐一直贴到容器的最右边</div>
+  <div class="row"> Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure.</div>
+  <div class="row me">这一条也是右对齐贴边，最后一个字会被条带吃掉</div>
+  <div class="row"> Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat.</div>
+  <div class="row me">右对齐的消息总是被滚动条压住</div>
+  <div class="row"> Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam eaque.</div>
+  <div class="row me">又一条贴右边缘的气泡</div>
+  <div class="row"> Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos.</div>
+  <div class="row me">倒数第三条</div>
+  <div class="row"> Neque porro quisquam est qui dolorem ipsum quia dolor sit amet consectetur adipisci velit sed quia non numquam eius modi.</div>
+  <div class="row me">倒数第二条</div>
+  <div class="row"> At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti.</div>
+  <div class="row me">最后一条消息，落在固定输入框底下</div>
+  <div class="row"> Itaque earum rerum hic tenetur a sapiente delectus ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis.</div>
+</div>
+<div class="composer" id="composer">
+  <input aria-label="消息输入框" />
+  <button id="send" aria-label="发送"></button>
+</div>

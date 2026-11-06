@@ -7,23 +7,24 @@ import { join } from 'node:path';
 import { renderPage, reportPathFor } from '../src/observe/web.mjs';
 import { verify } from '../src/evidence.mjs';
 
-// 一个"代码全合规、人看着难受"的聊天页采到的数据：覆盖式滚动条压右对齐气泡、
-// 最后一条消息落在固定输入框下面、发送按钮 28px。
+// 一个"代码全合规、人看着难受"的聊天页采到的数据：滚动条带压在右对齐气泡上、
+// 滚动区域伸进固定输入框底下、发送按钮 28px。
 const defectData = {
   viewport: { w: 400, h: 780 },
   scrollContainers: [
     {
       selector: 'body>div>.msg-list',
-      rect: { x: 0, y: 0, w: 400, h: 600 },
+      rect: { x: 0, y: 0, w: 400, h: 780 },
       scrollableY: true,
       reservedX: 0,
-      lastChildRect: { x: 0, y: 700, w: 400, h: 40 },
+      scrollbarStyle: 'auto',
+      gutter: 'auto',
     },
   ],
   texts: [
     { selector: '.bubble.me', rect: { x: 210, y: 500, w: 180, h: 40 }, color: 'rgb(17, 17, 17)', background: 'rgb(255, 255, 255)', fontSize: 15 },
   ],
-  interactive: [{ selector: '#send', rect: { x: 0, y: 0, w: 28, h: 28 }, focusable: true, hasVisibleFocus: null }],
+  interactive: [{ selector: '#send', rect: { x: 0, y: 0, w: 28, h: 28 }, focusable: true, baseStyle: 'sig', hasVisibleFocus: null }],
   fixedRects: [{ selector: '#composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
 };
 
@@ -58,8 +59,9 @@ test('报告里的红项直接点名动机缺陷', async () => {
     const { checks } = await renderPage(fakePage(defectData), { outDir: dir, name: 'chat' });
     const byId = Object.fromEntries(checks.map((c) => [c.id, c]));
     assert.equal(byId['scrollbar-clears-text'].ok, false);
-    assert.match(byId['scrollbar-clears-text'].detail, /覆盖式滚动条压住 1 处文本/);
+    assert.match(byId['scrollbar-clears-text'].detail, /压住 1 处文本/);
     assert.equal(byId['bottom-not-covered'].ok, false);
+    assert.match(byId['bottom-not-covered'].detail, /滚动区域与固定条重叠/);
     assert.equal(byId['touch-targets-ok'].ok, false);
     assert.equal(byId['focus-visible-ok'].ok, null);
     assert.equal(byId['contrast-ok'].ok, true);
@@ -85,7 +87,7 @@ test('端到端：修好之后同一份检查转绿，证据才成立', async ()
   await withDir(async (dir) => {
     const fixed = structuredClone(defectData);
     fixed.scrollContainers[0].reservedX = 15; // 经典滚动条占位
-    fixed.scrollContainers[0].lastChildRect = { x: 0, y: 600, w: 400, h: 40 };
+    fixed.scrollContainers[0].rect = { x: 0, y: 0, w: 400, h: 720 }; // 不再伸到输入框底下
     fixed.interactive[0].rect = { x: 0, y: 0, w: 44, h: 44 };
 
     await renderPage(fakePage(fixed), { outDir: dir, name: 'chat-fixed' });

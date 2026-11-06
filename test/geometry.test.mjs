@@ -143,20 +143,57 @@ test('部分元素探到了就按探到的判，说明里写清核了几个', ()
 
 // ---- 底部被遮 ----
 
-test('最后一条消息落在固定输入框范围内 → 红', () => {
+test('三种"其实没有条带压在内容上"的情况都不该判红', () => {
+  const page = (over) => ({ scrollContainers: [container(over)], texts: [rightBubble()] });
+  assert.equal(scrollbarClearsText(page({ reservedX: 15 })).ok, true, '经典滚动条占了布局宽度');
+  assert.equal(scrollbarClearsText(page({ scrollbarStyle: 'none' })).ok, true, 'scrollbar-width: none 根本不画条');
+  assert.equal(scrollbarClearsText(page({ gutter: 'stable' })).ok, true, 'scrollbar-gutter: stable 已预留位');
+});
+
+test('覆盖式滚动条 + 默认样式仍然是红——豁免不能把主例子一起豁免掉', () => {
+  assert.equal(scrollbarClearsText({ scrollContainers: [container({ scrollbarStyle: 'auto' })], texts: [rightBubble()] }).ok, false);
+});
+
+test('滚动容器自己的 sticky 子元素不算遮挡', () => {
   const page = {
-    scrollContainers: [container({ lastChildRect: { x: 0, y: 700, w: 400, h: 40 } })],
-    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [{ selector: '.day', rect: { x: 0, y: 0, w: 400, h: 28 }, inside: '.msg-list' }],
+  };
+  assert.equal(bottomNotCovered(page).ok, true);
+});
+
+test('不属于该容器的固定条照样判红', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [{ selector: '.day', rect: { x: 0, y: 0, w: 400, h: 28 }, inside: 'body>div>.other' }],
   };
   assert.equal(bottomNotCovered(page).ok, false);
 });
 
-test('内容项停在输入框之上 → 绿', () => {
+test('滚动区域伸进固定输入框底下 → 红（结构性，与滚到哪无关）', () => {
   const page = {
-    scrollContainers: [container({ lastChildRect: { x: 0, y: 600, w: 400, h: 40 } })],
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 780 } })],
+    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
+  };
+  const r = bottomNotCovered(page);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /滚动区域与固定条重叠/);
+});
+
+test('滚动容器停在输入框之上 → 绿', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 720 } })],
     fixedRects: [{ selector: '.composer', rect: { x: 0, y: 720, w: 400, h: 60 } }],
   };
   assert.equal(bottomNotCovered(page).ok, true);
+});
+
+test('末项在屏幕外不该被当成没盖住——曾经的漏判形状', () => {
+  const page = {
+    scrollContainers: [container({ rect: { x: 0, y: 0, w: 400, h: 2000 }, lastChildRect: { x: 0, y: 1900, w: 400, h: 40 } })],
+    fixedRects: [{ selector: '.composer', rect: { x: 0, y: 640, w: 400, h: 60 } }],
+  };
+  assert.equal(bottomNotCovered(page).ok, false);
 });
 
 test('没采到固定元素就是未判——缺数据不许冒充"没问题"', () => {

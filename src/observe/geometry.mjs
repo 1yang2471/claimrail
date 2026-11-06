@@ -52,11 +52,15 @@ export function contrastRatio(fg, bg) {
 const rect = (r) => ({ x: r.x, y: r.y, w: r.w ?? r.width ?? 0, h: r.h ?? r.height ?? 0 });
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-// 只有"纵向可滚 且 没给滚动条留布局宽度"才是覆盖式：经典滚动条会挤走内容，那种不遮。
+// 条带只在"确实会画一条盖在内容上"时才存在。三种情况没有条带：
+// 经典滚动条占了布局宽度、scrollbar-width: none 根本不画、scrollbar-gutter: stable 预留了位。
+// 少判一种就漏掉用户的原始例子，多判一种就是假红——所以三种都要显式承认。
 function overlayStrip(container) {
   const c = rect(container.rect);
   if (!container.scrollableY || c.w <= 0 || c.h <= 0) return null;
   if ((container.reservedX ?? 0) > 0) return null;
+  if (container.scrollbarStyle === 'none') return null;
+  if (String(container.gutter ?? '').includes('stable')) return null;
   return { x: c.x + c.w - OVERLAY_BAR, y: c.y, w: OVERLAY_BAR, h: c.h };
 }
 
@@ -128,19 +132,25 @@ export function focusVisibleOk(page) {
 }
 
 export function bottomNotCovered(page) {
-  // fixedRects 每项是 { selector, rect }，取内层矩形——直接 map(rect) 会把
-  // 整个包装对象当矩形，读出一堆 undefined，然后误判成"没数据"。
-  const fixed = (page.fixedRects ?? []).map((f) => rect(f?.rect ?? f)).filter((r) => r.w > 0 && r.h > 0);
-  const lasts = (page.scrollContainers ?? []).filter((c) => c.lastChildRect);
-  if (!fixed.length || !lasts.length) return skip('bottom-not-covered', '缺少固定元素或末项数据，未判');
+  // 信号是结构性的：滚动容器自己的矩形伸进了固定/粘性条底下。
+  // 曾经用"最后一个内容项"来比，结果漏判——列表一溢出末项就在屏幕外，
+  // 永远不相交，而那恰恰是最典型的一种盖住。跟滚动到哪无关。
+  const containers = (page.scrollContainers ?? []).map((c) => ({ selector: c.selector, rect: rect(c.rect) }));
+  const fixed = (page.fixedRects ?? [])
+    .map((f) => ({ selector: f.selector, inside: f.inside, rect: rect(f?.rect ?? f) }))
+    .filter((f) => f.rect.w > 0 && f.rect.h > 0);
+  if (!fixed.length || !containers.length) return skip('bottom-not-covered', '缺少固定条或滚动容器，未判');
 
   const hit = [];
-  for (const c of lasts) {
-    const last = rect(c.lastChildRect);
-    for (const f of fixed) if (overlaps(last, f)) hit.push({ selector: c.selector, cover: f });
+  for (const c of containers) {
+    for (const f of fixed) {
+      // 容器自己的 sticky 子元素（日期分隔条那种）必然与容器重叠，那不是遮挡
+      if (f.inside && f.inside === c.selector) continue;
+      if (overlaps(c.rect, f.rect)) hit.push(f.selector ?? c.selector);
+    }
   }
   if (!hit.length) return pass('bottom-not-covered');
-  return fail('bottom-not-covered', `最后一个内容项被固定元素盖住：${hit.map((h) => h.selector).join('、')}`);
+  return fail('bottom-not-covered', `滚动区域与固定条重叠，内容会被盖住：${[...new Set(hit)].join('、')}`);
 }
 
 export function runChecks(page) {
