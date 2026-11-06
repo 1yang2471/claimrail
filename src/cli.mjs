@@ -79,6 +79,7 @@ function makeCtx({ cwd, allowNet }) {
         return null;
       }
     },
+    readReport: async (p) => (await readJson(join(cwd, p))).value ?? null,
     fetch: async (url) => {
       if (!allowNet) return null;
       const res = await globalThis.fetch(url);

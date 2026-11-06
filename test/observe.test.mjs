@@ -29,9 +29,11 @@ test('没有测量对象时不硬猜，档位随之升 high', async () => {
 });
 
 test('排除定义所在文件：自己引用自己不涨 fan-in', async () => {
-  const obs = await observe({ file: 'src/observe/effects.mjs', symbol: 'EFFECT_KINDS' }, { cwd: repo, diffText: '' });
-  assert.equal(obs.fanIn, 0);
-  assert.equal(grade(obs), 'low');
+  const selfExcluded = await observe({ file: 'src/observe/effects.mjs', symbol: 'EFFECT_KINDS' }, { cwd: repo, diffText: '' });
+  const selfIncluded = await observe({ symbol: 'EFFECT_KINDS' }, { cwd: repo, diffText: '' });
+  assert.equal(typeof selfExcluded.fanIn, 'number');
+  assert.ok(selfIncluded.fanIn > selfExcluded.fanIn, '定义文件里的那一次不该算引用');
+  assert.equal(grade(selfExcluded), 'low');
 });
 
 test('diff 里的执行动作仍会被扫到', async () => {

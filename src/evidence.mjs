@@ -51,7 +51,27 @@ export async function verify(evidence, ctx) {
     if (st.mtimeMs < ctx.lastChangeMs) {
       return { ok: false, why: `截图比代码旧（${st.mtimeMs} < ${ctx.lastChangeMs}）` };
     }
-    return { ok: true, why: `${ref} 晚于最后一次代码改动` };
+
+    // 只有截图没有度量报告 = 看了图但没判过，不能算证据
+    const report = ctx.readReport ? await ctx.readReport(ref.replace(/\.png$/, '.report.json')) : null;
+    if (!report || !Array.isArray(report.checks)) return { ok: false, why: '有截图但没有度量报告' };
+
+    const judgedTrue = report.checks.filter((c) => c.ok === true);
+    if (asserts.length === 0) {
+      if (!judgedTrue.length) {
+        return { ok: false, why: `报告里 ${report.checks.length} 项没有一项真的判过（全为红或未采到）` };
+      }
+      return { ok: true, why: `${ref} 为新增，${judgedTrue.length} 项度量判过并通过` };
+    }
+
+    for (const id of asserts) {
+      const c = report.checks.find((x) => x.id === id);
+      if (!c) return { ok: false, why: `报告里没有 ${id} 这项检查` };
+      if (c.ok === false) return { ok: false, why: `${id} 判红：${c.detail}` };
+      // null 是"未采到"，不许冒充"没问题"
+      if (c.ok !== true) return { ok: false, why: `${id} 不作数：${c.detail}` };
+    }
+    return { ok: true, why: `${ref} 为新增，${asserts.length} 项断言全绿` };
   }
 
   if (kind === 'web') {
