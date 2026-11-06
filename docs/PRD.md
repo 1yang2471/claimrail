@@ -126,7 +126,8 @@ forklight 不重写那份清单，把它当上游引用。我们的差异在两�
       "picked": "候选B",
       "evidence": { "kind": "repo|memory|render|web", "ref": "Chat.tsx:88 | log#3 | chat@1280.png | https://…" },
       "cost_if_wrong": "high",       // 程序覆写，模型只能上调
-      "verified": true               // evidence 为 null 时必须为 false
+      "verified": true,              // evidence 为 null 时必须为 false
+      "options_cost": { "候选A": "low", "候选B": "high" }  // observe 供给，可缺省
     }
   ]
 }
@@ -165,6 +166,12 @@ forklight 不重写那份清单，把它当上游引用。我们的差异在两�
 - 有证据 → 不打断，只存档。
 
 页面不可达时的降级分支必须留下可见文字（"未视觉验证：dev server 未在 5173 响应"），禁止静默通过。v1 只实现"给一个 URL"入口 + `storageState` 登录态复用；seed 数据、Storybook 单组件模式、静态 preview 推 v2。
+
+### 实现期新增的门规则（超出盘问范围，待确认）
+
+写 `gate` 时补了第四条拦截规则，因为它是原始诊断最直接的形状：**无证据 + 候选代价数据齐全 + 却选了改起来更贵的那个候选 → 拦**。没有依据时滑向熟悉做法，而熟悉做法往往恰好更贵（改一个 token vs 重做信息架构）。
+
+它不引入新的判断来源，仍用同一个 `cost` 函数和同一份 `Observation`；候选档位数据不齐时**放弃判定**——误拦一次的代价比漏拦一次高，因为一次误拦就教会用户无视整屏清单。有证据时选贵做法属于知情决定，不拦。
 
 ### 记忆结构
 
