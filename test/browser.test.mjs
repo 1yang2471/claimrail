@@ -145,3 +145,38 @@ test('真浏览器：viewport 参数错了要说清，不能悄悄按默认跑',
     await assert.rejects(() => openPage(browser, { url: page('chat-good'), viewport: '宽屏' }), /1280x800/);
   });
 });
+
+// storageState（--state）的代码路径此前一次没实测过（HANDOFF 已知未修第 4 条）。
+// 用本地 http server 验证注入真的发生：cookie 与 localStorage 都要出现在页面里。
+// 页面没有登录门的项目（如 Shinsekai）不需要它，但需要它的项目不能再零覆盖。
+test('真浏览器：--state 登录态把 cookie 与 localStorage 注入上下文', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const { createServer } = await import('node:http');
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(
+      '<!doctype html><html><body><main><h1>probe</h1><p id="probe">pending</p></main>' +
+      '<script>document.getElementById("probe").textContent = "cookie=" + document.cookie + " ls=" + localStorage.getItem("fk-state-probe");</script>',
+    );
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = await mkdtemp(join(tmpdir(), 'fk-state-'));
+  try {
+    const state = {
+      cookies: [{ name: 'fkprobe', value: 'from-state', domain: '127.0.0.1', path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'Lax' }],
+      origins: [{ origin: `http://127.0.0.1:${srv.address().port}`, localStorage: [{ name: 'fk-state-probe', value: 'from-localstorage' }] }],
+    };
+    const statePath = join(dir, 'state.json');
+    await (await import('node:fs/promises')).writeFile(statePath, JSON.stringify(state));
+    await withBrowser(async (browser) => {
+      const session = await openPage(browser, { url: `http://127.0.0.1:${srv.address().port}/`, state: statePath });
+      const probe = await session.page.textContent('#probe');
+      assert.match(probe, /cookie=.*fkprobe=from-state/, 'storageState 的 cookie 没进上下文');
+      assert.match(probe, /ls=from-localstorage/, 'storageState 的 localStorage 没进上下文');
+      await session.context.close();
+    });
+  } finally {
+    srv.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
