@@ -47,7 +47,8 @@
 - 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。
 - 引文核实只保证**可见正文里有这串字**，不保证那个页面在推荐这个做法。实测 24 个 URL 里有两处命中的是例外条款：W3C 用色页的 "an author cannot use color alone to achieve 3:1 contrast…"、SC 2.5.8 的 "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements…"。语气程序判不了，台账里的 `url + quote` 就是留给 reviewer 抽查上下文的——这是这一档唯一的人防线，别把它当程序保证。
 - "≥3 独立域名推荐同一做法"在数字本身不收敛的主张上不该成立：触摸目标尺寸实测是 24 CSS px（WCAG 2.2 AA）/ 44pt（Apple）/ 48dp（Material）/ 1cm×1cm（NN/g，物理尺寸）。这种分叉该申报的是"各家数字不一致，我选 X 因为 Y"，硬凑"业界都这么做"会被回访戳穿。
-- 反爬站回访直接 403（实测 stackoverflow 的问答页）。不伪造浏览器 UA 去绕——这类来源就是不可核实，换静态文档站。
+- 反爬站回访直接 403（实测 stackoverflow 的问答页）。不伪造浏览器 UA 去绕——这类来源就是不可核实，换静态文档站。补测又见 Medium 系（medium.com、uxdesign.cc）对无浏览器指纹的回访一律 403，`adamsilver.io` 用 undici 直连 fetch failed：**口碑好的 UX 文章有一批永远够不着**，凑不齐 3 域时先检查是不是撞了这类站，而不是急着说"业界不收敛"。
+- 分叉型主张（"A 还是 B"）的证据可以引**任一候选方向**的句子：NN/g 谈数据表格的 "unlike with a card-based UI, users don't need to…" 是给表格方的票。按单边关键词挑句会漏计，台账里写清引的是支持哪个候选的。
 
 ## 改这些代码时的硬规矩
 
