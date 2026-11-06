@@ -34,7 +34,10 @@
 | 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（真站实测：三个 index.html 收敛同名，前一份证据被后一份覆盖） |
 
 | 设计类任务不许拿"一篇文章这么说"当好设计依据 | `src/schema.mjs` 的 `evidence.design-needs-precedent`：`ui-new`/`docs-new`/`api-design` 的 `kind: 'web'` 直接拒；必须给 `precedent`（`test/precedent.test.mjs`，变异验证：改成 `if (false)` → 红） |
-| "业界收敛"必须可回访 | `src/evidence.mjs` 的 `verifyPrecedent`：逐个 URL 回访 200 + 引文出现在页面原文 + 按注册域去重 ≥3（`MIN_SOURCES`，变异验证：降到 1 → 红 3 条）；`adoption` 的 star 数从 GitHub API 读，不达门槛或返回非 JSON 都判失败 |
+| "业界收敛"必须可回访 | `src/evidence.mjs` 的 `verifyPrecedent`：逐个 URL 回访 200 + 引文出现在页面**可见正文** + 按注册域去重 ≥3（`MIN_SOURCES`，变异验证：降到 1 → 红 3 条）；`adoption` 的 star 数从 GitHub API 读，不达门槛或返回非 JSON 都判失败 |
+| 引文对照可见正文，不对照传输字节 | `evidence.mjs` 的 `visibleText()`（去 script/style/注释/标签 + 解实体）+ 壳页分诊 `VISIBLE_MIN`。真网络实测 24 URL：17 个可选出引文，其中 9 个原始 HTML 直接命中、**8 个被行内标签切开**、0 个靠实体解码救回。拦住"引文只出现在 `<script>` 字符串里"这类假绿。测试：`test/precedent.test.mjs` 三条 + `test/evidence.test.mjs` web 档一条；变异验证：`visibleText` 退回 `norm(html)` → 红 4 条，只去掉脚本剥离 → 红 2 条 |
+| 采不到正文的页面要说"读不到"，不许算成编造 | `evidence.mjs` 的壳页分诊（可见正文 < `VISIBLE_MIN` 字符）。实测 `m3.material.io` 200 + 62KB HTML 只剩 15 字符、`developer.apple.com` 剩 38 字符——设计系统站普遍是 SPA。老实 agent 与编造 agent 必须拿到不同判词；要真判这一类得渲染，与对比度像素采样同列 v2 |
+| 回访必须声明语言 | `src/cli.mjs` 的 fetch 带 `headers: {'accept-language': 'en'}`（实测 web.dev 不带语言标返回过法语页，英文原句在自己引过的那篇上匹配不上）。`test/cli.test.mjs` 起本地 http server 断言收到该头；变异验证：删掉该行 → 红 |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的 `field.unknown` 与 `evidence.field.unknown`：只认白名单键。`confidence`/`rationale`/`options_cost` 都进不去 |
 
 ## 已知的检出边界（别把"未判"当"没问题"）
@@ -42,6 +45,9 @@
 - `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率极低（真站 7/111）。这类页面对比度没报红不代表合格，是**判不了**；要判得靠截图像素采样（v2）。
 - 非 git 目录里三个代价输入全部取不到 → 一切按 high。forklight 在 git 之外基本失明，这是边界不是特性。
 - 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。
+- 引文核实只保证**可见正文里有这串字**，不保证那个页面在推荐这个做法。实测 24 个 URL 里有两处命中的是例外条款：W3C 用色页的 "an author cannot use color alone to achieve 3:1 contrast…"、SC 2.5.8 的 "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements…"。语气程序判不了，台账里的 `url + quote` 就是留给 reviewer 抽查上下文的——这是这一档唯一的人防线，别把它当程序保证。
+- "≥3 独立域名推荐同一做法"在数字本身不收敛的主张上不该成立：触摸目标尺寸实测是 24 CSS px（WCAG 2.2 AA）/ 44pt（Apple）/ 48dp（Material）/ 1cm×1cm（NN/g，物理尺寸）。这种分叉该申报的是"各家数字不一致，我选 X 因为 Y"，硬凑"业界都这么做"会被回访戳穿。
+- 反爬站回访直接 403（实测 stackoverflow 的问答页）。不伪造浏览器 UA 去绕——这类来源就是不可核实，换静态文档站。
 
 ## 改这些代码时的硬规矩
 

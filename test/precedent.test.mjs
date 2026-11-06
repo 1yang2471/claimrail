@@ -35,10 +35,46 @@ test('三个来源里两个同域（转载同一篇）不算收敛', async () =>
 });
 
 test('引文在那页上找不到，就是编造', async () => {
-  const pages = { ...okPages(), 'https://gamma.io/guide': 'totally unrelated content' };
+  const pages = { ...okPages(), 'https://gamma.io/guide': 'unrelated but perfectly readable prose about typography and spacing that a real page would contain' };
   const r = await verify({ kind: 'precedent', sources: three() }, ctx(pages));
   assert.equal(r.ok, false);
   assert.match(r.why, /找不到/);
+});
+
+// 真网络实测（2026-11-06）：m3.material.io 返回 200、62KB HTML，抽掉标签后正文只剩 17 个字符
+// ——设计系统站是 SPA，程序根本读不到它说不说这句话。这与"引文是编的"是两回事，
+// 混在一起报就等于让老实 agent 和编造 agent 拿到同一句判词。
+// 真网络实测（2026-11-06，24 个公开设计文档 URL）：能选出引文的 17 个源里，9 个在原始 HTML
+// 上直接命中，8 个是"页面上确实有这句话、但被行内标签切开"（<strong>/<code>/<abbr>），
+// 0 个是靠实体解码救回来的。所以现在加的是去标签，不是实体表扩张。
+test('引文被行内标签切开，仍然算页面上有这句话', async () => {
+  const pages = {
+    ...okPages(),
+    'https://gamma.io/guide': 'Our <strong>recommended pattern</strong> for <em>this</em> is documented here.',
+  };
+  const r = await verify({ kind: 'precedent', sources: three() }, ctx(pages));
+  assert.equal(r.ok, true, r.why);
+});
+
+// 反面：拿原始 HTML 当页面正文，会把"只在脚本字符串里出现过"也算成页面说过这句话
+test('引文只出现在 <script> 里不算页面说过', async () => {
+  const prose = 'readable prose about typography, spacing and color that a real guideline page would actually contain';
+  const pages = {
+    ...okPages(),
+    'https://gamma.io/guide': `<html><head><script>var banner="recommended pattern for this";</script></head><body>${prose}</body></html>`,
+  };
+  const r = await verify({ kind: 'precedent', sources: three() }, ctx(pages));
+  assert.equal(r.ok, false);
+  assert.match(r.why, /找不到/, r.why);
+});
+
+test('SPA 壳页要说"正文读不到"，不许报"找不到引文"', async () => {
+  const shell = '<html><head><title>Color</title><script src="/runtime.js"></script><script>window.app={}</script></head><body><div id="app"></div><noscript>enable JS</noscript></body></html>';
+  const pages = { ...okPages(), 'https://gamma.io/guide': shell };
+  const r = await verify({ kind: 'precedent', sources: three() }, ctx(pages));
+  assert.equal(r.ok, false);
+  assert.match(r.why, /正文读不到/, r.why);
+  assert.doesNotMatch(r.why, /找不到/, r.why);
 });
 
 test('回访失败与 404 分别说清，不许合并成一句"核实不了"', async () => {

@@ -68,6 +68,30 @@ const registrable = (url) => {
 
 const norm = (s) => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
 
+// 引文要对照"页面上看得见的正文"，不是传输字节。真网络实测（2026-11-06，24 个公开设计文档）：
+// 能选出引文的 17 个源里 8 个句子被行内标签切开（<abbr>/<strong>/<code>、块级边界），原始 HTML
+// 匹配不上；反过来按原始 HTML 匹配，`<script>` 里的字符串也算"页面说过这句话"——那是假绿。
+// 两个方向同一个修法：去脚本样式、去标签、解实体。实体解码单独能救的是 0 个，留在这里是为了
+// 不把 `&amp;` 当成引文的一部分。
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', hellip: '…', middot: '·', times: '×', deg: '°' };
+function visibleText(html) {
+  const stripped = String(html)
+    .replace(/<(script|style|noscript|template)\b[\s\S]*?(?:<\/\1>|$)/gi, ' ')
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, ' ')
+    .replace(/<[^>]*>/g, ' ');
+  return norm(
+    stripped
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+      .replace(/&([a-z]+);/gi, (m, k) => ENTITIES[k.toLowerCase()] ?? m),
+  );
+}
+
+// 页面到底有没有正文可读。实测 m3.material.io 返回 200 + 62KB HTML，正文只剩 15 字符；
+// developer.apple.com 同理只剩 38 字符——设计系统站普遍是 SPA。阈值取 50：真实文档页正文
+// 以千字符计，连 50 个字符都没有的"页面"没有可引用的正文。
+const VISIBLE_MIN = 50;
+
 async function verifyPrecedent(evidence, ctx) {
   const sources = Array.isArray(evidence.sources) ? evidence.sources : [];
   if (sources.length < MIN_SOURCES) return { ok: false, why: `业界收敛需要 ≥${MIN_SOURCES} 个独立来源，给了 ${sources.length} 个` };
@@ -95,14 +119,18 @@ async function verifyPrecedent(evidence, ctx) {
       problems.push(`${s.url} 回访 ${res?.status ?? '无响应'}`);
       continue;
     }
-    const hay = norm(res.text ?? '');
+    const seen = visibleText(res.text ?? '');
     const needle = norm(s.quote);
     if (needle.length < MIN_QUOTE) {
       problems.push(`${s.url} 的引文太短，不足以证明它真的在说这件事`);
       continue;
     }
-    if (!hay.includes(needle)) {
-      problems.push(`${s.url} 里找不到那句引文`);
+    if (!seen.includes(needle)) {
+      problems.push(
+        seen.length < VISIBLE_MIN
+          ? `${s.url} 正文读不到（200 但可见正文只剩 ${seen.length} 字符，多半是 JS 渲染的壳页）——不算编造，这一票不成立`
+          : `${s.url} 里找不到那句引文`,
+      );
       continue;
     }
     confirmed.push({ host, url: s.url });
@@ -233,8 +261,9 @@ export async function verify(evidence, ctx) {
       return { ok: false, why: `回访失败：${err.message}` };
     }
     if (!res || res.status !== 200) return { ok: false, why: `回访失败：${res?.status ?? '无响应'}` };
-    if (!includesAll(String(res.text ?? ''), asserts)) {
-      return { ok: false, why: '来源里没有声称的要点' };
+    const seen = visibleText(res.text ?? '');
+    if (!includesAll(seen, asserts)) {
+      return { ok: false, why: seen.length < VISIBLE_MIN ? `回访 200 但可见正文只剩 ${seen.length} 字符（多半是 JS 渲染的壳页），要点无从核对` : '来源里没有声称的要点' };
     }
     return { ok: true, why: `${ref} 可回访且含声称要点` };
   }

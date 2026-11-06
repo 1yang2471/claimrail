@@ -118,7 +118,13 @@ function makeCtx({ cwd, allowNet, changed }) {
       if (!allowNet) return null;
       // 死链/DNS 失败必须变成这一条证据失败，而不是把整份 check 炸掉：
       // 没有 timeout 和 try/catch 时，一个不可达 URL 会让其余分叉的回验结果全部丢失
-      const res = await globalThis.fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'follow' });
+      // accept-language 是实测补的：web.dev 对不带语言标的回访返回过法语页，英文引文因此在
+      // 自己刚引过的那篇上匹配不上——语言漂移不该算成"这个来源不成立"
+      const res = await globalThis.fetch(url, {
+        signal: AbortSignal.timeout(10_000),
+        redirect: 'follow',
+        headers: { 'accept-language': 'en' },
+      });
       return { status: res.status, text: await res.text() };
     },
   };

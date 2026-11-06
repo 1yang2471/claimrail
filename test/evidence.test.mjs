@@ -37,6 +37,19 @@ test('五种 kind 的合法形状都能通过', async () => {
   assert.equal(web.ok, true);
 });
 
+// web 档回验的是"页面上有没有这句话"，不是"传输字节里有没有这串字"。与 precedent 档同源：
+// 真网络实测 17 个可引源里 8 个的句子被行内标签切开；反过来按原始 HTML 匹配，<script> 里的
+// 字符串也能冒充页面正文。
+test('web 档按可见正文回验：被标签切开算说过，只在脚本里出现不算', async () => {
+  const split = { allowNet: true, fetch: async () => ({ status: 200, text: 'the <strong>composer spacing</strong> is <em>tight</em>' }) };
+  const claim = { kind: 'web', ref: 'https://x.dev/a', asserts: ['composer spacing is tight'] };
+  assert.equal((await verify(claim, split)).ok, true);
+
+  const prose = 'prose a real documentation page would contain about layout, motion and color contrast';
+  const scripted = { allowNet: true, fetch: async () => ({ status: 200, text: `<script>var s="composer spacing is tight";</script><p>${prose}</p>` }) };
+  assert.equal((await verify(claim, scripted)).ok, false);
+});
+
 // ---- render 档：伪造报告 ----
 
 test('伪造：报告里写一个不存在的检查项 id，不认', async () => {

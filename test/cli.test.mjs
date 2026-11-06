@@ -199,3 +199,33 @@ test('刚 init 的空仓库可以直接过：无分叉 + 留了原因', async ()
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 实测到的假阴性来源：web.dev 对没带 Accept-Language 的回访返回过法语页，英文原句因此在
+// 自己引过的那篇上匹配不上。回访核实的是"那句话在不在页面上"，语言漂移属于核实之外的噪声。
+test('回访带 accept-language: en，且按可见正文核对要点', async () => {
+  const { createServer } = await import('node:http');
+  const { writeFile: wf, mkdtemp: mk } = await import('node:fs/promises');
+  const seen = {};
+  const srv = createServer((req, res) => {
+    seen.lang = req.headers['accept-language'];
+    res.writeHead(200, { 'content-type': 'text/html' });
+    // 句子被行内标签切开：原始 HTML 里没有连写的 "composer spacing is tight"
+    res.end('<p>the <strong>composer spacing</strong> is <em>tight</em> on this page.</p>');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = await mk(join(tmpdir(), 'fk-net-'));
+  try {
+    const ref = `http://127.0.0.1:${srv.address().port}/guide`;
+    const ledger = 'net-ledger.json';
+    await wf(join(dir, ledger), JSON.stringify({
+      schema: 1, task_class: 'refactor',
+      forks: [{ fork: '列表项密度', options: ['紧凑', '宽松'], picked: '宽松', evidence: { kind: 'web', ref, asserts: ['composer spacing is tight'] }, cost_if_wrong: 'low', verified: true }],
+    }));
+    const res = await check({ cwd: dir, ledger, diffText: '', allowNet: true });
+    assert.equal(seen.lang, 'en', `回访没带语言标头：${JSON.stringify(seen)}`);
+    assert.doesNotMatch(res.text, /来源里没有声称的要点/, res.text);
+  } finally {
+    srv.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

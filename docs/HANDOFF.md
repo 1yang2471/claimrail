@@ -8,8 +8,8 @@ forklight 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 15 个模块 / 1400+ 行 src / `node --test` 229 项（228 通过 + 1 skip，真网络烟测默认关）/ 6 条命令：`init check web record rules invalidate`
-- 提交到 `1720357`。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
+- 15 个模块 / 1400+ 行 src / `node --test` 234 项（233 通过 + 1 skip，真网络烟测默认关）/ 6 条命令：`init check web record rules invalidate`
+- 提交到 `de2cb59`（交接文档）之后是本轮：precedent 档真实测量 + 三处修正（`git log -1`）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 
 ## 别退回去的实测事实
@@ -22,15 +22,20 @@ forklight 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 - 先采未聚焦基线，再走 Tab。顺序倒过来焦点检查一路假绿。
 - 台账自身从 `lastChangeMs` 里排除，否则每条 render 证据先天"过时"，报告层检查永远轮不到执行。
 - 自供字段一律拒收（`options_cost`/`confidence`/`rationale`）；候选代价由程序逐候选 observe 真算，算不出就打「规则四未启用」。
+- 引文核实必须对照**可见正文**，不是传输字节（24 个真实设计文档 URL 实测：17 个可选出引文，其中 9 个原始 HTML 直接命中、8 个被行内标签切开、0 个靠实体解码救回）。按原始 HTML 匹配还反过来漏一类假绿：引文只在 `<script>` 字符串里出现也算"页面上有"。
+- 壳页判"正文读不到"、不判"编造"：`m3.material.io` 200 + 62KB HTML 只剩 15 个可见字符，`developer.apple.com` 剩 38 个。设计系统站普遍是 SPA，这一档现在够不着它们。
+- 回访必须带 `accept-language: en`——实测 web.dev 不带语言标返回过法语页，英文原句在自己刚引过的那篇上匹配不上。
+- "业界都这么做"这句话本身有时就是不成立的：触摸目标尺寸实测 24 CSS px（WCAG）/ 44pt（Apple）/ 48dp（Material）/ 1cm×1cm（NN/g，物理量纲）。这种分叉正确申报是"各家数字不一致，我选 X 因为 Y"。
+- 引文命中 ≠ 页面在推荐该做法。实测两处命中是例外条款（W3C "cannot use color alone to achieve 3:1…"、SC 2.5.8 "links within paragraphs…do not need to meet the 24 by 24 css pixels…"）。程序判不了语气，别把这一档说成"程序已经确认业界支持"。
 
 ## 下一步（按此顺序，别先做 bench）
 
-1. **验 `precedent` 档到底是真的还是我写来自我安慰的**（需用户同意发真网络请求，`FK_NET=1`）。要回答的是：真实设计文档里能不能找到 ≥3 个独立域名、且引文可回访核实地在推荐同一做法？普遍引文对不上（重排/JS 渲染/付费墙）就该改成"尽力核实 + 覆盖率如实上报"，而不是强制。
-2. **起 dev server 跑真 SPA**（Shinsekai/frontend；Vite，需装依赖）。当前 `file://` 打开是空白页 → 五项全未判。真实前端 + `--state` 登录态至今零覆盖。
-3. **bench：有/无协议对照，拿到静默塌缩率与打断中位数**。陷阱任务要来自第 1、2 步真翻过的车，不要新编。发布文案那句对比必须有数字，没有就照实写"尚未测量"。
-4. **hook 接线**（PostToolUse → `forklight check`），否则约束力仍依赖 agent 自觉。
-5. **把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录**跑一轮，验证 description 真会触发。
-6. README / LICENSE / `0.1.0` tag。只 commit，push 要用户明说。
+0. ~~验 `precedent` 档是真依据还是自我安慰~~ —— **已验完（2026-11-06，24 个真实文档 URL）**。结论：不是自我安慰，门保持强制、没降级成"尽力核实"；但按实测改了三处（可见正文匹配、壳页分诊、`accept-language`），改前 6 条主张放行 0 条、改后 4 条。数字与理由见 `AGENTS.md` 规则表与"别退回去的实测事实"。剩下的口子是语义级的（引文命中≠页面推荐），已列入检出边界，别再重跑这轮测量。
+1. **起 dev server 跑真 SPA**（Shinsekai/frontend；Vite，需装依赖）。当前 `file://` 打开是空白页 → 五项全未判。真实前端 + `--state` 登录态至今零覆盖。
+2. **bench：有/无协议对照，拿到静默塌缩率与打断中位数**。陷阱任务要来自第 1 步真翻过的车，不要新编。发布文案那句对比必须有数字，没有就照实写"尚未测量"。
+3. **hook 接线**（PostToolUse → `forklight check`），否则约束力仍依赖 agent 自觉。
+4. **把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录**跑一轮，验证 description 真会触发。
+5. README / LICENSE / `0.1.0` tag。只 commit，push 要用户明说。
 
 ## 已知未修
 
