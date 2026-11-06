@@ -8,8 +8,10 @@
 export const PROMOTE_HITS = 2;
 
 export function append(entries, e) {
-  if (!e?.key) throw new Error('否决记录必须带 key，否则无从统计命中次数');
-  if (!e?.what) throw new Error('否决记录必须带 what');
+  // key 是升格统计的分组依据，必须是字符串：填了数字会让两次命中算成两组，
+  // 而 rules() 排序时直接 TypeError（同一份 log 里混进两种类型就是这么来的）
+  if (typeof e?.key !== 'string' || !e.key) throw new Error('否决记录必须带字符串 key，否则无从统计命中次数');
+  if (typeof e?.what !== 'string' || !e.what) throw new Error('否决记录必须带字符串 what');
   const at = entries.length + 1;
   return Object.freeze([...entries, Object.freeze({ kind: 'rejection', ...e, at })]);
 }

@@ -79,9 +79,29 @@ test('repo 证据必须写明声称要点，否则"参考了现有代码"无从�
   assert.ok(r.errors.some((e) => e.rule === 'evidence.asserts'));
 });
 
-test('render 证据必须是图片，且不强制 asserts', () => {
-  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/chat@2x.png' } })] })).ok, true);
-  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/chat.txt' } })] })).ok, false);
+test('render 证据必须是图片，且必须写断言项——"我看过了"不是证据', () => {
+  assert.equal(
+    validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/chat@2x.png', asserts: ['scrollbar-clears-text'] } })] })).ok,
+    true,
+  );
+  const noAsserts = validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/chat.png' } })] }));
+  assert.equal(noAsserts.ok, false);
+  assert.ok(noAsserts.errors.some((e) => e.rule === 'evidence.asserts'));
+  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/chat.txt', asserts: ['contrast-ok'] } })] })).ok, false);
+});
+
+test('ref 不许用 ../ 跑到仓库外面去配一对伪造的 png+报告', () => {
+  for (const ref of ['../outside/shot.png', './x.png']) {
+    const r = validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref, asserts: ['contrast-ok'] } })] }));
+    assert.equal(r.ok, false, ref);
+  }
+});
+
+test('空格与中文文件名是合法路径，拒了只会逼人写假 ref', () => {
+  assert.equal(
+    validateLedger(ledger({ forks: [fork({ evidence: { kind: 'repo', ref: 'src/聊天 页面.tsx:12', asserts: ['scrollbar-gutter'] } })] })).ok,
+    true,
+  );
 });
 
 test('web 证据必须给可回访 URL 和要点', () => {

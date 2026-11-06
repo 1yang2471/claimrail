@@ -19,22 +19,31 @@ export const TASK_CLASSES = [
 
 export const EVIDENCE_KINDS = ['repo', 'memory', 'render', 'web'];
 
+// 允许空格与中文路径——"聊天 页面.tsx"这类文件真实存在，正则拒了它等于逼模型
+// 写一条假 ref 来凑数，那比误拦更糟。但禁止以 ./ 或 ../ 开头：render 的 ref 会被
+// join 到 cwd 之外，配上伪造的 .png + .report.json 就能躲到仓库外面去。
+const PATH_BODY = String.raw`(?!\.\.?[\\/])[^:\r\n]+`;
+
 const REF_PATTERNS = {
-  repo: /^[\w./\\-]+:\d+(-\d+)?$/,
-  memory: /^(log|rules|anchor)#\d+$/,
-  // 允许 @ 和方括号：截图文件名里 viewport@2x 这种写法太常见，卡掉它只会逼人改名
-  render: /^[\w.\-/\\[\]@]+\.png$/,
+  repo: new RegExp(`^${PATH_BODY}:\\d+(-\\d+)?$`),
+  // 只认 log#n。规则的真身份是 r:key，不是行号；接受 rules#1 的话回验实现只能按
+  // 数字去取 log 行——"引用一条规则"就变成了假的。
+  memory: /^log#\d+$/,
+  render: new RegExp(`^${PATH_BODY}\\.png$`),
   web: /^https?:\/\/\S+$/,
 };
 
-// 这两档必须去查：声称"参考了现有代码"却不给行号、声称"高分好评"却不给出处，
-// 是最省事的两种编造方式。
-const ASSERTS_REQUIRED = ['repo', 'web'];
+// 三档都必须写明声称要点：不给行号、不给出处、只有截图没有断言项，
+// 是三种最省事的编造方式——最后一种以前不要求，等于允许"我看过了"当证据。
+const ASSERTS_REQUIRED = ['repo', 'render', 'web'];
+
+const MAX_TEXT = 120; // 一屏清单要三秒读完；800 字符的单行"清单"没人读
 
 function badText(value) {
   if (typeof value !== 'string' || value.trim() === '') return '必须是非空单行文本';
   if (value.includes('```')) return '禁止内联代码块';
   if (/[\n\r]/.test(value)) return '禁止多行文本';
+  if (value.length > MAX_TEXT) return `单行不得超过 ${MAX_TEXT} 字符（长说明写进 PR，不要塞进台账）`;
   return null;
 }
 

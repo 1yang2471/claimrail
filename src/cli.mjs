@@ -10,7 +10,7 @@ import { grade } from './cost.mjs';
 import { verifyAll } from './evidence.mjs';
 import { enrich, decide, render } from './gate.mjs';
 import { observe, whyUnknown } from './observe/index.mjs';
-import { newestTrackedMtime, diffAgainstHead } from './observe/git.mjs';
+import { newestTrackedMtime, diffAgainstHead, changedLines, isChangedLine } from './observe/git.mjs';
 import { renderPage } from './observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from './observe/driver.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
@@ -51,10 +51,13 @@ export async function init({ cwd = process.cwd() } = {}) {
   return { code: 0, text: `${created ? '已建' : '已存在，不动'} ${LEDGER_PATH}\n补进 .gitignore：${add.join('、') || '（无新增）'}\n\n${NOTICE}` };
 }
 
-function makeCtx({ cwd, allowNet }) {
+function makeCtx({ cwd, allowNet, changed }) {
   return {
     allowNet,
     lastChangeMs: undefined, // 下面异步补
+    // 先干后证：引用本次新增/修改的行，不能算"仓库里本来就这么做"。
+    // 没有这一条，写完代码再补一条 repo 证据就能免掉一次提问。
+    isChanged: async (file, from, to) => isChangedLine(changed, file, from, to),
     readRange: async (file, from, to) => {
       try {
         const text = await readFile(join(cwd, file), 'utf8');
@@ -82,13 +85,15 @@ function makeCtx({ cwd, allowNet }) {
     readReport: async (p) => (await readJson(join(cwd, p))).value ?? null,
     fetch: async (url) => {
       if (!allowNet) return null;
-      const res = await globalThis.fetch(url);
+      // 死链/DNS 失败必须变成这一条证据失败，而不是把整份 check 炸掉：
+      // 没有 timeout 和 try/catch 时，一个不可达 URL 会让其余分叉的回验结果全部丢失
+      const res = await globalThis.fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'follow' });
       return { status: res.status, text: await res.text() };
     },
   };
 }
 
-export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unattended = false, allowNet = false, diffText = null } = {}) {
+export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unattended = false, allowNet = false, diffText = null, changed = null } = {}) {
   const raw = await readJson(join(cwd, ledger));
   if (!raw.ok) return { code: 1, text: `台账读不到或不是合法 JSON：${raw.error}\n（先跑 forklight init，或把路径传给 --ledger）` };
 
@@ -98,14 +103,15 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
   }
 
   try {
-    const ctx = makeCtx({ cwd, allowNet });
+    const changedNow = changed ?? (await changedLines(cwd));
+    const ctx = makeCtx({ cwd, allowNet, changed: changedNow });
     ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
     const diff = diffText ?? (await diffAgainstHead(cwd));
 
     const observations = [];
     const overrides = [];
     for (const fork of raw.value.forks) {
-      const obs = await observe(fork.target, { cwd, diffText: diff });
+      const obs = await observe(fork.target, { cwd, diffText: diff, changed: changedNow });
       observations.push(obs);
       // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
       if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {

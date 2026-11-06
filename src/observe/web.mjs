@@ -118,6 +118,7 @@ export async function renderPage(page, { outDir, name, label = '', focusSamples 
   await page.screenshot({ path: png });
 
   const report = {
+    report_schema: 1,
     name,
     label,
     viewport: data.viewport,

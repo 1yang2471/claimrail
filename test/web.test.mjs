@@ -109,9 +109,9 @@ test('采集器空转产不出证据：全 null 的报告不能当作"已经看�
       statFile: async (p) => ({ mtimeMs: (await stat(join(dir, p))).mtimeMs }),
       readReport: async (p) => JSON.parse(await readFile(join(dir, p), 'utf8')),
     };
-    const r = await verify({ kind: 'render', ref: 'blank.png' }, ctx);
+    const r = await verify({ kind: 'render', ref: 'blank.png', asserts: ['scrollbar-clears-text', 'contrast-ok'] }, ctx);
     assert.equal(r.ok, false);
-    assert.match(r.why, /没有一项真的判过/);
+    assert.match(r.why, /不作数/);
   });
 });
 
