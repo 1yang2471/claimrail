@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -101,4 +101,38 @@ test('git 退出码归类：缺 git 是"未知"，不是"0 处引用"', async ()
   assert.equal(mapGrepExit(128, ''), 'unknown', '不在 git 仓库里');
   assert.equal(mapGrepExit(2, ''), 'unknown');
   assert.equal(mapGrepExit(1, 'a.mjs:2'), 'unknown', '退出码 1 却带输出，是异常不是零');
+});
+
+// 大仓库不许因为文件多就交 null。实测 6000 个文件全量 stat 只需 148ms——
+// 5000 这个上限保护的是不存在的性能问题，代价是大 monorepo 的 render 证据全军覆没。
+test('文件数超过旧上限时仍然给出时间戳，而不是 null', async () => {
+  const { newestTrackedMtime } = await import('../src/observe/git.mjs');
+  const { writeFile, utimes } = await import('node:fs/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'cr-many-'));
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    // 5200 个文件：刚好越过旧的 5000 上限
+    for (let i = 0; i < 52; i++) {
+      const d = join(dir, `d${i}`);
+      await mkdir(d, { recursive: true });
+      const names = [];
+      for (let j = 0; j < 100; j++) names.push(`f${j}.txt`);
+      await Promise.all(names.map((n) => writeFile(join(d, n), 'x')));
+    }
+    g(['add', '-A']);
+    g(['commit', '-qm', 'many']);
+
+    const target = join(dir, 'd0', 'f0.txt');
+    const future = new Date(Date.now() + 5_000);
+    await utimes(target, future, future);
+
+    const newest = await newestTrackedMtime(dir);
+    assert.equal(typeof newest, 'number', `超过 5000 文件就返回了 ${newest}，大仓库的 render 证据会全失效`);
+    assert.ok(newest >= future.getTime(), `最新时间戳没被算进去：${newest} < ${future.getTime()}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

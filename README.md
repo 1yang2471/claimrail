@@ -92,12 +92,12 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 - SPA shells expose no readable text: `m3.material.io` returns 200 with 62KB of HTML and 15 visible characters. Most design-system sites are like this, so the `precedent` tier can't reach them.
 - A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
 - The logged-in flow is verified against a local login-gated site (anonymous → redirected to `/login`; with `--state` → real content collected). A third-party production page has not been run — that needs your credentials.
-- `newestTrackedMtime` caps at 5000 files and returns `null` beyond that — render evidence fails wholesale in large monorepos.
+- `newestTrackedMtime` stats every tracked file. The cap is 200,000 — high enough that no real repo hits it (6000 files measured at 148ms); beyond it, render evidence is reported undecided rather than guessed.
 
 ## Development
 
 ```bash
-node --test    # 275 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 276 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

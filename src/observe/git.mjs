@@ -187,14 +187,19 @@ export async function grepCount(term, excludeFile, cwd, { fixed = false } = {}) 
   return sumCounts(r.stdout, excludeFile);
 }
 
-// 仓库太大就放弃全量扫描：返回 null 让调用方按"未判"处理，
+// 仓库大到某个程度就放弃全量扫描：返回 null 让调用方按"未判"处理，
 // 而不是拿着半截结果宣布"都比代码新"。
+//
+// 上限原先是 5000，实测把它变成了一个纯损失：6000 个文件全部 stat 只要 148ms
+// （2026-11-08 实测，Windows + NTFS），而 5000 的门槛会让任何正常 monorepo
+// 的 render 证据一次性全失效。现在抬到 200000——它只用来挡住"误把整个 home
+// 目录当仓库"这类异常情况，不再对真实项目生效。
 //
 // 必须排除 claimrail 自己的产物：台账总是在截图之后写，若把它算进"代码改动时间"，
 // 每一条 render 证据都会先天"截图比代码旧"，报告层的伪造检查就永远轮不到执行。
 const SELF_ARTIFACT = /(^|\/)(\.claimrail|memory)(\/|$)/;
 
-export async function newestTrackedMtime(cwd, limit = 5000) {
+export async function newestTrackedMtime(cwd, limit = 200_000) {
   const r = await gitRaw(['ls-files', '-z'], cwd);
   if (r.code !== 0) return null;
   const tracked = splitZ(r.stdout).filter((p) => !SELF_ARTIFACT.test(toPosix(p)));

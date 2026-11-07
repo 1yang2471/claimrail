@@ -91,12 +91,12 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现�
 - SPA 壳页读不到正文：`m3.material.io` 200 + 62KB HTML，可见正文只剩 15 个字符。设计系统站普遍如此，`precedent` 这档现在够不着它们。
 - 引文命中 ≠ 页面在推荐该做法。实测有两处命中的是例外条款；`url + quote` 留给 reviewer 抽查上下文，这是这一档唯一的人防线。
 - 登录闭环已在本地真实的登录门站上验证（匿名被踢到 `/login`；带 `--state` 才拿到受保护内容）。第三方真实产品页未跑——那需要你的凭据。
-- `newestTrackedMtime` 有 5000 文件上限，超限返回 `null`——大 monorepo 的 render 证据会全失效。
+- `newestTrackedMtime` 要对每个跟踪文件取 mtime。上限 200000，真实项目够不着（6000 文件实测 148ms）；超过才返回 `null`，render 证据报未判而不是猜。
 
 ## 开发
 
 ```bash
-node --test    # 275 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 276 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

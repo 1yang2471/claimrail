@@ -8,7 +8,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 16 个模块 / 2260+ 行 src / `node --test` 275 项（274 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
+- 16 个模块 / 2260+ 行 src / `node --test` 276 项（275 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
 - 提交基线 `de2cb59`；之后本轮三条：precedent 实测修正 / 口味类补测降级 / 真 SPA + `--state` 实测（`git log --oneline -4` 可查）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 
@@ -49,7 +49,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 - ~~对比度在磨砂+渐变设计上覆盖率极低（真站 7/111），要判得靠截图像素采样~~ —— **v2 已做（2026-11-08）**：`src/observe/png.mjs`（零依赖 PNG 解码，只支持 8 位非隔行）+ `src/observe/pixel.mjs`（文字矩形内、字形之外的留白多点采样，一致才认）。真浏览器实测：渐变页浅灰字 CSS 判不了 → 像素判出 1.62:1 红；`pixel: false` 时退回未判。**磨砂卡片 + 渐变页的覆盖率实测（2026-11-08）**：10 处文本，关像素只判 2 处（另 8 处"采不到实色背景未判"，报告是绿的），开像素判满 10 处并抓出 2 处真实缺陷（最低 2.41:1）。这条已固化成 `test/browser.test.mjs` 的覆盖率用例；变异：拆掉补背景 → 红 2。仍判不了的：采样点跨渐变、整块图片背景。
 - 非 git 目录三个输入全 null → 一切判 high，工具近乎失明；要么发布时写明边界，要么设计显式非 git 降级模式（新需求，需用户拍板）。
-- `newestTrackedMtime` 有 5000 文件上限，超限返回 null（保守但会让大 monorepo 的 render 证据全失效）。
+- ~~`newestTrackedMtime` 有 5000 文件上限，超限返回 null~~ —— **已修（2026-11-08）**：实测 6000 个文件全量 stat 只要 148ms，5000 的门槛保护的是不存在的性能问题，代价是任何正常 monorepo 的 render 证据全失效。上限抬到 200000（只挡"误把整个 home 当仓库"这类异常）。5200 文件仓库端到端验证：render 证据正常成立、check 退出 0。测试：`test/observe.test.mjs` 超大仓库用例；变异：上限改回 5000 → 红 1。
 - ~~`storageState` 已在真 Chromium + 本地 HTTP 页验证 cookie/localStorage 注入；真实需要登录的产品页尚未跑~~ —— **登录闭环已跑（2026-11-08）**：本地起了一个真的需要登录的站（未登录访问 `/dashboard` 302 到 `/login`，`/login` 永远可达）。无登录态：被踢到 `/login`，看不到受保护内容；带 `--state`：落到 `/dashboard`，采集到 3 处文本 / 1 个控件。已固化成 `test/browser.test.mjs` 用例；变异：`newContext` 去掉 `storageState` → 红 2。仍**未跑**的是第三方真实产品（需要你的凭据）。
 - 门的"未验证"只写在交付末尾，**工具不读交付正文**：真模型实测（`shell-citation` on）在被点名"只有 1 个独立域名确认该说法"的情况下仍写"3 个来源的引文全部当场核实"。**已加反制（2026-11-07）**：`check()` 返回结构化的 `unverified` 数组，`hook()` 在 Stop 时若发现未验证条目且本轮还没续过，以退出码 2 拦一轮、把条目递给模型去逐条声明"这条没能验证，原因是 X"；续过一轮后不再重复阻断。护栏的顺序是"先判 continuedBefore、再判未验证"，变异验证：去掉续轮守卫 → 红 3，去掉未验证分支 → 红 1。**钩子不读交付正文**——它只知道"模型还没被要求声明过"，声明了什么是真是假仍只有人能判。
 - 壳页不是不可核实，取决于台账里写哪个 URL：Apple HIG 的 HTML 可见正文只剩 39 字符，但模型声称从 Apple 的 JSON 数据接口取到了原文。`verifyPrecedent` 只回访台账给的 URL：写壳页 URL 这一票就不成立（v2 再考虑自动找数据接口）。
