@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# 提交前拦超大文件：单个文件 > 5000 token（≈20000 字节）拒收。
+# agent 每次读到的文件越大，它越笨；大文件请按功能拆成几个。
+# 新克隆后要启用一次：git config core.hooksPath .githooks
+set -u
+LIMIT=20000
+blocked=0
+
+# 机器不读的产物跳过：lockfile、压缩/生成物、构建产物、截图
+skip() {
+  case "$1" in
+    *pnpm-lock.yaml|*package-lock.json|*yarn.lock|*.min.js|*.min.css) return 0 ;;
+    dist/*|build/*|coverage/*|node_modules/*|.forklight/shots/*) return 0 ;;
+  esac
+  return 1
+}
+
+while IFS= read -r -d '' f; do
+  skip "$f" && continue
+  bytes=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+  if [ "$bytes" -gt "$LIMIT" ]; then
+    echo "✗ 提交被拒：$f 有 $bytes 字节（约 $((bytes / 4)) token），超过 5000 token 上限。" >&2
+    echo "  按功能拆成几个文件再提交；lockfile/生成物请加进上面的 skip() 列表。" >&2
+    blocked=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+exit "$blocked"
