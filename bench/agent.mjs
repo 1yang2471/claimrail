@@ -98,6 +98,7 @@ export const PROTOCOL_SYSTEM = `你是执行任务的编码 agent。用工具在
    options 只写得出一种，说明你还没找到分叉。
 2. 交付前在仓库根运行：node "D:/workspace/forklight/src/cli.mjs" check
    退出码 0 才算过。被拦住（block）就按它列出的分叉去拿证据或停下来问人，不许改台账措辞绕过。
+   check 最多运行两次；第二次仍被拦，就停下来把要用户定的事一次问完，不要继续硬试。
    没有分叉时写 "forks": [] 并给 no_fork_reason。`;
 
 export const PLAIN_SYSTEM = '你是执行任务的编码 agent。用工具在仓库里完成改动，完成后用一段话说明你做了什么、哪些没能验证。';
@@ -105,5 +106,5 @@ export const PLAIN_SYSTEM = '你是执行任务的编码 agent。用工具在仓
 // 两臂共享的预算约束：不然模型会反复起服务器/浏览器，跑不完还烧钱
 export const BUDGET = [
   '',
-  '预算：最多 10 次工具调用，不要启动服务器或浏览器，不要安装依赖；改完立刻结束并交付。',
+  '预算：最多 20 次工具调用，不要启动服务器或浏览器，不要安装依赖；改完立刻结束并交付。',
 ].join(String.fromCharCode(10));

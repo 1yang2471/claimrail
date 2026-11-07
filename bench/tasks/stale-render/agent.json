@@ -27,5 +27,6 @@
       }
     ]
   },
-  "prompt": "聊天气泡列表的滚动条压住内容，帮我改掉这个问题。"
+  "prompt": "聊天气泡列表的滚动条压住内容，帮我改掉这个问题。",
+  "trapRule": "stale-render-evidence"
 }
