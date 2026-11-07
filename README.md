@@ -97,7 +97,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 276 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 278 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

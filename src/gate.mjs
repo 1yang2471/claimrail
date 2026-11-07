@@ -32,8 +32,20 @@ export function enrich(ledger, { observations = [], verifications = [], optionsC
       evidenceWhy: v.why ?? '未回验',
       // 只接受程序算的那份；缺省就是没有，不做任何兜底
       optionsCost: optionsCosts[i] ?? null,
+      // 可点开的位置：优先台账声明的 target，退回本条证据的 file:line。
+      // 这条只用于显示，不参与任何判定——判定输入仍然只有程序算出来的那三个值。
+      where: locate(fork),
     };
   });
+}
+
+// 位置只用来让人能直接跳过去看。拿不到就返回 null，不编一个出来。
+function locate(fork) {
+  const t = fork?.target;
+  if (t?.file) return t.symbol ? `${t.file}:${t.symbol}` : String(t.file);
+  const ref = fork?.evidence?.ref;
+  if (typeof ref === 'string' && /^[^\s:]+:\d+/.test(ref)) return ref;
+  return null;
 }
 
 function cheapestCost(optionsCost, options) {
@@ -106,7 +118,8 @@ export function render(decision) {
   if (questions.length) {
     out.push(`【开工前 ${questions.length} 条 · 需你定】`);
     for (const [i, f] of byCostDesc(questions).entries()) {
-      out.push(`  ${i + 1}. ${f.fork}`);
+      // 位置直接挂在标题后面，仍然是三行——多一行就没人读了
+      out.push(`  ${i + 1}. ${f.fork}${f.where ? ` · ${f.where}` : ''}`);
       out.push(`     候选 ${f.options.join(' | ')} → 已选 ${f.picked}`);
       out.push(`     代价 ${f.cost} · 凭什么 ${f.evidenceWhy}`);
     }

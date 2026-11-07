@@ -140,3 +140,25 @@ test('分叉多于一条时逐条独立判定，互不遮蔽', () => {
   assert.deepEqual([d.questions.length, d.unverified.length], [1, 1]);
   assert.equal(d.metrics.interrupts, 1);
 });
+
+// PRD 用户故事 4：清单里的位置要能直接点开。渲染曾是三行但没有位置，
+// 用户还得回台账里翻哪个文件。
+test('渲染带可点开的位置：target 优先，退回 evidence 的 file:line，都没有就不编', () => {
+  const withTarget = fork({ target: { file: 'src/Chat.tsx', symbol: 'MessageList' } });
+  const withRef = fork({ fork: '只带 ref', evidence: { kind: 'repo', ref: 'src/base.mjs:12', asserts: ['x'] } });
+  const bare = fork({ fork: '什么都没给' });
+  const text = render(run([withTarget, withRef, bare], { observations: [HIGH, HIGH, HIGH], verifications: [NONE, NONE, NONE] }));
+
+  assert.match(text, /src\/Chat\.tsx:MessageList/);
+  assert.match(text, /src\/base\.mjs:12/);
+  const bareLine = text.split('\n').find((l) => l.includes('什么都没给'));
+  assert.ok(!/:/.test(bareLine), `没有位置时不该编一个出来：${bareLine}`);
+});
+
+// 位置只用于显示，不许改变判定：加上 target 不该让同一条分叉从拦变成放行。
+test('位置只用于显示，不参与判定', () => {
+  const without = run([fork()], { observations: [HIGH], verifications: [NONE] });
+  const withLoc = run([fork({ target: { file: 'src/Chat.tsx' } })], { observations: [HIGH], verifications: [NONE] });
+  assert.equal(without.action, withLoc.action);
+  assert.equal(without.metrics.interrupts, withLoc.metrics.interrupts);
+});
