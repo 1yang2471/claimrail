@@ -53,11 +53,6 @@ export async function headOnRemote(cwd) {
   return n === 0;
 }
 
-export async function diffAgainstHead(cwd) {
-  const r = await gitRaw(['diff', 'HEAD', '--no-color'], cwd);
-  return r.code === 0 ? r.stdout : null;
-}
-
 // baseline 由 init 记录。没有它，"先把改动 commit 掉再 check"就能让
 // `git diff HEAD` 输出空串，副作用扫描与档位计算双双失明——审查报告点名的绕道之二。
 export async function resolveRef(cwd, ref) {

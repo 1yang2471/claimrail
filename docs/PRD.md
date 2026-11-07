@@ -285,4 +285,4 @@ v1 明确不做：
 - `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率只有 7/111，几乎不判。样式层面拿不到真实底色，**要靠像素采样（读截图中文字背后的实际像素）**才能判。列为 v2；在那之前这一项对现代设计语言的检出率要如实写低。
 - FreeCast 仓库有 5 个 tag 且 `origin/main` 有上游 → `published` 非空 → 任何改动都判 high。设计意图（已发布产物收不回来）在真仓库上确认成立，不是只在 fixture 上成立。
 - 名字待定。`forklight` 取"让岔路口可见"，与台账机制一致。
-- **驱动层未决（阻塞 `forklight web` 真正跑起来）**：判定层与采集器已完成并有测试，但本机没有 Playwright 也没有浏览器缓存，所以截图和真实焦点事件都还没有出口。两条路各有代价：装 Playwright（依赖重、要多下载一个浏览器，但 `storageState` 与真实键盘事件都是现成的）；或用系统 Edge 走裸 CDP（零新依赖，Node 自带 WebSocket 就能连，但启动参数、端口发现、消息解析都要自己维护）。焦点环那一项在两条路上都要靠真实键盘事件才能从 `null` 变成可判。
+- **驱动层已选定 Playwright 并跑通（2026-11-07 更新，取代原"未决"条目）**：Playwright + Chromium 已装，`forklight web` 在 Shinsekai 真 Vite SPA 上双视口出报告（390×700 / 1280×800），真实键盘 Tab 让焦点项从 `null` 变成可判；首次冷启动时 `networkidle` 有 20s 超时，预热后消失。`storageState` 的 cookie/localStorage 注入有真浏览器测试（变异验证红/绿），但**真实需要登录的产品页仍未跑**。Edge 裸 CDP 那条路不再考虑。
