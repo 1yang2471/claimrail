@@ -9,6 +9,23 @@
   "bin": {
     "forklight": "src/cli.mjs"
   },
+  "files": [
+    "src",
+    "skill",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forklight/forklight.git"
+  },
+  "keywords": [
+    "ai-agents",
+    "decision-log",
+    "evidence",
+    "verification",
+    "cli"
+  ],
   "peerDependencies": {
     "playwright": "^1.40.0"
   },

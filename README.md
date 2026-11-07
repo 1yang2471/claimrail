@@ -19,13 +19,15 @@ forklight 在交付前把门关上：AI 必须先写一份决策台账（哪些�
 
 ## 用法
 
+安装后用 `forklight` 命令；仓库内开发用 `node src/cli.mjs`：
+
 ```bash
-node src/cli.mjs init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
-node src/cli.mjs check             # 交付前校验；退出码 0 才放行
-node src/cli.mjs web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
-node src/cli.mjs record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
-node src/cli.mjs rules             # 现行规则 + 原始否决 + 来源
-node src/cli.mjs invalidate <key>  # 作废一条规则；原始 log 一条不动
+forklight init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
+forklight check             # 交付前校验；退出码 0 才放行（CI / npx 同理）
+forklight web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
+forklight record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
+forklight rules             # 现行规则 + 原始否决 + 来源
+forklight invalidate <key>  # 作废一条规则；原始 log 一条不动
 ```
 
 `check` 默认不联网。`precedent` / `web` 两档要真回访时加 `--allow-net`——这是外发查询，默认需要你同意。
