@@ -399,3 +399,12 @@ test('init 的指路段指向包内真实存在的 SKILL.md，不写"加载技�
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 端到端接线：parse() 把拼错的命令放在 flags.unknown，handler 必须从那里读。
+// 只测 unknownCmd({command}) 会漏掉这个错配——真实 CLI 报过"没有这个命令："后面是空的。
+test('parse → unknownCmd 接线：拼错的命令名要真的出现在报错里', async () => {
+  const { cmd, flags } = parse(['chekc']);
+  assert.equal(cmd, 'unknown');
+  const r = await unknownCmd(flags);
+  assert.match(r.text, /没有这个命令：chekc/, `报错里没带命令名：${r.text.split('\n')[0]}`);
+});

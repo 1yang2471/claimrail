@@ -37,10 +37,13 @@ export async function help() {
   return { code: 0, text: HELP };
 }
 
-export async function unknownCmd({ command } = {}) {
+// parse() 把拼错的命令放在 flags.unknown（handler 收到的就是整个 flags），
+// 所以这里读 unknown；`command` 是给直接调用者留的别名。
+export async function unknownCmd({ unknown, command } = {}) {
+  const name = unknown ?? command ?? '';
   return {
     code: 1,
-    text: [`没有这个命令：${command ?? ''}`, '', HELP, '', '查看命令：forklight --help'].join('\n'),
+    text: [`没有这个命令：${name}`, '', HELP, '', '查看命令：forklight --help'].join('\n'),
   };
 }
 
