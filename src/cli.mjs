@@ -13,11 +13,10 @@ import { observe, whyUnknown } from './observe/index.mjs';
 import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince } from './observe/git.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
 import { web } from './commands/web.mjs';
+import { LEDGER_PATH, BASELINE_PATH } from './paths.mjs';
+import { parse, help, unknownCmd } from './args.mjs';
 
-export { web };
-
-export const LEDGER_PATH = join('.forklight', 'decisions.json');
-const BASELINE_PATH = join('.forklight', 'baseline');
+export { web, parse, help, unknownCmd, LEDGER_PATH };
 
 // init 记下 HEAD 作为起点。没有它，"先把改动 commit 掉再 check"就能让
 // `git diff HEAD` 输出空串，副作用扫描与档位计算一起失明。
@@ -60,11 +59,15 @@ async function readJson(path) {
 // 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
 const AGENTS_BEGIN = '<!-- forklight:begin -->';
 const AGENTS_END = '<!-- forklight:end -->';
+// 指路块里刻意不写"去加载 forklight 技能"：技能要靠 SKILL.md 装进宿主的 skills 目录才算注册，
+// npm 安装只把 skill/ 放在包里，不会自动装。写"读技能"会让 agent 去找一个没注册的技能。
+// 改成指向包里那个真实存在的文件路径——它一定在，且能直接读。
 const AGENTS_BLOCK = [
   AGENTS_BEGIN,
   '## forklight',
   '',
-  '动界面、文档、接口之前，先读 forklight 技能，写 `.forklight/decisions.json` 申报分叉与证据；',
+  '动界面、文档、接口之前，先读 `node_modules/forklight/skill/SKILL.md`（没装成依赖就读仓库里的 `skill/SKILL.md`），',
+  '写 `.forklight/decisions.json` 申报分叉与证据；',
   '交付前跑 `forklight check`——结构不合规先修申报，红的不许交。',
   AGENTS_END,
 ].join('\n');
@@ -334,56 +337,7 @@ export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
   }
 }
 
-const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
-
-function parse(argv) {
-  const cmd = COMMANDS.includes(argv[0]) ? argv[0] : 'check';
-  const opts = { cmd, start: COMMANDS.includes(argv[0]) ? 1 : 0 };
-  const flags = {
-    cwd: process.cwd(),
-    ledger: LEDGER_PATH,
-    unattended: false,
-    allowNet: false,
-    url: undefined,
-    state: undefined,
-    viewport: '390x700,1280x800',
-    out: join('.forklight', 'shots'),
-    name: undefined,
-    key: undefined,
-    what: undefined,
-    why: undefined,
-    anchor: false,
-  };
-  let ledgerGiven = false;
-  for (let i = opts.start; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--cwd') flags.cwd = argv[++i];
-    else if (a === '--ledger') {
-      flags.ledger = argv[++i];
-      ledgerGiven = true;
-    } else if (a === '--unattended') flags.unattended = true;
-    else if (a === '--allow-net') flags.allowNet = true;
-    else if (a === '--url') flags.url = argv[++i];
-    else if (a === '--state') flags.state = argv[++i];
-    else if (a === '--viewport') flags.viewport = argv[++i];
-    else if (a === '--out') flags.out = argv[++i];
-    else if (a === '--name') flags.name = argv[++i];
-    else if (a === '--key') flags.key = argv[++i];
-    else if (a === '--what') flags.what = argv[++i];
-    else if (a === '--why') flags.why = argv[++i];
-    else if (a === '--anchor') flags.anchor = true;
-    else if (!a.startsWith('--')) {
-      // check 的位置参数是台账，invalidate 的位置参数是被废的 key，两者不重叠
-      if (cmd === 'check' && !ledgerGiven) {
-        flags.ledger = a;
-        ledgerGiven = true;
-      } else if (cmd === 'invalidate' && !flags.key) flags.key = a;
-    }
-  }
-  return { ...opts, flags };
-}
-
-const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd };
+const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd, help, unknown: unknownCmd };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { cmd, flags } = parse(process.argv.slice(2));

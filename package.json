@@ -15,10 +15,6 @@
     "README.md",
     "LICENSE"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/forklight/forklight.git"
-  },
   "keywords": [
     "ai-agents",
     "decision-log",

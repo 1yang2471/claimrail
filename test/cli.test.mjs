@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
+import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH, parse, help, unknownCmd } from '../src/cli.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = (name) => join('test', 'fixtures', name);
@@ -339,6 +339,62 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
     const second = await hook({ cwd: dir, payload: { stop_hook_active: true } });
     assert.equal(second.code, 0, second.text);
     assert.match(second.text, /不再重复阻断/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 新用户第一屏就是 --help。之前 parse() 把不认识的第一个词当 check，位置参数当台账路径，
+// 于是 `forklight --help` 会去读一份叫 "--help" 的台账、`forklight foo` 读 "foo"。
+test('parse：--help / -h 走帮助，不当成 check', () => {
+  for (const argv of [['--help'], ['-h'], ['help'], ['check', '--help']]) {
+    const r = parse(argv);
+    assert.equal(r.cmd, 'help', `${argv.join(' ')} → ${r.cmd}`);
+  }
+});
+
+test('parse：拼错的命令要报错，不许静默退化成 check', () => {
+  const r = parse(['chekc']);
+  assert.equal(r.cmd, 'unknown');
+  assert.equal(r.flags.unknown, 'chekc');
+});
+
+test('parse：合法命令与位置参数照旧', () => {
+  assert.equal(parse([]).cmd, 'check', '无参数仍然是 check');
+  const withLedger = parse(['check', 'custom.json']);
+  assert.equal(withLedger.cmd, 'check');
+  assert.equal(withLedger.flags.ledger, 'custom.json');
+  assert.equal(parse(['invalidate', 'ui.spacing']).flags.key, 'ui.spacing');
+});
+
+test('帮助文本列出全部命令，且退出码 0', async () => {
+  const r = await help({});
+  assert.equal(r.code, 0);
+  for (const c of ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate']) {
+    assert.match(r.text, new RegExp(`\\b${c}\\b`), `帮助里没有 ${c}`);
+  }
+});
+
+test('未知命令：退出码非 0，且明确说"没有这个命令"并给出 help 提示', async () => {
+  const r = await unknownCmd({ command: 'chekc' });
+  assert.equal(r.code, 1);
+  assert.match(r.text, /没有这个命令/);
+  assert.match(r.text, /chekc/);
+  assert.match(r.text, /--help/);
+});
+
+// npm 安装只把 skill/ 放进包里，不会注册到宿主的 skills 目录。指路块里写"去加载技能"
+// 会让 agent 找一个不存在的东西；必须指向包里真实存在的文件路径。
+test('init 的指路段指向包内真实存在的 SKILL.md，不写"加载技能"', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'forklight-pointer-'));
+  try {
+    await init({ cwd: dir });
+    const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
+    const block = agents.slice(agents.indexOf('<!-- forklight:begin -->'), agents.indexOf('<!-- forklight:end -->'));
+    assert.match(block, /skill\/SKILL\.md/, '指路没给可读的文件路径');
+    assert.doesNotMatch(block, /加载\s*forklight\s*技能|先读 forklight 技能/, '指路仍要求加载一个可能没注册的技能');
+    // 这个路径必须真的存在（本仓库里）
+    assert.ok(existsSync(join(repo, 'skill', 'SKILL.md')), 'skill/SKILL.md 不在包里');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

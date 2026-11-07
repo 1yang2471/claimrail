@@ -36,7 +36,20 @@ forklight invalidate <key>  # 作废一条规则；原始 log 一条不动
 
 ### 接进 agent
 
-`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容）。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 forklight。
+分两步：**指路**（必做，`init` 自动写）和**装技能**（可选，让 agent 能主动加载协议）。
+
+**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），指向 `node_modules/forklight/skill/SKILL.md`。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 forklight。
+
+**装技能**（可选）：`npm install` 只把技能放在包里，**不会**注册到宿主的 skills 目录。要让 agent 能按需加载，把它链到宿主扫描的目录（以 ZCode / CodeBuddy / Trae 共用的 `~/.agents/skills` 为例）：
+
+```bash
+# Linux / macOS
+ln -s "$(pwd)/node_modules/forklight/skill" ~/.agents/skills/forklight
+# Windows（管理员或开发者模式）
+mklink /D "%USERPROFILE%\.agents\skills\forklight" "%CD%\node_modules\forklight\skill"
+```
+
+不装也能用：`AGENTS.md` 里给的是文件路径，agent 直接读那个文件即可，只是不会在你没提到时主动加载。
 
 Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 
@@ -79,7 +92,7 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现�
 ## 开发
 
 ```bash
-node --test    # 250 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 257 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。
