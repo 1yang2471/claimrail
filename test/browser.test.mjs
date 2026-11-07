@@ -279,3 +279,56 @@ test('磨砂+渐变页：像素采样把覆盖率从少数拉到全部，并抓�
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 真实受保护页面的闭环：没有登录态被踢到 /login，带 --state 才能落到真实内容并采集。
+// 之前只验证过"cookie/localStorage 注入进去了"，没验证"注入之后真的能看到受保护内容"。
+test('受保护页面：无登录态被踢到登录页，--state 才拿到真实内容', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const { createServer } = await import('node:http');
+  // /login 本身永远可达——否则未登录访问 /dashboard 会无限重定向，那是夹具的 bug
+  const srv = createServer((req, res) => {
+    const authed = /session=ok/.test(req.headers.cookie || '');
+    if (req.url.startsWith('/login')) {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      return res.end('<!doctype html><body><h1>请登录</h1><form><input><button>登录</button></form></body>');
+    }
+    if (!authed) {
+      res.writeHead(302, { location: '/login' });
+      return res.end();
+    }
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<!doctype html><body><main><h1>私密仪表盘</h1><p>只有登录后才能看到的内容</p><button>导出</button></main></body>');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const port = srv.address().port;
+  const dir = await mkdtemp(join(tmpdir(), 'cr-login-'));
+  try {
+    const statePath = join(dir, 'state.json');
+    await (await import('node:fs/promises')).writeFile(
+      statePath,
+      JSON.stringify({ cookies: [{ name: 'session', value: 'ok', domain: '127.0.0.1', path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'Lax' }], origins: [] }),
+    );
+    const url = `http://127.0.0.1:${port}/dashboard`;
+
+    await withBrowser(async (browser) => {
+      const anon = await openPage(browser, { url, viewport: '1280x800' });
+      const anonBody = await anon.page.textContent('body');
+      assert.ok(anon.page.url().endsWith('/login'), `匿名访问没被踢到登录页：${anon.page.url()}`);
+      assert.ok(!anonBody.includes('私密仪表盘'), '匿名访问看到了受保护内容');
+      await anon.context.close();
+
+      const authed = await openPage(browser, { url, state: statePath, viewport: '1280x800' });
+      const authedBody = await authed.page.textContent('body');
+      assert.ok(authed.page.url().endsWith('/dashboard'), `带登录态仍被踢走：${authed.page.url()}`);
+      assert.ok(authedBody.includes('私密仪表盘'), '带登录态没看到受保护内容');
+
+      const report = await renderPage(authed.page, { outDir: dir, name: 'dash' });
+      await authed.context.close();
+      assert.ok(report.counts.texts >= 3, `受保护页采集到的文本太少：${report.counts.texts}`);
+      assert.ok(report.counts.interactive >= 1, '受保护页没采到可交互元素');
+    });
+  } finally {
+    srv.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
