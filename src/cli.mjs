@@ -215,7 +215,11 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       optionsCosts.push(costs);
     }
 
-    const d = decide(enrich(raw.value, { observations, verifications, optionsCosts }), { humanPresent: !unattended });
+    const d = decide(enrich(raw.value, { observations, verifications, optionsCosts }), {
+      humanPresent: !unattended,
+      // reviewer 抽查"哪个类别从来不长分叉"靠的就是这个字段，不能只校验不显示
+      noForkReason: raw.value.no_fork_reason ?? null,
+    });
 
     return {
       code: d.action === 'proceed' ? 0 : 1,

@@ -8,7 +8,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 16 个模块 / 2260+ 行 src / `node --test` 278 项（277 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
+- 16 个模块 / 2260+ 行 src / `node --test` 279 项（278 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
 - 提交基线 `de2cb59`；之后本轮三条：precedent 实测修正 / 口味类补测降级 / 真 SPA + `--state` 实测（`git log --oneline -4` 可查）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 

@@ -162,3 +162,15 @@ test('位置只用于显示，不参与判定', () => {
   assert.equal(without.action, withLoc.action);
   assert.equal(without.metrics.interrupts, withLoc.metrics.interrupts);
 });
+
+// 0 条分叉不是"所有分叉都有证据"，两者不能共用一句话；
+// 而 no_fork_reason 只校验不显示，reviewer 就看不到"这个类别为什么从不长分叉"。
+test('申报无分叉：显示原因，而不是"0 条均有可回验证据"', () => {
+  const withReason = render(decide([], { noForkReason: '只改了一个错别字' }));
+  assert.match(withReason, /申报无分叉/);
+  assert.match(withReason, /只改了一个错别字/);
+  assert.doesNotMatch(withReason, /均有可回验证据/, '0 条分叉不该说"均有证据"');
+
+  const bare = render(decide([]));
+  assert.match(bare, /没写原因/);
+});

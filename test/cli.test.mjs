@@ -194,7 +194,10 @@ test('刚 init 的空仓库可以直接过：无分叉 + 留了原因', async ()
     await init({ cwd: dir });
     const res = await check({ cwd: dir });
     assert.equal(res.code, 0, res.text);
-    assert.match(res.text, /无需打断/);
+    // 0 条分叉说的是"申报无分叉 + 原因"，不是"所有分叉都有证据"。
+    // init 的模板原因是一句占位提示，正好该被显示出来提醒改写。
+    assert.match(res.text, /申报无分叉/);
+    assert.match(res.text, /为什么这次没有分叉/);
     assert.ok((await stat(join(dir, LEDGER_PATH))).size > 0);
   } finally {
     await rm(dir, { recursive: true, force: true });

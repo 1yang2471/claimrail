@@ -55,7 +55,7 @@ function cheapestCost(optionsCost, options) {
   return grades.includes('low') ? 'low' : 'high';
 }
 
-export function decide(enriched, { humanPresent = true } = {}) {
+export function decide(enriched, { humanPresent = true, noForkReason = null } = {}) {
   const questions = [];
   const unverified = [];
   const violations = [];
@@ -93,6 +93,7 @@ export function decide(enriched, { humanPresent = true } = {}) {
   return {
     action,
     total: enriched.length,
+    noForkReason,
     questions,
     unverified,
     violations,
@@ -145,7 +146,13 @@ export function render(decision) {
     }
   }
 
-  if (out.length === 0) out.push(`【无需打断 · ${total} 条分叉均有可回验证据】`);
+  // 0 条分叉是"申报无分叉"，不是"所有分叉都有证据"——两者不能共用一句话。
+  // 同时把 no_fork_reason 摊出来：reviewer 抽查逃逸靠的就是这个字段（用户故事 18）。
+  if (total === 0) {
+    out.push(decision.noForkReason ? `【申报无分叉 · ${decision.noForkReason}】` : '【申报无分叉 · 没写原因】');
+  } else if (out.length === 0) {
+    out.push(`【无需打断 · ${total} 条分叉均有可回验证据】`);
+  }
 
   return out.join('\n');
 }
