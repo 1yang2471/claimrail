@@ -1,16 +1,36 @@
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { observe, whyUnknown } from '../src/observe/index.mjs';
 import { grade } from '../src/cost.mjs';
 
-// 这一层按 PRD 不做逐命令 mock，直接对 forklight 自己的仓库跑：
-// 它是手头唯一的真 git 仓库，而且正好是 PRD 点名的最大风险形状——
-// 一个没有任何 tag、也没有上游的仓库。
-const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
+// 这一层按 PRD 不做逐命令 mock，直接对一个真 git 仓库跑。
+// 不能拿 forklight 自己的仓库当样本：本仓库发过 0.1.0 之后就有 tag 了，
+// "干净未发布"这个前提会随发版变红。改成每次拷一份工作树到临时目录、重新 init，
+// 这样测试的前提由测试自己造，不受发版状态影响。
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+let repo;
+
+before(async () => {
+  repo = await mkdtemp(join(tmpdir(), 'fk-observe-'));
+  const skip = (p) => !/[\\/](node_modules|\.git|\.forklight|memory)([\\/]|$)/.test(p);
+  await cp(root, join(repo, 'wt'), { recursive: true, filter: skip });
+  repo = join(repo, 'wt');
+  const g = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  g(['init', '-q']);
+  g(['config', 'user.email', 'observe@example.invalid']);
+  g(['config', 'user.name', 'observe']);
+  g(['add', '-A']);
+  g(['commit', '-qm', 'init']);
+});
+
+after(async () => {
+  if (repo) await rm(join(dirname(repo)), { recursive: true, force: true });
+});
 
 test('干净未发布仓库：published 是空数组而不是 null', async () => {
   const obs = await observe({ file: 'src/cost.mjs', symbol: 'FAN_IN_HIGH' }, { cwd: repo, diffText: '' });
