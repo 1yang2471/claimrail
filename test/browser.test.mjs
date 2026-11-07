@@ -180,3 +180,51 @@ test('真浏览器：--state 登录态把 cookie 与 localStorage 注入上下�
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// v2：渐变/图片背景上 CSS 采不到色值，旧实现整项"未判"（真站 104/111 处）。
+// 现在读截图像素补上——但只补能确认的，采样不可信时仍留 null。
+test('渐变背景：CSS 采不到底色时，靠截图像素判出对比度不足', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const dir = await mkdtemp(join(tmpdir(), 'fk-pixel-'));
+  try {
+    await withBrowser(async (browser) => {
+      const session = await openPage(browser, { url: 'about:blank', viewport: '400x200' });
+      await session.page.setContent(
+        '<body style="margin:0;background:linear-gradient(90deg,#ffffff,#f2f2f2)">' +
+          '<p style="margin:40px;font:16px/2 system-ui;color:#c8c8c8">浅灰文字压在渐变上</p></body>',
+      );
+      const report = await renderPage(session.page, { outDir: dir, name: 'gradient' });
+      await session.context.close();
+
+      assert.ok(report.pixelBackgrounds, '报告里没有像素采样统计');
+      assert.equal(report.pixelBackgrounds.filled, 1, '这一处应当靠像素补上');
+      const c = report.checks.find((x) => x.id === 'contrast-ok');
+      assert.equal(c.ok, false, `渐变上的浅灰字应当判红，实得 ${c.ok}：${c.detail}`);
+      assert.match(c.detail, /不足 4\.5:1/);
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('像素采样失败不制造假绿：截图解不了就退回未判', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const dir = await mkdtemp(join(tmpdir(), 'fk-pixel-off-'));
+  try {
+    await withBrowser(async (browser) => {
+      const session = await openPage(browser, { url: 'about:blank', viewport: '400x200' });
+      await session.page.setContent(
+        '<body style="margin:0;background:linear-gradient(90deg,#ffffff,#f2f2f2)">' +
+          '<p style="margin:40px;font:16px/2 system-ui;color:#c8c8c8">浅灰文字压在渐变上</p></body>',
+      );
+      const report = await renderPage(session.page, { outDir: dir, name: 'gradient', pixel: false });
+      await session.context.close();
+
+      assert.equal(report.pixelBackgrounds, undefined, '关掉像素采样后不该有统计');
+      const c = report.checks.find((x) => x.id === 'contrast-ok');
+      assert.equal(c.ok, null, '采不到底色时必须判未判，不许当合格');
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

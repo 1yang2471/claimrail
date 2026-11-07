@@ -1,7 +1,9 @@
 import { join } from 'node:path';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { runChecks } from './geometry.mjs';
 import { applyFocusProbe } from './focus.mjs';
+import { decodePng } from './png.mjs';
+import { applyPixelBackgrounds } from './pixel.mjs';
 
 // 在页面里执行，只采数不判断。某一类元素没采到就少给一类数据，
 // 判定层会返回 null（不作数）——采集失败永远不能变成绿。
@@ -153,13 +155,28 @@ export const reportPathFor = (pngRef) => String(pngRef).replace(/\.png$/, '.repo
 //
 // focusProbe 是回调而不是现成数据：必须先采到未聚焦基线样式，再走 Tab。
 // 顺序反过来（曾经就是反的）会让基线带着焦点，焦点检查一路判绿。
-export async function renderPage(page, { outDir, name, label = '', focusProbe = null, focusSamples = null } = {}) {
+export async function renderPage(page, { outDir, name, label = '', focusProbe = null, focusSamples = null, pixel = true } = {}) {
   await mkdir(outDir, { recursive: true });
   const data = await page.evaluate(collectInPage);
   const png = join(outDir, `${name}.png`);
   const samples = focusProbe ? await focusProbe() : focusSamples;
   const interactive = samples ? applyFocusProbe(data.interactive, samples) : data.interactive;
   await page.screenshot({ path: png });
+
+  // 对比度在渐变/图片背景上 CSS 采不到色值。截图已经落地，就顺手读像素把那一类补上——
+  // 补不上的仍然留 null（未判），绝不猜。采样本身失败（截图解不了）也只是退回原样。
+  let texts = data.texts;
+  let pixelFill = null;
+  if (pixel && data.texts?.length) {
+    try {
+      const img = decodePng(await readFile(png));
+      const r = applyPixelBackgrounds({ ...data, texts }, img);
+      texts = r.texts;
+      pixelFill = { filled: r.filled, inkSuspected: r.inkSuspected, total: r.total };
+    } catch (err) {
+      pixelFill = { error: err.message };
+    }
+  }
 
   const report = {
     report_schema: 1,
@@ -174,7 +191,8 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
       focusProbed: samples ? samples.length : 0,
       ...(data.raw ?? {}),
     },
-    checks: runChecks({ ...data, interactive }),
+    ...(pixelFill ? { pixelBackgrounds: pixelFill } : {}),
+    checks: runChecks({ ...data, texts, interactive }),
   };
   await writeFile(join(outDir, `${name}.report.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   return report;

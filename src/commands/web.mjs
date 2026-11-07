@@ -53,6 +53,13 @@ export async function web({ url, state, viewport = '390x700,1280x800', out = joi
             // 只许引用绿的项。把"未判"写成"已验证"是这套机制最不能出现的事。
             green.length ? `  可引用：{ "kind": "render", "ref": "${ref}", "asserts": [${green.map((g) => `"${g}"`).join(', ')}] }` : '  没有一项真的判过——这份报告不能当证据',
             undecided.length ? `  未判（不作数）：${undecided.join('、')}` : '',
+            // 像素补背景要说出来：读者得知道这一项是读截图读出来的，不是读样式读出来的
+            report.pixelBackgrounds?.filled
+              ? `  像素补背景：${report.pixelBackgrounds.filled}/${report.pixelBackgrounds.total} 处（CSS 采不到色值的）`
+              : '',
+            report.pixelBackgrounds?.inkSuspected
+              ? `  采样疑似压到字形、退回未判：${report.pixelBackgrounds.inkSuspected} 处`
+              : '',
           ]
             .filter(Boolean)
             .join('\n'),
