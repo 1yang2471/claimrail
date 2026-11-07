@@ -1,57 +1,60 @@
 # forklight
 
-规格没写完时，AI 会输出它见过最多的做法，然后交一个看起来已经想清楚的成品。岔路口被走掉了，也没有任何地方记录"这里曾经有过岔路口"。
+English | [中文](README.zh-CN.md)
 
-forklight 在交付前把门关上：AI 必须先写一份决策台账（哪些分叉、候选是什么、选了哪个、凭什么）；程序算改动的代价、回访声称的证据；校验不过，交付不出去。
+When the spec isn't finished, an AI still has to output *something* — so it outputs the most common thing it has seen. What you get back looks like a finished decision. The fork in the road was taken, and nothing records that a fork ever existed.
 
-它不教 AI 有品味。它让 AI 在没依据的时候不再伪装成有依据。
+forklight closes the gate before delivery. The AI must first write a decision ledger (which forks it hit, what the options were, which it picked, and on what grounds). A program computes the cost of each change and re-visits every claimed piece of evidence. If the check fails, nothing ships.
 
-## 拦什么
+It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 
-| 声称 | 程序怎么核 |
+## What it catches
+
+| Claim | How the program checks it |
 | --- | --- |
-| "业界都这么做" | 回访 ≥3 个独立域名；引文必须出现在页面可见正文，只出现在 `<script>` 里不算 |
-| "改回来很容易" | 代价由程序从 fan-in、是否已发布、有无外部副作用算出；模型只能上调 |
-| "截图证明没问题" | 截图必须晚于最后一次代码改动；报告里的未判项（`null`）不作数 |
-| "参考了仓库里的做法" | 重读 `file:line`；本次新增/修改的行不算既有做法 |
-| "我记得你否决过 X" | `log#n` 必须存在且内容对得上；行号错位直接报错 |
-| "本任务没有分叉" | 门看不见。这是目前唯一已知的洞，只能用 `no_fork_reason` 做统计审计，不假装能拦 |
+| "Everyone does it this way" | Re-fetches ≥3 independent registrable domains; the quote must appear in the page's *visible text* — inside `<script>` does not count |
+| "It's easy to revert" | Cost is computed from fan-in, whether the artifact is published, and side effects; the model may only raise it |
+| "The screenshot proves it's fine" | Screenshot must be newer than the last code change; `null` (undecided) items in the report never count as passing |
+| "I followed the existing pattern" | Re-reads the cited `file:line`; lines added/modified in this session don't count as an existing pattern |
+| "I remember you rejected X" | `log#n` must exist and match; a misaligned line number is a hard error |
+| "There are no forks in this task" | Invisible to the gate. This is the one known hole — auditable via `no_fork_reason`, not pretended to be caught |
 
-## 用法
+## Usage
 
-安装后用 `forklight` 命令；仓库内开发用 `node src/cli.mjs`：
+Once installed, use the `forklight` command (from a repo checkout, `node src/cli.mjs` works the same):
 
 ```bash
-forklight init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
-forklight check             # 交付前校验；退出码 0 才放行（CI / npx 同理）
-forklight web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
-forklight record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
-forklight rules             # 现行规则 + 原始否决 + 来源
-forklight invalidate <key>  # 作废一条规则；原始 log 一条不动
+forklight init              # ledger template + AGENTS.md pointer + baseline
+forklight check             # pre-delivery check; exit code 0 lets it through
+forklight web --url http://127.0.0.1:5173/   # two viewports, five geometry checks (needs playwright)
+forklight record --key ui.spacing --what "no overlay scrollbars" --why "covers right-aligned bubbles"
+forklight rules             # current rules + raw rejections + provenance
+forklight invalidate <key>  # retract a rule; the raw log is untouched
+forklight --help            # all commands and flags
 ```
 
-`check` 默认不联网。`precedent` / `web` 两档要真回访时加 `--allow-net`——这是外发查询，默认需要你同意。
+`check` does not touch the network by default. The `precedent` and `web` evidence tiers need real re-fetching, so they require `--allow-net` — an explicit outbound request.
 
-`web` 依赖 Playwright（`peerDependencies` 里的可选项）。没装时 `web` 明确报错，不会伪绿。
+`web` depends on Playwright (an optional peer dependency). Without it, `web` fails loudly rather than pretending to have checked.
 
-### 接进 agent
+### Wiring it into an agent
 
-分两步：**指路**（必做，`init` 自动写）和**装技能**（可选，让 agent 能主动加载协议）。
+Two steps: **pointing** (required, written by `init`) and **installing the skill** (optional, lets the agent load the protocol on its own).
 
-**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），指向 `node_modules/forklight/skill/SKILL.md`。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 forklight。
+**Pointing**: `init` appends a marker block to the target repo's `AGENTS.md` (idempotent, existing content untouched) that points at `node_modules/forklight/skill/SKILL.md`. This is the wiring that measurably works: relying on the skill description alone, ZCode 0.17.1 ran three design tasks without ever loading forklight.
 
-**装技能**（可选）：`npm install` 只把技能放在包里，**不会**注册到宿主的 skills 目录。要让 agent 能按需加载，把它链到宿主扫描的目录（以 ZCode / CodeBuddy / Trae 共用的 `~/.agents/skills` 为例）：
+**Installing the skill** (optional): `npm install` puts the skill in the package but does **not** register it in your host's skills directory. To let the agent load it on demand, link it where the host scans (shown for `~/.agents/skills`, shared by ZCode / CodeBuddy / Trae):
 
 ```bash
 # Linux / macOS
 ln -s "$(pwd)/node_modules/forklight/skill" ~/.agents/skills/forklight
-# Windows（管理员或开发者模式）
+# Windows (admin or developer mode)
 mklink /D "%USERPROFILE%\.agents\skills\forklight" "%CD%\node_modules\forklight\skill"
 ```
 
-不装也能用：`AGENTS.md` 里给的是文件路径，agent 直接读那个文件即可，只是不会在你没提到时主动加载。
+Skipping this is fine: the `AGENTS.md` block gives a real file path, so the agent can just read it — it simply won't load the protocol unprompted.
 
-Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
+Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 ```json
 {
@@ -70,33 +73,33 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 }
 ```
 
-`hook` 从 stdin 读事件；退出码 2 = 拦住并续一轮，stderr 交给模型去修。没有台账的仓库静默放行；`stop_hook_active` 为真时不再重复阻断，否则会打成死循环。
+`hook` reads the event from stdin; exit code 2 means "block and continue one more turn", with stderr handed to the model. Repos without a ledger pass silently; once a turn has already been continued, `stop_hook_active` prevents blocking again (otherwise it loops forever).
 
-## 基准：尚未测量
+## Benchmarks: not yet measured
 
-PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现在 `bench/tasks/` 有 6 个来自真实翻车的任务；真实模型只跑过小样本（本地 Anthropic 兼容网关，`autoclaw-cn/zai_glm-5.3-flash`），够看方向，不够写文案。
+The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` currently holds 6 tasks drawn from real failures; real-model runs so far are a small sample against a local Anthropic-compatible gateway (`autoclaw-cn/zai_glm-5.3-flash`) — enough to see direction, not enough to write copy.
 
-假 agent 跑出的数字只用于机制自测，不是模型的行为分布。
+Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
 
-**所以：发布文案里的对比数字，尚未测量。** 原始记录在 `docs/HANDOFF.md`，没有挑好的数字。
+**So: the comparison numbers in any release copy are not yet measured.** Raw records live in `docs/HANDOFF.md`; nothing has been cherry-picked.
 
-## 已知边界
+## Known limits
 
-- 非 git 目录：三个代价输入全取不到 → 一切判 high，工具近乎失明。
-- 对比度在磨砂 / 渐变背景上覆盖率极低（真站 7/111）。没报红不代表合格，是判不了；要判得靠截图像素采样（v2）。
-- SPA 壳页读不到正文：`m3.material.io` 200 + 62KB HTML，可见正文只剩 15 个字符。设计系统站普遍如此，`precedent` 这档现在够不着它们。
-- 引文命中 ≠ 页面在推荐该做法。实测有两处命中的是例外条款；`url + quote` 留给 reviewer 抽查上下文，这是这一档唯一的人防线。
-- 真实受保护页面的登录闭环尚未跑过（`--state` 注入 cookie / localStorage 已在本地页验证）。
-- `newestTrackedMtime` 有 5000 文件上限，超限返回 `null`——大 monorepo 的 render 证据会全失效。
+- Non-git directories: all three cost inputs are unavailable → everything grades `high`; the tool is nearly blind there.
+- Contrast on frosted/gradient backgrounds used to be unjudgeable (7/111 texts on a real site). It is now sampled from screenshot pixels (v2) — but a text whose sample points straddle a gradient or land on the glyphs themselves is still reported as undecided, not as passing.
+- SPA shells expose no readable text: `m3.material.io` returns 200 with 62KB of HTML and 15 visible characters. Most design-system sites are like this, so the `precedent` tier can't reach them.
+- A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
+- The logged-in flow against a real protected page has not been run (`--state` cookie/localStorage injection is verified against a local page).
+- `newestTrackedMtime` caps at 5000 files and returns `null` beyond that — render evidence fails wholesale in large monorepos.
 
-## 开发
+## Development
 
 ```bash
-node --test    # 258 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 273 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
-真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。
+The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).
 
-## 许可
+## License
 
-MIT，见 [LICENSE](LICENSE)。
+MIT, see [LICENSE](LICENSE).

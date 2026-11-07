@@ -408,3 +408,25 @@ test('parse → unknownCmd 接线：拼错的命令名要真的出现在报错�
   const r = await unknownCmd(flags);
   assert.match(r.text, /没有这个命令：chekc/, `报错里没带命令名：${r.text.split('\n')[0]}`);
 });
+
+// 文档双语化之后，中英两版必须同时进包，且互相链得上。
+// 少一个链接就是"英文用户点不开中文版"，而 npm 页面只显示 README.md。
+test('中英双语文档：两版都在包内，且互相链接', async () => {
+  const pkg = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8'));
+  assert.ok(pkg.files.includes('README.md'), '英文 README 不在 files 里');
+  assert.ok(pkg.files.includes('README.zh-CN.md'), '中文 README 不在 files 里');
+
+  const en = await readFile(join(repo, 'README.md'), 'utf8');
+  const zh = await readFile(join(repo, 'README.zh-CN.md'), 'utf8');
+  assert.match(en, /README\.zh-CN\.md/, '英文版没有链到中文版');
+  assert.match(zh, /README\.md/, '中文版没有链到英文版');
+  assert.ok(existsSync(join(repo, 'README.zh-CN.md')));
+});
+
+test('SKILL.md 的 description 中英双语，英文关键词也要能触发', async () => {
+  const skill = await readFile(join(repo, 'skill', 'SKILL.md'), 'utf8');
+  const desc = skill.split('---')[1].split('description:')[1].split('\n')[0];
+  assert.match(desc, /决策台账/, '中文触发词丢了');
+  assert.match(desc, /decision ledger/i, '英文触发词丢了');
+  assert.ok(desc.length < 1024, `description 过长（${desc.length}），多数宿主会截断`);
+});

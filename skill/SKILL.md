@@ -1,6 +1,6 @@
 ---
 name: forklight
-description: 在规格没定的地方留下决策台账，交付前由程序算代价、回验证据。**要动界面/页面/样式/文档/接口/组件之前先加载**；同一处存在两种以上合理写法、用户说"这不是我要的""看着不舒服""按我们的惯例来"、前端改动收尾、forklight check 报 block 时也用。只有三类不用：改错别字、纯重命名、已知成因的 bug（这三类写 forks: [] 加一句原因）。
+description: 在规格没定的地方留下决策台账，交付前由程序算代价、回验证据。**要动界面/页面/样式/文档/接口/组件之前先加载**；同一处存在两种以上合理写法、用户说"这不是我要的""看着不舒服""按我们的惯例来"、前端改动收尾、forklight check 报 block 时也用。只有三类不用：改错别字、纯重命名、已知成因的 bug（这三类写 forks: [] 加一句原因）。 Leave a decision ledger wherever the spec is underspecified; a program computes cost and re-verifies evidence before delivery. Load this BEFORE touching UI/pages/styles/docs/APIs/components, when more than one reasonable implementation exists, when the user says "not what I wanted"/"looks off"/"follow our conventions", when wrapping up a frontend change, or when forklight check blocks. Only three exceptions: typo, pure rename, bug with a known cause (write forks: [] plus a reason).
 ---
 
 # forklight：让选择留下痕迹
@@ -113,3 +113,116 @@ forklight record --key card-gap --what "卡片上下间距至少 16px" --why "�
 - 不许为了过门把 `evidence` 填成看起来能回验但实际没跑过的东西——五种 kind 全部会被程序回访。`precedent` 尤其查得狠：域名会去重，引文会逐条比对原文。
 - 不许把 `forks: []` 当默认答案。
 - 不许在 block 时改台账措辞绕过提问，要改的是"去拿证据"或"去问人"。
+
+---
+
+# forklight (English)
+
+> Read this whole file before you start. If this change has more than one reasonable implementation, the protocol applies — **even if you think it's small**. "It's a small change" is the most common escape hatch, not a reason.
+
+Where the spec is silent you must output something, so you output the most common thing you've seen. That is not a taste problem, it's a distribution problem. This skill turns that step into a **visible decision**: declare the fork first, let a program compute what it costs to undo, and make the evidence re-visitable. Red does not ship.
+
+The force does not come from how carefully you read this page. It comes from `forklight check`'s exit code.
+
+## 1. Does this task go through the protocol?
+
+Judge by `task_class`, never by "this one looks simple":
+
+- Through the protocol: `ui-new` `docs-new` `api-design` `refactor`
+- Not through: `typo` `rename` `bugfix-known-cause` (write `"forks": []` plus a one-line `no_fork_reason`)
+
+Declaring "no forks" is allowed but always recorded. A category that never grows a fork is where the escape happens.
+
+## 2. Write the ledger
+
+`.forklight/decisions.json`:
+
+```jsonc
+{
+  "schema": 1,
+  "task_class": "ui-new",
+  "forks": [
+    {
+      "fork": "Chat scroll area: overlay scrollbar or reserved gutter",
+      "options": ["overlay", "reserve gutter"],
+      "picked": "reserve gutter",
+      "evidence": { "kind": "repo", "ref": "src/Chat.tsx:88", "asserts": ["scrollbar-gutter"] },
+      "target": { "file": "src/Chat.tsx", "symbol": "MessageList" },
+      "cost_if_wrong": "low",
+      "verified": true
+    }
+  ]
+}
+```
+
+Rules, not suggestions:
+
+- `options` needs at least two entries. If you can only think of one, you haven't found the fork — it doesn't mean there isn't one.
+- One field per line, no inline code. The ledger goes into git for humans to review.
+- `cost_if_wrong` can only be raised by you. The program computes its own grade; if yours is lower it gets overwritten and printed — that overwrite is the place to think again.
+- When `evidence` is `null`, `verified` must be `false`. "I haven't checked yet" is a legal state; "I didn't check but said I did" is not.
+- Write down the forks you're unsure about, even if you plan to take the default. **An undeclared fork is the only thing this mechanism cannot catch.**
+
+## 3. Five evidence tiers
+
+Local tiers first (cheap, offline, authoritative), then:
+
+- **precedent (industry convergence)** — for design tasks, when neither `repo` nor `memory` gives you grounds, you must use this tier; taking "the most common approach" directly is not allowed. `repo` answers "how is this codebase consistent", not "what is the accepted good practice"; a greenfield project has no former, and aligning only with the repo pins output at the average forever. This tier exists to counter "AI ships what it has seen most".
+
+  ```jsonc
+  "evidence": {
+    "kind": "precedent",
+    "sources": [
+      { "url": "https://alpha.dev/guide", "quote": "recommends an 8pt grid for list item spacing" },
+      { "url": "https://beta.design/guide", "quote": "…" },
+      { "url": "https://gamma.io/guide",  "quote": "…" }
+    ],
+    "adoption": { "repo": "primer/css", "minStars": 5000 }   // optional; star count is read live from the GitHub API
+  }
+  ```
+
+  How the program checks it: **each URL is re-fetched and the quote must actually be on that page's visible text**; deduplicated by registrable domain it needs **≥3 independent domains** (three blogs reposting one article is not three votes); `adoption` numbers are read from the API, never from a claim. So "this product has a great review score" can't be said here — which is exactly why it couldn't be said before.
+
+- **web**: a supplementary single source. For `ui-new` / `docs-new` / `api-design` the schema **rejects** this tier outright: a design decision cannot rest on one article.
+
+Stop when you have enough: `repo → memory → render → precedent → web`. If the first four can settle it, don't go further; when none apply, the answer is "ask a human", not "go with the default".
+
+## 4. You must pass the gate before delivering
+
+```
+forklight check            # inside this repo: node src/cli.mjs check
+```
+
+- `✓ 可以交付` (exit 0): continue.
+- `✗ 交付被拦住（block）`: **ask the user about the listed forks before doing anything else**, all at once, not in three rounds. The questions are the `evidence: null` entries.
+- `✗ 交付被拦住（halt）`: unattended, high cost, no evidence. Stop and report where you're stuck; do not "build the common version now and revisit later".
+- Ledger structurally invalid: fix the declaration first, nothing else needs to run.
+- Run `check` at most twice; if the second run still blocks, stop and ask everything in one go — don't keep grinding.
+
+## 5. Frontend changes
+
+```
+forklight web --url http://localhost:5173/chat --state .forklight/storage.json
+```
+
+Multiple viewports are the default (390×700 and 1280×800) — defects like an overlay scrollbar covering text only show up on narrow screens, so running wide-only means letting them through.
+
+If the page won't load, or needs a login you don't have: **never skip silently**. State in your delivery notes "I could not visually verify this item, because X" and run whatever you can.
+
+The output ends with a paste-ready `evidence` line whose `asserts` contain only checks the program passed. Copy it verbatim, don't write your own — turning `null` (undecided) into "verified" is the one thing this mechanism must never do.
+
+## 6. After the user rejects something
+
+```
+forklight record --key card-gap --what "card vertical gap at least 16px" --why "too cramped"
+```
+
+A key must be hit twice before it becomes a rule; `forklight invalidate <key>` retracts a rule, and the raw log stays untouched (the log is truth, rules are cache).
+
+When the user says "not this", record **what they want** (`--what`), not their complaint verbatim. Run `forklight rules` before your next change.
+
+## Never do this
+
+- Never fill `evidence` with something that looks verifiable but was never run — all five kinds are re-checked by the program. `precedent` is checked hardest: domains are deduplicated and every quote is compared against the page.
+- Never treat `forks: []` as the default answer.
+- Never reword the ledger to get past a block; get evidence or ask a human.
