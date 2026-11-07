@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
+import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = (name) => join('test', 'fixtures', name);
@@ -259,4 +259,38 @@ test('重复 init 不重复写指路，也不动已有内容', async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// hooks 层刻意做薄：宿主在"一次响应结束（交付前）"调它。ZCode 的语义是退出码 0 放行、
+// 2 才是故意阻断；其它非零会被宿主当成故障，而不是"拦住"。没有台账 = 这个仓库不在协议里。
+test('hook：没台账时静默放行，不制造噪音', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-hook-'));
+  try {
+    const r = await hook({ cwd: dir });
+    assert.equal(r.code, 0);
+    assert.equal(r.text, '');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('hook：台账通过 → 0；被拦 → 2（2 才是故意阻断）', async () => {
+  const ok = await hook({ cwd: repo, ledger: fixture('ledger-clean.json') });
+  assert.equal(ok.code, 0, ok.text);
+  const blocked = await hook({ cwd: repo, ledger: fixture('ledger-block.json') });
+  assert.equal(blocked.code, 2);
+  assert.match(blocked.text, /拦住/);
+});
+
+// 业界语义（Claude Code / ZCode 同一套）：Stop 的退出码 2 会"续一轮"把 stderr 交给模型。
+// 所以已经因 Stop 钩子续过一轮（stop_hook_active）时不能再拦，否则死循环。
+test('hook：stop_hook_active 为真时不再阻断（防自锁），但仍然报原因', async () => {
+  const again = await hook({ cwd: repo, ledger: fixture('ledger-block.json'), payload: { stop_hook_active: true } });
+  assert.equal(again.code, 0, again.text);
+  assert.match(again.text, /拦住|block|未验证/, '第二次至少要说明为什么没交付');
+});
+
+test('hook：stopHookActive（ZCode 驼峰）同样认', async () => {
+  const again = await hook({ cwd: repo, ledger: fixture('ledger-block.json'), payload: { stopHookActive: true } });
+  assert.equal(again.code, 0, again.text);
 });

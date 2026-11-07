@@ -36,7 +36,7 @@ forklight 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 2. **bench：有/无协议对照，拿到静默塌缩率与打断中位数**。陷阱任务要来自第 0、1 步真翻过的车，不要新编。发布文案那句对比必须有数字，没有就照实写"尚未测量"。
    - **tracer bullet 已跑（2026-11-07）**：`src/bench.mjs` + `bench/tasks/` 三个任务（已发布仓库自报 low、旧截图冒充新证据、申报"无分叉"绕开台账）。假 agent 跑出的机制数字：off 交付 3/3、静默塌缩 3；on 交付 1/3、拦住 2、静默塌缩 1、打断中位数 1。**漏的那 1 条是已知盲区**（口头申报无分叉），bench 如实计入，不藏。
    - **这些数只能说明门对这三种形状有效，不能进发布文案**：agent 是确定性的假 agent，量的是机制不是模型行为；额外耗时中位数也没测（假 agent 不耗时）。要把"模型静默塌缩率"写进文案，先扩到 20-30 个任务并换成真实模型重跑。
-3. **hook 接线**（PostToolUse → `forklight check`），否则约束力仍依赖 agent 自觉。
+3. ~~hook 接线（PostToolUse → `forklight check`）~~ —— **已接（2026-11-07，用户级 Stop）**。位置：`~/.zcode/cli/config.json`（实际 `D:\dev-cache\zcode-home\cli\config.json`）的 `hooks.enabled + events.Stop`，命令 `node "D:/workspace/forklight/src/cli.mjs" hook`（原文件备份在 `config.json.bak-forklight-20261107`）。选择 Stop 而非 PostToolUse 的依据：Claude Code / ZCode 的 Stop + 退出码 2 语义就是"拦住并续一轮，stderr 交给模型修"，正是交付前检查的标准位置；PostToolUse 每次编辑都跑会制造噪音。两个护栏写进 `hook()`：无台账仓库静默放行、`stop_hook_active` 为真时不再重复阻断（防死循环）。真机验证：一次"只回答两个字"的请求被拦后续一轮，模型改成「forklight 卡在滚动区分叉，请定 A/B」。**注意**：ZCode 的**工作区**配置钩子要一次性信任（`security/workspace-hook-trust-v1.json`，按摘要绑定），headless 下未信任会被静默跳过；config 钩子不写进 debug 日志，只能靠行为证据。
 4. ~~把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录，验证 description 真会触发~~ —— **已装并验证（2026-11-07）**。skill 通过 junction 装到 `D:/agent-skills/forklight`（ZCode/CodeBuddy/Trae 共用），`zcode skills list` 可见。**结论：description 单独触发不了**——真模型（ZCode 0.17.1 无头）在"把保存按钮改成固定底栏"上连跑两次设计任务都照做、台账一字不写，即使技能描述已加入"动手前先加载"、且确认 Skill 工具可调。改由 `forklight init` 往目标仓库 AGENTS.md 写 marker 指路段后，同一 prompt 立刻写出 3 条分叉台账（含 repo/memory 证据与一条 `evidence: null`），自跑 `forklight check` 退出码 0、`forklight web` 出双视口报告并说明"未判"项。两级验收（硬：台账落盘可校验；强：跑通 check 闭环）都过。
 5. README / LICENSE / `0.1.0` tag。只 commit，push 要用户明说。
 

@@ -229,6 +229,33 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
   }
 }
 
+// 宿主从 stdin 发事件 JSON（Stop 的 payload 里有 stop_hook_active / stopHookActive）。
+async function readIncoming() {
+  if (process.stdin.isTTY) return null;
+  try {
+    let raw = '';
+    for await (const chunk of process.stdin) raw += chunk;
+    return raw.trim() ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// hooks：宿主接线，刻意做薄，不放逻辑。ZCode/Claude Code 的 Stop 事件 = 一次响应结束（交付前）。
+// 退出码语义是宿主定的：0 放行、2 是"拦住并续一轮"（stderr 交给模型去修），其它非零会被当成故障。
+// 两个护栏：没有台账 = 这个仓库不在协议里 → 静默放行；已经因 Stop 钩子续过一轮 → 不再重复阻断，
+// 否则永远拦的钩子会打成死循环。
+export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
+  const p = payload ?? {};
+  const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const continuedBefore = p?.stop_hook_active === true || p?.stopHookActive === true;
+  if (!existsSync(join(dir, ledger))) return { code: 0, text: '' };
+  const r = await check({ cwd: dir, ledger });
+  if (r.code === 0) return { code: 0, text: '' };
+  if (continuedBefore) return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
+  return { code: 2, text: `${r.text}\n先修申报或去拿证据；拿不到就问人，不要改措辞绕过。` };
+}
+
 export async function web({ url, state, viewport = '390x700,1280x800', out = join('.forklight', 'shots'), name, cwd = process.cwd() } = {}) {
   if (!url) return { code: 1, text: '用法：forklight web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .forklight/shots]' };
 
@@ -345,7 +372,7 @@ export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
   }
 }
 
-const COMMANDS = ['init', 'check', 'web', 'record', 'rules', 'invalidate'];
+const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
 
 function parse(argv) {
   const cmd = COMMANDS.includes(argv[0]) ? argv[0] : 'check';
@@ -394,17 +421,20 @@ function parse(argv) {
   return { ...opts, flags };
 }
 
-const HANDLERS = { init, check, web, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd };
+const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { cmd, flags } = parse(process.argv.slice(2));
   let res;
   try {
-    res = await HANDLERS[cmd](flags);
+    // hook 的 payload 在 stdin：在入口读一次，保持 hook() 本身是纯函数、测试不会挂在等 EOF
+    const args = cmd === 'hook' ? { ...flags, payload: await readIncoming() } : flags;
+    res = await HANDLERS[cmd](args);
   } catch (err) {
     // 兜底：log 损坏、权限问题这类必须报非零，不能静默当成"跑过了"
     res = { code: 1, text: `没跑成：${err.message}` };
   }
-  console.log(res.text);
+  if (cmd === 'hook') { if (res.text) console.error(res.text); }
+  else console.log(res.text);
   process.exitCode = res.code;
 }
