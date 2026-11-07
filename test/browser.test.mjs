@@ -228,3 +228,54 @@ test('像素采样失败不制造假绿：截图解不了就退回未判', async
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// v2 的核心主张：磨砂卡片 + 渐变背景上，CSS 只能判少数文本，像素能判全部。
+// 这条同时钉住"覆盖率提升"和"提升之后抓到的是真缺陷"，而不只是"没报错"。
+test('磨砂+渐变页：像素采样把覆盖率从少数拉到全部，并抓到真实的浅字', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const { createServer } = await import('node:http');
+  const html =
+    '<!doctype html><html><head><style>' +
+    'body{margin:0;font:16px/1.6 system-ui;background:linear-gradient(135deg,#e8f0ff,#fdf2f8 40%,#ecfdf5)}' +
+    '.card{background:rgba(255,255,255,.55);backdrop-filter:blur(12px);padding:20px;margin:16px}' +
+    '.card p{color:#4b5563}.card .dim{color:#9ca3af}' +
+    '.solid{background:#fff;padding:20px;margin:16px}.solid p{color:#374151}' +
+    '</style></head><body>' +
+    '<div class="card"><p>正常对比度</p><p class="dim">偏浅的文字</p></div>' +
+    '<div class="solid"><p>纯色卡片</p></div>' +
+    '<div class="card"><p>渐变上的正文</p></div></body></html>';
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(html);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = await mkdtemp(join(tmpdir(), 'cr-cov-'));
+  try {
+    await withBrowser(async (browser) => {
+      const url = `http://127.0.0.1:${srv.address().port}/`;
+
+      const off = await openPage(browser, { url, viewport: '1280x800' });
+      const noPixel = await renderPage(off.page, { outDir: dir, name: 'off', pixel: false });
+      await off.context.close();
+
+      const on = await openPage(browser, { url, viewport: '1280x800' });
+      const withPixel = await renderPage(on.page, { outDir: dir, name: 'on' });
+      await on.context.close();
+
+      const offDetail = noPixel.checks.find((c) => c.id === 'contrast-ok').detail;
+      const onDetail = withPixel.checks.find((c) => c.id === 'contrast-ok').detail;
+
+      // 关掉像素：有文本判不了（这正是不开 v2 时的假绿来源）
+      assert.match(offDetail, /采不到实色背景未判/, `关像素时应当有未判项，实得：${offDetail}`);
+      // 开像素：全部判上，且补的处数等于刚才未判的处数
+      assert.equal(withPixel.pixelBackgrounds.inkSuspected, 0);
+      assert.ok(withPixel.pixelBackgrounds.filled >= 3, `补的处数太少：${JSON.stringify(withPixel.pixelBackgrounds)}`);
+      assert.doesNotMatch(onDetail, /采不到实色背景/, `开像素后仍有未判：${onDetail}`);
+      // 补上之后必须抓到真实的浅字，而不是"全部合格"
+      assert.match(onDetail, /对比度不足 4\.5:1/, `浅灰字没被抓到：${onDetail}`);
+    });
+  } finally {
+    srv.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

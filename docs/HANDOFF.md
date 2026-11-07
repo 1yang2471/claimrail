@@ -8,7 +8,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 16 个模块 / 2260+ 行 src / `node --test` 273 项（272 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
+- 16 个模块 / 2260+ 行 src / `node --test` 274 项（273 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
 - 提交基线 `de2cb59`；之后本轮三条：precedent 实测修正 / 口味类补测降级 / 真 SPA + `--state` 实测（`git log --oneline -4` 可查）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 
@@ -47,7 +47,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 已知未修
 
-- ~~对比度在磨砂+渐变设计上覆盖率极低（真站 7/111），要判得靠截图像素采样~~ —— **v2 已做（2026-11-08）**：`src/observe/png.mjs`（零依赖 PNG 解码，只支持 8 位非隔行）+ `src/observe/pixel.mjs`（文字矩形内、字形之外的留白多点采样，一致才认）。真浏览器实测：渐变页浅灰字 CSS 判不了 → 像素判出 1.62:1 红；`pixel: false` 时退回未判。仍判不了的：采样点跨渐变、整块图片背景。
+- ~~对比度在磨砂+渐变设计上覆盖率极低（真站 7/111），要判得靠截图像素采样~~ —— **v2 已做（2026-11-08）**：`src/observe/png.mjs`（零依赖 PNG 解码，只支持 8 位非隔行）+ `src/observe/pixel.mjs`（文字矩形内、字形之外的留白多点采样，一致才认）。真浏览器实测：渐变页浅灰字 CSS 判不了 → 像素判出 1.62:1 红；`pixel: false` 时退回未判。**磨砂卡片 + 渐变页的覆盖率实测（2026-11-08）**：10 处文本，关像素只判 2 处（另 8 处"采不到实色背景未判"，报告是绿的），开像素判满 10 处并抓出 2 处真实缺陷（最低 2.41:1）。这条已固化成 `test/browser.test.mjs` 的覆盖率用例；变异：拆掉补背景 → 红 2。仍判不了的：采样点跨渐变、整块图片背景。
 - 非 git 目录三个输入全 null → 一切判 high，工具近乎失明；要么发布时写明边界，要么设计显式非 git 降级模式（新需求，需用户拍板）。
 - `newestTrackedMtime` 有 5000 文件上限，超限返回 null（保守但会让大 monorepo 的 render 证据全失效）。
 - `storageState` 已在真 Chromium + 本地 HTTP 页验证 cookie/localStorage 注入（变异验证红/绿）；**真实需要登录的产品页尚未跑**。Shinsekai 本身无登录门，不要把注入测试说成登录闭环。
