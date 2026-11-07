@@ -34,7 +34,7 @@ const fakePage = (data) => ({
 });
 
 const withDir = async (fn) => {
-  const dir = await mkdtemp(join(tmpdir(), 'forklight-web-'));
+  const dir = await mkdtemp(join(tmpdir(), 'claimrail-web-'));
   try {
     return await fn(dir);
   } finally {

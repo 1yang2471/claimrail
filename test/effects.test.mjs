@@ -82,7 +82,7 @@ test('测试、fixtures、文档、台账、memory、规则表本身都不算被
     'test/fixtures/cmd.sh',
     'docs/PRD.md',
     'README.md',
-    '.forklight/decisions.json',
+    '.claimrail/decisions.json',
     'memory/log.jsonl',
     'src/observe/effects.mjs',
   ]) {
@@ -92,7 +92,7 @@ test('测试、fixtures、文档、台账、memory、规则表本身都不算被
 
 test('台账里诚实描述危险选项的分叉，不再被扫成副作用', () => {
   // 曾经：诚实写出"要不要 rm -rf 旧缓存"的发布类任务，每次都被强制升 high
-  assert.deepEqual(scanDiff(chunk('.forklight/decisions.json', ['要不要 rm -rf 旧缓存并 git push --force'])) , []);
+  assert.deepEqual(scanDiff(chunk('.claimrail/decisions.json', ['要不要 rm -rf 旧缓存并 git push --force'])) , []);
 });
 
 test('文件路径不参与匹配', () => {

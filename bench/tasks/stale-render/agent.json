@@ -17,7 +17,7 @@
         "picked": "保留覆盖式",
         "evidence": {
           "kind": "render",
-          "ref": ".forklight/shots/bubble.png",
+          "ref": ".claimrail/shots/bubble.png",
           "asserts": [
             "scrollbar-clears-text"
           ]

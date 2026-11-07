@@ -9,7 +9,7 @@ import { observe, whyUnknown } from '../src/observe/index.mjs';
 import { grade } from '../src/cost.mjs';
 
 // 这一层按 PRD 不做逐命令 mock，直接对一个真 git 仓库跑。
-// 不能拿 forklight 自己的仓库当样本：本仓库发过 0.1.0 之后就有 tag 了，
+// 不能拿 claimrail 自己的仓库当样本：本仓库发过 0.1.0 之后就有 tag 了，
 // "干净未发布"这个前提会随发版变红。改成每次拷一份工作树到临时目录、重新 init，
 // 这样测试的前提由测试自己造，不受发版状态影响。
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,7 +17,7 @@ let repo;
 
 before(async () => {
   repo = await mkdtemp(join(tmpdir(), 'fk-observe-'));
-  const skip = (p) => !/[\\/](node_modules|\.git|\.forklight|memory)([\\/]|$)/.test(p);
+  const skip = (p) => !/[\\/](node_modules|\.git|\.claimrail|memory)([\\/]|$)/.test(p);
   await cp(root, join(repo, 'wt'), { recursive: true, filter: skip });
   repo = join(repo, 'wt');
   const g = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });

@@ -6,8 +6,8 @@ import { join } from 'node:path';
 import { renderPage } from '../observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from '../observe/driver.mjs';
 
-export async function web({ url, state, viewport = '390x700,1280x800', out = join('.forklight', 'shots'), name, cwd = process.cwd() } = {}) {
-  if (!url) return { code: 1, text: '用法：forklight web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .forklight/shots]' };
+export async function web({ url, state, viewport = '390x700,1280x800', out = join('.claimrail', 'shots'), name, cwd = process.cwd() } = {}) {
+  if (!url) return { code: 1, text: '用法：claimrail web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .claimrail/shots]' };
 
   let browser;
   try {

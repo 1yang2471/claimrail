@@ -106,7 +106,7 @@ export async function invalidateRule(dir, keyOrId) {
   const hit = list.filter((r) => r.key === keyOrId || r.id === keyOrId);
   if (!hit.length) {
     throw new Error(
-      `没有叫 "${keyOrId}" 的现行规则。可能它还没命中满两次（还没升格），也可能已经废过——原始 log 不受影响，用 forklight rules 看现在生效的`,
+      `没有叫 "${keyOrId}" 的现行规则。可能它还没命中满两次（还没升格），也可能已经废过——原始 log 不受影响，用 claimrail rules 看现在生效的`,
     );
   }
 

@@ -90,13 +90,13 @@ export async function runRealAgent({ dir, prompt, system, maxSteps = 12 }) {
 
 export const PROTOCOL_SYSTEM = `你是执行任务的编码 agent。用工具在仓库里完成改动，完成后用一段话说明你做了什么、哪些没能验证。
 
-本仓库启用了 forklight 协议，你必须：
-1. 动手前写 .forklight/decisions.json（JSON，schema=1），task_class 取 ui-new|docs-new|api-design|refactor|typo|rename|bugfix-known-cause 之一。
+本仓库启用了 claimrail 协议，你必须：
+1. 动手前写 .claimrail/decisions.json（JSON，schema=1），task_class 取 ui-new|docs-new|api-design|refactor|typo|rename|bugfix-known-cause 之一。
    每个"规格没定、存在两种以上合理写法"的分叉写一条：fork（一句话）、options（≥2 项）、picked、target（{file, symbol?}）、evidence、cost_if_wrong、verified。
    evidence 五档：repo{ref:"file:line",asserts:[要点]}、memory{ref:"log#n",asserts}、render{ref:截图,asserts}、precedent{sources:[{url,quote}],adoption?}、web{ref,asserts}。
    没有证据就写 evidence:null 且 verified:false——"没查"是合法状态，"没查却说查了"不是。
    options 只写得出一种，说明你还没找到分叉。
-2. 交付前在仓库根运行：node "D:/workspace/forklight/src/cli.mjs" check
+2. 交付前在仓库根运行：node "D:/workspace/claimrail/src/cli.mjs" check
    退出码 0 才算过。被拦住（block）就按它列出的分叉去拿证据或停下来问人，不许改台账措辞绕过。
    check 最多运行两次；第二次仍被拦，就停下来把要用户定的事一次问完，不要继续硬试。
    没有分叉时写 "forks": [] 并给 no_fork_reason。`;

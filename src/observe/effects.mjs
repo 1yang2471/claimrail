@@ -31,7 +31,7 @@ const SELF_IGNORE = [
   /(^|\/)tests?(\/|$)/,
   /(^|\/)fixtures(\/|$)/,
   /(^|\/)docs(\/|$)/,
-  /(^|\/)\.forklight(\/|$)/,
+  /(^|\/)\.claimrail(\/|$)/,
   /(^|\/)memory(\/|$)/,
   /(^|\/)(README|AGENTS)\.md$/,
   /\.test\.[cm]?js$/,

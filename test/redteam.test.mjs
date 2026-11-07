@@ -32,19 +32,19 @@ const withRepo = async (fn) => {
 };
 
 const ledger = (dir, forks, extra = {}) =>
-  writeFile(join(dir, '.forklight', 'decisions.json'), JSON.stringify({ schema: 1, task_class: 'ui-new', forks, ...extra }, null, 2), 'utf8');
+  writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify({ schema: 1, task_class: 'ui-new', forks, ...extra }, null, 2), 'utf8');
 
 const fork = (over = {}) => ({ fork: '滚动区实现', options: ['覆盖式', '留 gutter'], picked: '留 gutter', cost_if_wrong: 'low', verified: false, evidence: null, ...over });
 
 test('伪造一：手写 png + report.json 冒充判过 → 拦', async () => {
   await withRepo(async (dir) => {
-    await mkdir(join(dir, '.forklight/shots'), { recursive: true });
-    await writeFile(join(dir, '.forklight/shots/x.png'), 'PNG');
+    await mkdir(join(dir, '.claimrail/shots'), { recursive: true });
+    await writeFile(join(dir, '.claimrail/shots/x.png'), 'PNG');
     await writeFile(
-      join(dir, '.forklight/shots/x.report.json'),
+      join(dir, '.claimrail/shots/x.report.json'),
       JSON.stringify({ checks: [{ id: 'anything-i-made-up', ok: true }] }), // 无版本、无 name、id 是编的、四项缺失
     );
-    await ledger(dir, [fork({ evidence: { kind: 'render', ref: '.forklight/shots/x.png', asserts: ['scrollbar-clears-text'] }, verified: true })]);
+    await ledger(dir, [fork({ evidence: { kind: 'render', ref: '.claimrail/shots/x.png', asserts: ['scrollbar-clears-text'] }, verified: true })]);
 
     const r = await check({ cwd: dir });
     assert.equal(r.code, 1, r.text);
@@ -99,7 +99,7 @@ test('中文文件名：旧截图不许因为路径被转义而蒙过新鲜度',
     await g(dir, ['add', 'src/清理脚本.mjs']);
     await g(dir, ['commit', '-qm', '中文名']);
 
-    const mk = join(dir, '.forklight/shots');
+    const mk = join(dir, '.claimrail/shots');
     await mkdir(mk, { recursive: true });
     await writeFile(join(mk, 's.png'), 'PNG');
     await writeFile(
@@ -121,7 +121,7 @@ test('中文文件名：旧截图不许因为路径被转义而蒙过新鲜度',
     const { utimes } = await import('node:fs/promises');
     await utimes(join(mk, 's.png'), past, past);
 
-    await ledger(dir, [fork({ target: { file: 'src/清理脚本.mjs', symbol: 'b' }, evidence: { kind: 'render', ref: '.forklight/shots/s.png', asserts: ['contrast-ok'] }, verified: true })]);
+    await ledger(dir, [fork({ target: { file: 'src/清理脚本.mjs', symbol: 'b' }, evidence: { kind: 'render', ref: '.claimrail/shots/s.png', asserts: ['contrast-ok'] }, verified: true })]);
     const r = await check({ cwd: dir });
     // 低代价 + 证据不成立 → 照做但当场说出（锁定的降级规则），关键是旧图没被当成新图
     assert.match(r.text, /截图比代码旧/, r.text);
@@ -234,7 +234,7 @@ test('绕道洞二：纯 rename（相对起点只有一行 rename，无内容行
     await g(dir, ['commit', '-qm', '搬进执行区']);
 
     // 先确认这个 diff 里真的只有 rename、没有内容行
-    const raw = g(dir, ['diff', (await readFile(join(dir, '.forklight', 'baseline'), 'utf8')).trim(), '--no-color']);
+    const raw = g(dir, ['diff', (await readFile(join(dir, '.claimrail', 'baseline'), 'utf8')).trim(), '--no-color']);
     assert.match(raw, /rename from docs\/notes-copy\.mjs/, raw.slice(0, 400));
     assert.equal(raw.includes('+rm -rf'), false, 'diff 里居然带了内容行，这条用例测不到纯 rename');
 
@@ -249,7 +249,7 @@ test('绕道洞二：纯 rename（相对起点只有一行 rename，无内容行
 test('没有 baseline 时不许静默缩小扫描范围，要当场说明', async () => {
   await withRepo(async (dir) => {
     const { rm: rmf } = await import('node:fs/promises');
-    await rmf(join(dir, '.forklight', 'baseline'), { force: true });
+    await rmf(join(dir, '.claimrail', 'baseline'), { force: true });
     await ledger(dir, [], { no_fork_reason: '本次只动了 baseline 文件，没有设计分叉' });
     const r = await check({ cwd: dir, diffText: null });
     assert.match(r.text, /没有 baseline/, r.text);
@@ -318,12 +318,12 @@ test('弱断言一律拒：单字符、跨整文件、第 0 行', async () => {
 
 test('空报告全 null 也不能当证据：未判就是未判', async () => {
   await withRepo(async (dir) => {
-    const mk = join(dir, '.forklight/shots');
+    const mk = join(dir, '.claimrail/shots');
     await mkdir(mk, { recursive: true });
     await writeFile(join(mk, 'e.png'), 'PNG');
     const ids = ['scrollbar-clears-text', 'touch-targets-ok', 'contrast-ok', 'focus-visible-ok', 'bottom-not-covered'];
     await writeFile(join(mk, 'e.report.json'), JSON.stringify({ report_schema: 1, name: 'e', checks: ids.map((id) => ({ id, ok: null, detail: '未采到' })) }));
-    await ledger(dir, [fork({ evidence: { kind: 'render', ref: '.forklight/shots/e.png', asserts: ['contrast-ok'] }, verified: true })]);
+    await ledger(dir, [fork({ evidence: { kind: 'render', ref: '.claimrail/shots/e.png', asserts: ['contrast-ok'] }, verified: true })]);
     const r = await check({ cwd: dir });
     assert.equal(r.code, 1, r.text);
     assert.match(r.text, /不作数/);

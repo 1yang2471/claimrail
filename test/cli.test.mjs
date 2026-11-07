@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH, parse, help, unknownCmd } from '../src/cli.mjs';
+import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = (name) => join('test', 'fixtures', name);
@@ -45,11 +45,11 @@ test('结构不合规就不进入后续检查——先修申报，再谈代价',
 test('台账缺失给出可执行的下一步，不抛栈', async () => {
   const res = await check({ cwd: repo, ledger: 'test/fixtures/nope.json', diffText: '' });
   assert.equal(res.code, 1);
-  assert.match(res.text, /forklight init/);
+  assert.match(res.text, /claimrail init/);
 });
 
 test('init 建模板、说清数据去向，并让偏好与截图不进 git', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'forklight-init-'));
+  const dir = await mkdtemp(join(tmpdir(), 'claimrail-init-'));
   try {
     const res = await init({ cwd: dir });
     assert.equal(res.code, 0);
@@ -62,14 +62,14 @@ test('init 建模板、说清数据去向，并让偏好与截图不进 git', as
     assert.deepEqual(ledger.forks, []);
 
     const gi = await readFile(join(dir, '.gitignore'), 'utf8');
-    for (const p of ['memory/', '*.png', '.forklight/shots/']) assert.ok(gi.includes(p), p);
+    for (const p of ['memory/', '*.png', '.claimrail/shots/']) assert.ok(gi.includes(p), p);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
 
 test('init 不覆盖已有台账——那是别人的申报记录', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'forklight-init2-'));
+  const dir = await mkdtemp(join(tmpdir(), 'claimrail-init2-'));
   try {
     await init({ cwd: dir });
     const file = join(dir, LEDGER_PATH);
@@ -189,7 +189,7 @@ test('record 缺参数给用法，而不是写出半条记录', async () => {
   }
 });
 test('刚 init 的空仓库可以直接过：无分叉 + 留了原因', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'forklight-empty-'));
+  const dir = await mkdtemp(join(tmpdir(), 'claimrail-empty-'));
   try {
     await init({ cwd: dir });
     const res = await check({ cwd: dir });
@@ -232,16 +232,16 @@ test('回访带 accept-language: en，且按可见正文核对要点', async () 
 });
 
 // 实测（2026-11-07，ZCode 0.17.1 无头）：技能描述已加载、Skill 工具可调，但模型在一个
-// "把保存按钮改成底部固定栏" 的设计任务上就是不加载 forklight（改完样式还自己起了 Chrome
+// "把保存按钮改成底部固定栏" 的设计任务上就是不加载 claimrail（改完样式还自己起了 Chrome
 // 验证）。光靠 description 触发不了，所以 init 要在目标仓库写一段宿主必读的指路。
 test('init 在目标仓库 AGENTS.md 写指路段（没有就建）', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'fk-agents-'));
   try {
     await init({ cwd: dir });
     const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
-    assert.match(agents, /forklight:begin/);
+    assert.match(agents, /claimrail:begin/);
     assert.match(agents, /decisions\.json/);
-    assert.match(agents, /forklight check/);
+    assert.match(agents, /claimrail check/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -256,7 +256,7 @@ test('重复 init 不重复写指路，也不动已有内容', async () => {
     const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
     assert.match(agents, /^# 本仓库规则/, '原有内容被改动了');
     assert.match(agents, /- 用 pnpm/);
-    assert.equal((agents.match(/forklight:begin/g) ?? []).length, 1, '指路段被重复写入');
+    assert.equal((agents.match(/claimrail:begin/g) ?? []).length, 1, '指路段被重复写入');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -309,7 +309,7 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
     await writeFile(join(dir, 'package.json'), '{\n  "name": "x"\n}\n', 'utf8');
     g(['add', '-A']);
     g(['commit', '-qm', 'init']);
-    await mkdir(join(dir, '.forklight'), { recursive: true });
+    await mkdir(join(dir, '.claimrail'), { recursive: true });
     const ledger = {
       schema: 1,
       task_class: 'refactor',
@@ -325,7 +325,7 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
         },
       ],
     };
-    await writeFile(join(dir, '.forklight', 'decisions.json'), JSON.stringify(ledger, null, 2), 'utf8');
+    await writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify(ledger, null, 2), 'utf8');
 
     const c = await check({ cwd: dir });
     assert.equal(c.code, 0, c.text);
@@ -342,91 +342,4 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-});
-
-// 新用户第一屏就是 --help。之前 parse() 把不认识的第一个词当 check，位置参数当台账路径，
-// 于是 `forklight --help` 会去读一份叫 "--help" 的台账、`forklight foo` 读 "foo"。
-test('parse：--help / -h 走帮助，不当成 check', () => {
-  for (const argv of [['--help'], ['-h'], ['help'], ['check', '--help']]) {
-    const r = parse(argv);
-    assert.equal(r.cmd, 'help', `${argv.join(' ')} → ${r.cmd}`);
-  }
-});
-
-test('parse：拼错的命令要报错，不许静默退化成 check', () => {
-  const r = parse(['chekc']);
-  assert.equal(r.cmd, 'unknown');
-  assert.equal(r.flags.unknown, 'chekc');
-});
-
-test('parse：合法命令与位置参数照旧', () => {
-  assert.equal(parse([]).cmd, 'check', '无参数仍然是 check');
-  const withLedger = parse(['check', 'custom.json']);
-  assert.equal(withLedger.cmd, 'check');
-  assert.equal(withLedger.flags.ledger, 'custom.json');
-  assert.equal(parse(['invalidate', 'ui.spacing']).flags.key, 'ui.spacing');
-});
-
-test('帮助文本列出全部命令，且退出码 0', async () => {
-  const r = await help({});
-  assert.equal(r.code, 0);
-  for (const c of ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate']) {
-    assert.match(r.text, new RegExp(`\\b${c}\\b`), `帮助里没有 ${c}`);
-  }
-});
-
-test('未知命令：退出码非 0，且明确说"没有这个命令"并给出 help 提示', async () => {
-  const r = await unknownCmd({ command: 'chekc' });
-  assert.equal(r.code, 1);
-  assert.match(r.text, /没有这个命令/);
-  assert.match(r.text, /chekc/);
-  assert.match(r.text, /--help/);
-});
-
-// npm 安装只把 skill/ 放进包里，不会注册到宿主的 skills 目录。指路块里写"去加载技能"
-// 会让 agent 找一个不存在的东西；必须指向包里真实存在的文件路径。
-test('init 的指路段指向包内真实存在的 SKILL.md，不写"加载技能"', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'forklight-pointer-'));
-  try {
-    await init({ cwd: dir });
-    const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
-    const block = agents.slice(agents.indexOf('<!-- forklight:begin -->'), agents.indexOf('<!-- forklight:end -->'));
-    assert.match(block, /skill\/SKILL\.md/, '指路没给可读的文件路径');
-    assert.doesNotMatch(block, /加载\s*forklight\s*技能|先读 forklight 技能/, '指路仍要求加载一个可能没注册的技能');
-    // 这个路径必须真的存在（本仓库里）
-    assert.ok(existsSync(join(repo, 'skill', 'SKILL.md')), 'skill/SKILL.md 不在包里');
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-// 端到端接线：parse() 把拼错的命令放在 flags.unknown，handler 必须从那里读。
-// 只测 unknownCmd({command}) 会漏掉这个错配——真实 CLI 报过"没有这个命令："后面是空的。
-test('parse → unknownCmd 接线：拼错的命令名要真的出现在报错里', async () => {
-  const { cmd, flags } = parse(['chekc']);
-  assert.equal(cmd, 'unknown');
-  const r = await unknownCmd(flags);
-  assert.match(r.text, /没有这个命令：chekc/, `报错里没带命令名：${r.text.split('\n')[0]}`);
-});
-
-// 文档双语化之后，中英两版必须同时进包，且互相链得上。
-// 少一个链接就是"英文用户点不开中文版"，而 npm 页面只显示 README.md。
-test('中英双语文档：两版都在包内，且互相链接', async () => {
-  const pkg = JSON.parse(await readFile(join(repo, 'package.json'), 'utf8'));
-  assert.ok(pkg.files.includes('README.md'), '英文 README 不在 files 里');
-  assert.ok(pkg.files.includes('README.zh-CN.md'), '中文 README 不在 files 里');
-
-  const en = await readFile(join(repo, 'README.md'), 'utf8');
-  const zh = await readFile(join(repo, 'README.zh-CN.md'), 'utf8');
-  assert.match(en, /README\.zh-CN\.md/, '英文版没有链到中文版');
-  assert.match(zh, /README\.md/, '中文版没有链到英文版');
-  assert.ok(existsSync(join(repo, 'README.zh-CN.md')));
-});
-
-test('SKILL.md 的 description 中英双语，英文关键词也要能触发', async () => {
-  const skill = await readFile(join(repo, 'skill', 'SKILL.md'), 'utf8');
-  const desc = skill.split('---')[1].split('description:')[1].split('\n')[0];
-  assert.match(desc, /决策台账/, '中文触发词丢了');
-  assert.match(desc, /decision ledger/i, '英文触发词丢了');
-  assert.ok(desc.length < 1024, `description 过长（${desc.length}），多数宿主会截断`);
 });

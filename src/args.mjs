@@ -6,14 +6,14 @@ import { LEDGER_PATH } from './paths.mjs';
 
 export const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
 
-// 帮助。新用户第一屏就是 `forklight --help`；没有它，拼错命令的人会看到"台账读不到"。
+// 帮助。新用户第一屏就是 `claimrail --help`；没有它，拼错命令的人会看到"台账读不到"。
 const HELP = [
-  'forklight —— 让 AI 的选择留下痕迹：决策台账 + 程序算代价 + 可回验证据',
+  'claimrail —— 让 AI 的选择留下痕迹：决策台账 + 程序算代价 + 可回验证据',
   '',
-  '用法：forklight <命令> [选项]',
+  '用法：claimrail <命令> [选项]',
   '',
   '命令：',
-  '  init                        建 .forklight/decisions.json、补 .gitignore、在 AGENTS.md 写指路段、记 baseline',
+  '  init                        建 .claimrail/decisions.json、补 .gitignore、在 AGENTS.md 写指路段、记 baseline',
   '  check [台账路径]            交付前校验。退出码 0 放行 / 1 拦住',
   '  web --url <地址>            双视口截图 + 五项几何检查（需 playwright）',
   '  hook                       宿主钩子（从 stdin 读事件）。退出码 2 = 拦住并续一轮',
@@ -23,7 +23,7 @@ const HELP = [
   '',
   '选项：',
   '  --cwd <目录>      在指定目录工作（默认当前目录）',
-  '  --ledger <路径>   台账路径（默认 .forklight/decisions.json）',
+  '  --ledger <路径>   台账路径（默认 .claimrail/decisions.json）',
   '  --unattended      无人值守：高代价无证据时 halt 而不是 block',
   '  --allow-net       precedent / web 两档要真回访时必须显式打开（外发查询）',
   '  --viewport <列表> web 的视口，默认 390x700,1280x800',
@@ -43,7 +43,7 @@ export async function unknownCmd({ unknown, command } = {}) {
   const name = unknown ?? command ?? '';
   return {
     code: 1,
-    text: [`没有这个命令：${name}`, '', HELP, '', '查看命令：forklight --help'].join('\n'),
+    text: [`没有这个命令：${name}`, '', HELP, '', '查看命令：claimrail --help'].join('\n'),
   };
 }
 
@@ -64,7 +64,7 @@ export function parse(argv) {
     url: undefined,
     state: undefined,
     viewport: '390x700,1280x800',
-    out: join('.forklight', 'shots'),
+    out: join('.claimrail', 'shots'),
     name: undefined,
     key: undefined,
     what: undefined,

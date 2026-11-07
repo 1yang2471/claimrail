@@ -33,7 +33,7 @@ async function one(taskDir, protocol) {
     if (protocol === 'on') {
       await init({ cwd: dir });
       // init 写的模板本身就能过 check。不比对它，"agent 什么都没写"会被算成合规交付。
-      template = await readFile(join(dir, '.forklight', 'decisions.json'), 'utf8');
+      template = await readFile(join(dir, '.claimrail', 'decisions.json'), 'utf8');
     }
 
     const run = await runRealAgent({ dir, prompt: PROMPT(spec), system: (protocol === 'on' ? PROTOCOL_SYSTEM : PLAIN_SYSTEM) + BUDGET, maxSteps: Number(process.env.FK_MAX_STEPS ?? spec.maxSteps ?? 20) });
@@ -41,7 +41,7 @@ async function one(taskDir, protocol) {
     let ledger = null;
     let rawLedger = null;
     try {
-      rawLedger = await readFile(join(dir, '.forklight', 'decisions.json'), 'utf8');
+      rawLedger = await readFile(join(dir, '.claimrail', 'decisions.json'), 'utf8');
       ledger = JSON.parse(rawLedger);
     } catch {}
     const declared = Array.isArray(ledger?.forks) ? ledger.forks.length : 0;

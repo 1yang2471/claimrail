@@ -190,9 +190,9 @@ export async function grepCount(term, excludeFile, cwd, { fixed = false } = {}) 
 // 仓库太大就放弃全量扫描：返回 null 让调用方按"未判"处理，
 // 而不是拿着半截结果宣布"都比代码新"。
 //
-// 必须排除 forklight 自己的产物：台账总是在截图之后写，若把它算进"代码改动时间"，
+// 必须排除 claimrail 自己的产物：台账总是在截图之后写，若把它算进"代码改动时间"，
 // 每一条 render 证据都会先天"截图比代码旧"，报告层的伪造检查就永远轮不到执行。
-const SELF_ARTIFACT = /(^|\/)(\.forklight|memory)(\/|$)/;
+const SELF_ARTIFACT = /(^|\/)(\.claimrail|memory)(\/|$)/;
 
 export async function newestTrackedMtime(cwd, limit = 5000) {
   const r = await gitRaw(['ls-files', '-z'], cwd);

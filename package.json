@@ -1,5 +1,5 @@
 {
-  "name": "forklight",
+  "name": "claimrail",
   "version": "0.1.0",
   "description": "让 AI 的选择留下痕迹：决策台账 + 程序算代价 + 可回验证据",
   "type": "module",
@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "bin": {
-    "forklight": "src/cli.mjs"
+    "claimrail": "src/cli.mjs"
   },
   "files": [
     "src",

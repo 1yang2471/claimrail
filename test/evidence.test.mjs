@@ -185,7 +185,7 @@ test('evidence 与 geometry 的检查项集合必须一致（两处写两遍的�
 
 test('evidence 与 web 的报告路径派生必须一致', async () => {
   const { reportPathFor } = await import('../src/observe/web.mjs');
-  for (const ref of ['shots/chat.png', '.forklight/shots/chat@390x700.png']) {
+  for (const ref of ['shots/chat.png', '.claimrail/shots/chat@390x700.png']) {
     assert.equal(String(ref).replace(/\.png$/, '.report.json'), reportPathFor(ref), ref);
   }
 });

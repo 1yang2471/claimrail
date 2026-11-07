@@ -1,10 +1,12 @@
-# forklight
+# claimrail
 
 [English](README.md) | 中文
 
+claim 是 AI 的声称：它验证过设计、看过截图、照着既有做法来的。rail 是它交付前必须过的那道栏。名字就是机制本身。
+
 规格没写完时，AI 会输出它见过最多的做法，然后交一个看起来已经想清楚的成品。岔路口被走掉了，也没有任何地方记录"这里曾经有过岔路口"。
 
-forklight 在交付前把门关上：AI 必须先写一份决策台账（哪些分叉、候选是什么、选了哪个、凭什么）；程序算改动的代价、回访声称的证据；校验不过，交付不出去。
+claimrail 在交付前把门关上：AI 必须先写一份决策台账（哪些分叉、候选是什么、选了哪个、凭什么）；程序算改动的代价、回访声称的证据；校验不过，交付不出去。
 
 它不教 AI 有品味。它让 AI 在没依据的时候不再伪装成有依据。
 
@@ -21,15 +23,15 @@ forklight 在交付前把门关上：AI 必须先写一份决策台账（哪些�
 
 ## 用法
 
-安装后用 `forklight` 命令；仓库内开发用 `node src/cli.mjs`：
+安装后用 `claimrail` 命令；仓库内开发用 `node src/cli.mjs`：
 
 ```bash
-forklight init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
-forklight check             # 交付前校验；退出码 0 才放行（CI / npx 同理）
-forklight web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
-forklight record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
-forklight rules             # 现行规则 + 原始否决 + 来源
-forklight invalidate <key>  # 作废一条规则；原始 log 一条不动
+claimrail init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
+claimrail check             # 交付前校验；退出码 0 才放行（CI / npx 同理）
+claimrail web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
+claimrail record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
+claimrail rules             # 现行规则 + 原始否决 + 来源
+claimrail invalidate <key>  # 作废一条规则；原始 log 一条不动
 ```
 
 `check` 默认不联网。`precedent` / `web` 两档要真回访时加 `--allow-net`——这是外发查询，默认需要你同意。
@@ -40,15 +42,15 @@ forklight invalidate <key>  # 作废一条规则；原始 log 一条不动
 
 分两步：**指路**（必做，`init` 自动写）和**装技能**（可选，让 agent 能主动加载协议）。
 
-**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），指向 `node_modules/forklight/skill/SKILL.md`。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 forklight。
+**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），指向 `node_modules/claimrail/skill/SKILL.md`。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 claimrail。
 
 **装技能**（可选）：`npm install` 只把技能放在包里，**不会**注册到宿主的 skills 目录。要让 agent 能按需加载，把它链到宿主扫描的目录（以 ZCode / CodeBuddy / Trae 共用的 `~/.agents/skills` 为例）：
 
 ```bash
 # Linux / macOS
-ln -s "$(pwd)/node_modules/forklight/skill" ~/.agents/skills/forklight
+ln -s "$(pwd)/node_modules/claimrail/skill" ~/.agents/skills/claimrail
 # Windows（管理员或开发者模式）
-mklink /D "%USERPROFILE%\.agents\skills\forklight" "%CD%\node_modules\forklight\skill"
+mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\node_modules\claimrail\skill"
 ```
 
 不装也能用：`AGENTS.md` 里给的是文件路径，agent 直接读那个文件即可，只是不会在你没提到时主动加载。

@@ -38,7 +38,7 @@ export async function runTask(taskDir, { protocol = 'off' } = {}) {
       await mkdir(join(dir, dirOf(rel)), { recursive: true });
       await writeFile(join(dir, rel), body);
     }
-    await writeFile(join(dir, '.forklight', 'decisions.json'), JSON.stringify(spec.ledger, null, 2));
+    await writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify(spec.ledger, null, 2));
     // 假 agent 也会刷新证据文件的时间戳：有些陷阱是"图是新的、报告里却写着未判"，
     // 不 touch 就会被"截图比代码旧"先拦下，测到的就不是那条守卫了。
     // 往后推 5 秒是因为 utimes 只落到整毫秒，而 init 写的 AGENTS.md 时间戳带小数位。

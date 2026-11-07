@@ -1,15 +1,15 @@
 ---
-name: forklight
-description: 在规格没定的地方留下决策台账，交付前由程序算代价、回验证据。**要动界面/页面/样式/文档/接口/组件之前先加载**；同一处存在两种以上合理写法、用户说"这不是我要的""看着不舒服""按我们的惯例来"、前端改动收尾、forklight check 报 block 时也用。只有三类不用：改错别字、纯重命名、已知成因的 bug（这三类写 forks: [] 加一句原因）。 Leave a decision ledger wherever the spec is underspecified; a program computes cost and re-verifies evidence before delivery. Load this BEFORE touching UI/pages/styles/docs/APIs/components, when more than one reasonable implementation exists, when the user says "not what I wanted"/"looks off"/"follow our conventions", when wrapping up a frontend change, or when forklight check blocks. Only three exceptions: typo, pure rename, bug with a known cause (write forks: [] plus a reason).
+name: claimrail
+description: 在规格没定的地方留下决策台账，交付前由程序算代价、回验证据。**要动界面/页面/样式/文档/接口/组件之前先加载**；同一处存在两种以上合理写法、用户说"这不是我要的""看着不舒服""按我们的惯例来"、前端改动收尾、claimrail check 报 block 时也用。只有三类不用：改错别字、纯重命名、已知成因的 bug（这三类写 forks: [] 加一句原因）。 Leave a decision ledger wherever the spec is underspecified; a program computes cost and re-verifies evidence before delivery. Load this BEFORE touching UI/pages/styles/docs/APIs/components, when more than one reasonable implementation exists, when the user says "not what I wanted"/"looks off"/"follow our conventions", when wrapping up a frontend change, or when claimrail check blocks. Only three exceptions: typo, pure rename, bug with a known cause (write forks: [] plus a reason).
 ---
 
-# forklight：让选择留下痕迹
+# claimrail：让选择留下痕迹
 
 > 动手前先读完本文件。只要这次改动存在两种以上合理写法，就必须走协议——**哪怕你觉得它很小**。"小改动"是最常见的逃逸口，不是理由。
 
 你在规格没写到的地方必须输出点什么，于是你会输出你见过最多的那个做法。这不是品味问题，是分布问题。这个技能把那一歩变成**看得见的决定**：先申报分叉，程序算改回来的代价，证据必须能被回访，红的不许交。
 
-约束力不来自你把这段话读得多认真，来自 `forklight check` 的退出码。
+约束力不来自你把这段话读得多认真，来自 `claimrail check` 的退出码。
 
 ## 一、这次任务要不要走协议
 
@@ -22,7 +22,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 
 ## 二、写台账
 
-`.forklight/decisions.json`：
+`.claimrail/decisions.json`：
 
 ```jsonc
 {
@@ -77,7 +77,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 ## 四、交付前必须过门
 
 ```
-forklight check            # 本仓库内开发时用：node src/cli.mjs check
+claimrail check            # 本仓库内开发时用：node src/cli.mjs check
 ```
 
 - `✓ 可以交付`（退出码 0）：继续。
@@ -89,7 +89,7 @@ forklight check            # 本仓库内开发时用：node src/cli.mjs check
 ## 五、前端改动
 
 ```
-forklight web --url http://localhost:5173/chat --state .forklight/storage.json
+claimrail web --url http://localhost:5173/chat --state .claimrail/storage.json
 ```
 
 多视口是默认的（390×700 和 1280×800）——覆盖式滚动条压字这类缺陷只在窄屏出现，只跑宽屏等于放过。
@@ -101,12 +101,12 @@ forklight web --url http://localhost:5173/chat --state .forklight/storage.json
 ## 六、被用户否决之后
 
 ```
-forklight record --key card-gap --what "卡片上下间距至少 16px" --why "贴太紧"
+claimrail record --key card-gap --what "卡片上下间距至少 16px" --why "贴太紧"
 ```
 
-同一条命中两次才升格成规则；`forklight invalidate <key>` 废掉一条规则，但原始 log 不动（log 是真相，规则是缓存）。
+同一条命中两次才升格成规则；`claimrail invalidate <key>` 废掉一条规则，但原始 log 不动（log 是真相，规则是缓存）。
 
-用户说"不是这个"的时候，你要记的是**要什么**（`--what`），不是他那句抱怨的原话。下次动手前先 `forklight rules`。
+用户说"不是这个"的时候，你要记的是**要什么**（`--what`），不是他那句抱怨的原话。下次动手前先 `claimrail rules`。
 
 ## 不许做
 
@@ -116,13 +116,13 @@ forklight record --key card-gap --what "卡片上下间距至少 16px" --why "�
 
 ---
 
-# forklight (English)
+# claimrail (English)
 
 > Read this whole file before you start. If this change has more than one reasonable implementation, the protocol applies — **even if you think it's small**. "It's a small change" is the most common escape hatch, not a reason.
 
 Where the spec is silent you must output something, so you output the most common thing you've seen. That is not a taste problem, it's a distribution problem. This skill turns that step into a **visible decision**: declare the fork first, let a program compute what it costs to undo, and make the evidence re-visitable. Red does not ship.
 
-The force does not come from how carefully you read this page. It comes from `forklight check`'s exit code.
+The force does not come from how carefully you read this page. It comes from `claimrail check`'s exit code.
 
 ## 1. Does this task go through the protocol?
 
@@ -135,7 +135,7 @@ Declaring "no forks" is allowed but always recorded. A category that never grows
 
 ## 2. Write the ledger
 
-`.forklight/decisions.json`:
+`.claimrail/decisions.json`:
 
 ```jsonc
 {
@@ -190,7 +190,7 @@ Stop when you have enough: `repo → memory → render → precedent → web`. I
 ## 4. You must pass the gate before delivering
 
 ```
-forklight check            # inside this repo: node src/cli.mjs check
+claimrail check            # inside this repo: node src/cli.mjs check
 ```
 
 - `✓ 可以交付` (exit 0): continue.
@@ -202,7 +202,7 @@ forklight check            # inside this repo: node src/cli.mjs check
 ## 5. Frontend changes
 
 ```
-forklight web --url http://localhost:5173/chat --state .forklight/storage.json
+claimrail web --url http://localhost:5173/chat --state .claimrail/storage.json
 ```
 
 Multiple viewports are the default (390×700 and 1280×800) — defects like an overlay scrollbar covering text only show up on narrow screens, so running wide-only means letting them through.
@@ -214,12 +214,12 @@ The output ends with a paste-ready `evidence` line whose `asserts` contain only 
 ## 6. After the user rejects something
 
 ```
-forklight record --key card-gap --what "card vertical gap at least 16px" --why "too cramped"
+claimrail record --key card-gap --what "card vertical gap at least 16px" --why "too cramped"
 ```
 
-A key must be hit twice before it becomes a rule; `forklight invalidate <key>` retracts a rule, and the raw log stays untouched (the log is truth, rules are cache).
+A key must be hit twice before it becomes a rule; `claimrail invalidate <key>` retracts a rule, and the raw log stays untouched (the log is truth, rules are cache).
 
-When the user says "not this", record **what they want** (`--what`), not their complaint verbatim. Run `forklight rules` before your next change.
+When the user says "not this", record **what they want** (`--what`), not their complaint verbatim. Run `claimrail rules` before your next change.
 
 ## Never do this
 

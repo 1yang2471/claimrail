@@ -1,4 +1,4 @@
-# PRD：forklight —— 让 AI 的选择留下痕迹
+# PRD：claimrail —— 让 AI 的选择留下痕迹
 
 状态：已按 v1 实现并打 `0.1.0` tag（2026-11-08）。名字仍可能改（见 PRD-notes 的命名待议），改名只需一次 `git mv` + README 一处。
 本文件是 14 轮逐项盘问的结论汇总，不是草案。凡本文未写的范围，v1 不做。
@@ -33,7 +33,7 @@ AI 在行动前必须写一份**决策台账**：这个任务里有几个规格�
 
 [antfu 的 web-design-guidelines](https://github.com/antfu/skills)（star 数 [TK: 复核，第三方页显示约 4.8k]）包装 Vercel 的 `web-interface-guidelines`（100+ 条，数量 [TK: 复核]），做的是**读代码、按公开规则匹配、输出 `file:line`**。这条赛道已经有人占住，且做得比我们好。
 
-forklight 不重写那份清单，把它当上游引用。我们的差异在两处它结构上不可能做的事：
+claimrail 不重写那份清单，把它当上游引用。我们的差异在两处它结构上不可能做的事：
 
 - **它读代码，我们看实物。** 渲染截图、几何相交、时间戳新旧——代码层面合规的缺陷在它那里查不出来。
 - **它对齐公开共识，我们对齐具体的那个人。** 公开清单给的是平均值；`memory/log.md` 给的是你的否决记录。
@@ -71,7 +71,7 @@ forklight 不重写那份清单，把它当上游引用。我们的差异在两�
 
 ### CI / 无人值守
 
-19. 作为 CI，我想 `npx forklight check` 用退出码说话，这样约束力不依赖任何人的记性。
+19. 作为 CI，我想 `npx claimrail check` 用退出码说话，这样约束力不依赖任何人的记性。
 20. 作为夜间任务的使用者，我想高代价且无证据的任务直接停下来等确认，这样过夜跑出来的不是一个建错的成品而是一句"我卡在这儿"。
 21. 作为项目维护者，我想偏好 log 和截图默认不进 git，这样个人品味数据和真实产品画面不会跟着仓库外流。
 
@@ -211,7 +211,7 @@ v1 的五个检查及其阈值（全部为可判定的硬事实，不含品味�
 
 副作用扫描只作用于**新增行**，且排除 `test(s)/`、`fixtures/`、`docs/`、`*.test.*` 以及规则表自身所在文件。原因不是洁癖：规则表文本里必然含 `rm -rf`、`DROP TABLE`、`npm publish` 这些形状，扫全文等于任何一次改动都判定"有不可逆副作用"，门在第一天就彻底失灵。测试数据与文档里的命令不是动作。
 
-CLI 的实际表面：`forklight init`（建 `.forklight/decisions.json`、补 `.gitignore` 三条、在 AGENTS.md 里写一段带 marker 的指路段（幂等、不动原有内容）、打印一次数据去向）和 `forklight check [ledger] [--cwd] [--ledger] [--unattended] [--allow-net]`。退出码 0 放行 / 1 拦住；结构不合规时不进入后续检查——先修申报，再谈代价。`check` 会把程序覆写的档位打出来（`申报 low → 程序 high（原因）`），这一步不留痕迹就等于没拦。
+CLI 的实际表面：`claimrail init`（建 `.claimrail/decisions.json`、补 `.gitignore` 三条、在 AGENTS.md 里写一段带 marker 的指路段（幂等、不动原有内容）、打印一次数据去向）和 `claimrail check [ledger] [--cwd] [--ledger] [--unattended] [--allow-net]`。退出码 0 放行 / 1 拦住；结构不合规时不进入后续检查——先修申报，再谈代价。`check` 会把程序覆写的档位打出来（`申报 low → 程序 high（原因）`），这一步不留痕迹就等于没拦。
 
 ### 第四条门规则（盘问之外补入，已确认保留）
 

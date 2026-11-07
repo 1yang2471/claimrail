@@ -36,7 +36,7 @@ async function readBaseline(cwd) {
 }
 
 const NOTICE = `数据去向：
-  .forklight/decisions.json  进 git（它是给你 review 的东西）
+  .claimrail/decisions.json  进 git（它是给你 review 的东西）
   memory/                    不进 git（个人偏好，只在你机器上）
   *.png 截图                 不进 git（真实产品画面）`;
 
@@ -57,18 +57,18 @@ async function readJson(path) {
 
 // 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
 // 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
-const AGENTS_BEGIN = '<!-- forklight:begin -->';
-const AGENTS_END = '<!-- forklight:end -->';
-// 指路块里刻意不写"去加载 forklight 技能"：技能要靠 SKILL.md 装进宿主的 skills 目录才算注册，
+const AGENTS_BEGIN = '<!-- claimrail:begin -->';
+const AGENTS_END = '<!-- claimrail:end -->';
+// 指路块里刻意不写"去加载 claimrail 技能"：技能要靠 SKILL.md 装进宿主的 skills 目录才算注册，
 // npm 安装只把 skill/ 放在包里，不会自动装。写"读技能"会让 agent 去找一个没注册的技能。
 // 改成指向包里那个真实存在的文件路径——它一定在，且能直接读。
 const AGENTS_BLOCK = [
   AGENTS_BEGIN,
-  '## forklight',
+  '## claimrail',
   '',
-  '动界面、文档、接口之前，先读 `node_modules/forklight/skill/SKILL.md`（没装成依赖就读仓库里的 `skill/SKILL.md`），',
-  '写 `.forklight/decisions.json` 申报分叉与证据；',
-  '交付前跑 `forklight check`——结构不合规先修申报，红的不许交。',
+  '动界面、文档、接口之前，先读 `node_modules/claimrail/skill/SKILL.md`（没装成依赖就读仓库里的 `skill/SKILL.md`），',
+  '写 `.claimrail/decisions.json` 申报分叉与证据；',
+  '交付前跑 `claimrail check`——结构不合规先修申报，红的不许交。',
   AGENTS_END,
 ].join('\n');
 
@@ -82,14 +82,14 @@ async function writeAgentsPointer(cwd) {
 }
 
 export async function init({ cwd = process.cwd() } = {}) {
-  await mkdir(join(cwd, '.forklight'), { recursive: true });
+  await mkdir(join(cwd, '.claimrail'), { recursive: true });
   const file = join(cwd, LEDGER_PATH);
   const created = !existsSync(file);
   if (created) await writeFile(file, `${JSON.stringify(TEMPLATE, null, 2)}\n`, 'utf8');
 
   const gi = join(cwd, '.gitignore');
   const lines = existsSync(gi) ? (await readFile(gi, 'utf8')).split('\n') : [];
-  const add = ['memory/', '.forklight/shots/', '*.png'].filter((p) => !lines.includes(p));
+  const add = ['memory/', '.claimrail/shots/', '*.png'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
   // baseline 只在没有的时候写：重复 init 不许把起点往前推，那等于把已提交的改动洗白
@@ -160,7 +160,7 @@ function makeCtx({ cwd, allowNet, changed }) {
 
 export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unattended = false, allowNet = false, diffText = null, changed = null } = {}) {
   const raw = await readJson(join(cwd, ledger));
-  if (!raw.ok) return { code: 1, text: `台账读不到或不是合法 JSON：${raw.error}\n（先跑 forklight init，或把路径传给 --ledger）` };
+  if (!raw.ok) return { code: 1, text: `台账读不到或不是合法 JSON：${raw.error}\n（先跑 claimrail init，或把路径传给 --ledger）` };
 
   const v = validateLedger(raw.value);
   if (!v.ok) {
@@ -176,7 +176,7 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     const diff = diffText ?? (await diffSince(cwd, base));
     const overrides = [];
     if (!base && diffText === null) {
-      overrides.push('⚠ 没有 baseline（没跑过 forklight init，或仓库当时没有提交）：本次只比较 HEAD 之后的改动，已提交的内容扫不到');
+      overrides.push('⚠ 没有 baseline（没跑过 claimrail init，或仓库当时没有提交）：本次只比较 HEAD 之后的改动，已提交的内容扫不到');
     }
 
     const observations = [];
@@ -285,7 +285,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
 
 export async function recordCmd({ cwd = process.cwd(), key, what, why, anchor = false } = {}) {
   if (!key || !what) {
-    return { code: 1, text: '用法：forklight record --key <类别> --what <要什么> [--why <为什么>] [--anchor]' };
+    return { code: 1, text: '用法：claimrail record --key <类别> --what <要什么> [--why <为什么>] [--anchor]' };
   }
   try {
     if (anchor) {
@@ -295,8 +295,8 @@ export async function recordCmd({ cwd = process.cwd(), key, what, why, anchor = 
     const r = await record(cwd, { key, what, why });
     const lines = [`记为 log#${r.n}，key "${key}" 累计命中 ${r.hits} 次`, `现行规则 ${r.rules.length} 条`];
     if (r.hits < 2) lines.push('还没升格——同一条否决要命中满两次才写进规则，一次随口的吐槽不该被永久固化');
-    else if (r.promoted) lines.push(`已升格：${r.promoted.rule}  [来源: ${r.promoted.sources.join(',')}]`, `推翻它：forklight invalidate ${key}`);
-    else lines.push(`这条命中满两次了，但被你用 forklight invalidate ${key} 废过，不会自动复活`);
+    else if (r.promoted) lines.push(`已升格：${r.promoted.rule}  [来源: ${r.promoted.sources.join(',')}]`, `推翻它：claimrail invalidate ${key}`);
+    else lines.push(`这条命中满两次了，但被你用 claimrail invalidate ${key} 废过，不会自动复活`);
     return { code: 0, text: lines.join('\n') };
   } catch (err) {
     return { code: 1, text: `没记上：${err.message}` };
@@ -312,7 +312,7 @@ export async function rulesCmd({ cwd = process.cwd() } = {}) {
       text: [
         `现行规则 ${list.length} 条 · 原始否决 ${rejections} 条 · 参照物 ${entries.length - rejections} 条 · 已废 ${denied.length} 个 key`,
         text || '（还没有一条命中满两次，所以现在只有记录、没有规则）',
-        ...list.map((r) => `  · 推翻它：forklight invalidate ${r.key}`),
+        ...list.map((r) => `  · 推翻它：claimrail invalidate ${r.key}`),
       ].join('\n'),
     };
   } catch (err) {
@@ -321,7 +321,7 @@ export async function rulesCmd({ cwd = process.cwd() } = {}) {
 }
 
 export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
-  if (!key) return { code: 1, text: '用法：forklight invalidate <key 或 r:key>' };
+  if (!key) return { code: 1, text: '用法：claimrail invalidate <key 或 r:key>' };
   try {
     const { removed, remaining } = await invalidateRule(cwd, key);
     return {

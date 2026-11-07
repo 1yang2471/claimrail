@@ -55,10 +55,11 @@ v1 明确不做：
   3. 正文里的行内链接按控件标准考核 → 16 处假红。`inline` 元素不参与触摸目标检查。
   4. `nameFromUrl` 只取 URL 末段 → 三个不同页面的报告同名互相覆盖，**真丢过一次证据**（审查时列为 P2，实测代价是证据被偷换）。现在名字带 URL 指纹。
 - 两个**前提级**发现，比假红更重要：
-  - Shinsekai 不是 git 仓库 → `fanIn`/`published`/`irreversible` 三者全取不到 → 每条分叉都判 high。forklight 在非 git 项目上接近全盲，发布时必须写明这条边界，或者提供一个显式的"非 git 模式"降级。
+  - Shinsekai 不是 git 仓库 → `fanIn`/`published`/`irreversible` 三者全取不到 → 每条分叉都判 high。claimrail 在非 git 项目上接近全盲，发布时必须写明这条边界，或者提供一个显式的"非 git 模式"降级。
   - Vite SPA 用 `file://` 打开是空白页：五项全部"未判"，且报告无法被引用（0 项绿）——"采不到就不作数"在这里表现正确，但也说明**没有 dev server 或 storageState 就测不到真实前端**。dogfood 的下一轮必须起服务。
 - `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率只有 7/111，几乎不判。样式层面拿不到真实底色，**要靠像素采样（读截图中文字背后的实际像素）**才能判。列为 v2；在那之前这一项对现代设计语言的检出率要如实写低。
 - FreeCast 仓库有 5 个 tag 且 `origin/main` 有上游 → `published` 非空 → 任何改动都判 high。设计意图（已发布产物收不回来）在真仓库上确认成立，不是只在 fixture 上成立。
-- 名字待定。`forklight` 取"让岔路口可见"，与台账机制一致。**2026-11-08 待议**：已打 `0.1.0` tag 但名字未定；改名成本是一次 `git mv` + README/package.json/AGENTS 指路段各一处。另：`github.com/forklight` 这个账号名已被他人注册，`package.json` 的 `repository` 已先删除，等真仓库建好再加回。
-- **中英双语**（2026-11-08 记）：README 与 SKILL.md 需要英文版；用户故事与 PRD 不要求。做法待定——README.md / README.zh-CN.md 分册，还是单文件双语。
-- **驱动层已选定 Playwright 并跑通（2026-11-07 更新，取代原"未决"条目）**：Playwright + Chromium 已装，`forklight web` 在 Shinsekai 真 Vite SPA 上双视口出报告（390×700 / 1280×800），真实键盘 Tab 让焦点项从 `null` 变成可判；首次冷启动时 `networkidle` 有 20s 超时，预热后消失。`storageState` 的 cookie/localStorage 注入有真浏览器测试（变异验证红/绿），但**真实需要登录的产品页仍未跑**。Edge 裸 CDP 那条路不再考虑。
+- **名字已定（2026-11-08）：`claimrail`**。claim = AI 的声称，rail = 交付前那道栏。旧名 `forklight` 弃用，原因是 GitHub 上 8 个同名仓库里有 3 个同赛道（AI agent 的编排/可观测/交付前预演），搜索会直接混进去；`claimrail` 在 npm 与 GitHub 都干净（实测 npm 404、GitHub 同名仓库 0 个）。
+- 改名已执行：`forklight` → `claimrail` 全量替换（30 个文件 166 处），台账目录 `.forklight/` → `.claimrail/`。因为尚未发布，没有兼容包袱，不做旧名兼容层。
+- **中英双语已做（2026-11-08）**：`README.md` 英文主文件 + `README.zh-CN.md` 中文版（互相链接，两版都进 npm 包）；`skill/SKILL.md` 的 description 中英并列，正文追加英文全节。
+- **驱动层已选定 Playwright 并跑通（2026-11-07 更新，取代原"未决"条目）**：Playwright + Chromium 已装，`claimrail web` 在 Shinsekai 真 Vite SPA 上双视口出报告（390×700 / 1280×800），真实键盘 Tab 让焦点项从 `null` 变成可判；首次冷启动时 `networkidle` 有 20s 超时，预热后消失。`storageState` 的 cookie/localStorage 注入有真浏览器测试（变异验证红/绿），但**真实需要登录的产品页仍未跑**。Edge 裸 CDP 那条路不再考虑。

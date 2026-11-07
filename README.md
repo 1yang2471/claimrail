@@ -1,10 +1,12 @@
-# forklight
+# claimrail
 
 English | [中文](README.zh-CN.md)
 
+A *claim* is what the AI says it did: it verified the design, checked the screenshot, followed the existing pattern. A *rail* is the bar it clears before shipping. The name is the mechanism.
+
 When the spec isn't finished, an AI still has to output *something* — so it outputs the most common thing it has seen. What you get back looks like a finished decision. The fork in the road was taken, and nothing records that a fork ever existed.
 
-forklight closes the gate before delivery. The AI must first write a decision ledger (which forks it hit, what the options were, which it picked, and on what grounds). A program computes the cost of each change and re-visits every claimed piece of evidence. If the check fails, nothing ships.
+claimrail closes the gate before delivery. The AI must first write a decision ledger (which forks it hit, what the options were, which it picked, and on what grounds). A program computes the cost of each change and re-visits every claimed piece of evidence. If the check fails, nothing ships.
 
 It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 
@@ -21,16 +23,16 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 
 ## Usage
 
-Once installed, use the `forklight` command (from a repo checkout, `node src/cli.mjs` works the same):
+Once installed, use the `claimrail` command (from a repo checkout, `node src/cli.mjs` works the same):
 
 ```bash
-forklight init              # ledger template + AGENTS.md pointer + baseline
-forklight check             # pre-delivery check; exit code 0 lets it through
-forklight web --url http://127.0.0.1:5173/   # two viewports, five geometry checks (needs playwright)
-forklight record --key ui.spacing --what "no overlay scrollbars" --why "covers right-aligned bubbles"
-forklight rules             # current rules + raw rejections + provenance
-forklight invalidate <key>  # retract a rule; the raw log is untouched
-forklight --help            # all commands and flags
+claimrail init              # ledger template + AGENTS.md pointer + baseline
+claimrail check             # pre-delivery check; exit code 0 lets it through
+claimrail web --url http://127.0.0.1:5173/   # two viewports, five geometry checks (needs playwright)
+claimrail record --key ui.spacing --what "no overlay scrollbars" --why "covers right-aligned bubbles"
+claimrail rules             # current rules + raw rejections + provenance
+claimrail invalidate <key>  # retract a rule; the raw log is untouched
+claimrail --help            # all commands and flags
 ```
 
 `check` does not touch the network by default. The `precedent` and `web` evidence tiers need real re-fetching, so they require `--allow-net` — an explicit outbound request.
@@ -41,15 +43,15 @@ forklight --help            # all commands and flags
 
 Two steps: **pointing** (required, written by `init`) and **installing the skill** (optional, lets the agent load the protocol on its own).
 
-**Pointing**: `init` appends a marker block to the target repo's `AGENTS.md` (idempotent, existing content untouched) that points at `node_modules/forklight/skill/SKILL.md`. This is the wiring that measurably works: relying on the skill description alone, ZCode 0.17.1 ran three design tasks without ever loading forklight.
+**Pointing**: `init` appends a marker block to the target repo's `AGENTS.md` (idempotent, existing content untouched) that points at `node_modules/claimrail/skill/SKILL.md`. This is the wiring that measurably works: relying on the skill description alone, ZCode 0.17.1 ran three design tasks without ever loading claimrail.
 
 **Installing the skill** (optional): `npm install` puts the skill in the package but does **not** register it in your host's skills directory. To let the agent load it on demand, link it where the host scans (shown for `~/.agents/skills`, shared by ZCode / CodeBuddy / Trae):
 
 ```bash
 # Linux / macOS
-ln -s "$(pwd)/node_modules/forklight/skill" ~/.agents/skills/forklight
+ln -s "$(pwd)/node_modules/claimrail/skill" ~/.agents/skills/claimrail
 # Windows (admin or developer mode)
-mklink /D "%USERPROFILE%\.agents\skills\forklight" "%CD%\node_modules\forklight\skill"
+mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\node_modules\claimrail\skill"
 ```
 
 Skipping this is fine: the `AGENTS.md` block gives a real file path, so the agent can just read it — it simply won't load the protocol unprompted.

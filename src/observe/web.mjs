@@ -13,7 +13,7 @@ import { applyPixelBackgrounds } from './pixel.mjs';
 // Tab 探到的元素会被当成"没探到"。缺注入就直接抛错，不做静默兜底。
 export function collectInPage() {
   const fk = window.__fk;
-  if (!fk) throw new Error('未注入 __fk 辅助函数：请经 forklight web（驱动层 addInitScript）打开页面');
+  if (!fk) throw new Error('未注入 __fk 辅助函数：请经 claimrail web（驱动层 addInitScript）打开页面');
   const sel = fk.sel;
   const scrollOwner = fk.scrollOwner;
 
