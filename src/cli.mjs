@@ -11,9 +11,10 @@ import { verifyAll } from './evidence.mjs';
 import { enrich, decide, render } from './gate.mjs';
 import { observe, whyUnknown } from './observe/index.mjs';
 import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince } from './observe/git.mjs';
-import { renderPage } from './observe/web.mjs';
-import { openPage, launchBrowser, parseViewports, nameFromUrl } from './observe/driver.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
+import { web } from './commands/web.mjs';
+
+export { web };
 
 export const LEDGER_PATH = join('.forklight', 'decisions.json');
 const BASELINE_PATH = join('.forklight', 'baseline');
@@ -215,6 +216,8 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
 
     return {
       code: d.action === 'proceed' ? 0 : 1,
+      // unverified 单独给结构化一份：hook 要按条目回给模型"逐条声明"，别让它解析渲染文本
+      unverified: d.unverified.map((f) => ({ fork: f.fork, picked: f.picked, why: f.evidenceWhy })),
       text: [
         `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
         ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),
@@ -245,77 +248,36 @@ async function readIncoming() {
 // 退出码语义是宿主定的：0 放行、2 是"拦住并续一轮"（stderr 交给模型去修），其它非零会被当成故障。
 // 两个护栏：没有台账 = 这个仓库不在协议里 → 静默放行；已经因 Stop 钩子续过一轮 → 不再重复阻断，
 // 否则永远拦的钩子会打成死循环。
+//
+// "低代价 + 无证据"是放行但要点名（gate 的 unverified，check 退出码 0）。点名只写在 check 的
+// 输出里，模型交付的正文完全可能不提——真模型实测（shell-citation on 臂）：末尾挂着
+// "只有 1 个独立域名确认该说法"，正文照样写"3 个来源全部当场核实"。所以钩子在放行前把这些
+// 条目回给模型续一轮改口：交付正文里必须逐条写"这条我没能验证，原因是 X"。仍是只拦一次。
 export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const p = payload ?? {};
   const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const continuedBefore = p?.stop_hook_active === true || p?.stopHookActive === true;
   if (!existsSync(join(dir, ledger))) return { code: 0, text: '' };
   const r = await check({ cwd: dir, ledger });
-  if (r.code === 0) return { code: 0, text: '' };
+  // 两种拦截都要模型续一轮：显式 block（高代价无证据），以及"门放行了但有没有验证的条目
+  // 要逐条声明"——后者在 check 里退出码是 0，模型容易把"check 过了"当成"正文可以只字不提"。
+  // 真模型实测（shell-citation on 臂）：末尾挂着"只有 1 个独立域名确认该说法"，正文照样写
+  // "3 个来源全部当场核实"。所以钩子把未验证条目结构化地回给模型改口。仍然是只拦一次。
+  // 注意顺序：stop_hook_active 的放行判断必须在未验证声明之前，否则续过一轮还会被拦。
   if (continuedBefore) return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
+  if (r.code === 0 && r.unverified?.length) {
+    return {
+      code: 2,
+      text: [
+        r.text,
+        '交付说明必须逐条声明未验证项（你的交付说明里一条都没提）：',
+        ...r.unverified.map((u) => `  • ${u.fork}｜已选 ${u.picked}｜${u.why}`),
+        '在正文里写清"哪条没能验证、原因是什么"，然后结束本轮。',
+      ].join('\n'),
+    };
+  }
+  if (r.code === 0) return { code: 0, text: '' };
   return { code: 2, text: `${r.text}\n先修申报或去拿证据；拿不到就问人，不要改措辞绕过。` };
-}
-
-export async function web({ url, state, viewport = '390x700,1280x800', out = join('.forklight', 'shots'), name, cwd = process.cwd() } = {}) {
-  if (!url) return { code: 1, text: '用法：forklight web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .forklight/shots]' };
-
-  let browser;
-  try {
-    browser = await launchBrowser();
-  } catch (err) {
-    return { code: 1, text: `浏览器没起来：${err.message}` };
-  }
-
-  const blocks = [];
-  let red = false;
-
-  try {
-    for (const vp of parseViewports(viewport)) {
-      let session;
-      try {
-        session = await openPage(browser, { url, state, viewport: vp });
-      } catch (err) {
-        blocks.push(`${vp}：页面没打开 —— ${err.message}`);
-        red = true;
-        continue;
-      }
-
-      try {
-        const base = name ?? nameFromUrl(url);
-        const vlabel = String(vp).replace(/×/g, 'x');
-        const shotName = `${base}@${vlabel}`;
-        const report = await renderPage(session.page, {
-          outDir: join(cwd, out),
-          name: shotName,
-          label: `${url} @ ${vlabel}`,
-          focusProbe: session.focusProbe,
-        });
-
-        const ref = join(out, `${shotName}.png`).replaceAll('\\', '/');
-        const green = report.checks.filter((c) => c.ok === true).map((c) => c.id);
-        const undecided = report.checks.filter((c) => c.ok === null).map((c) => c.id);
-        if (report.checks.some((c) => c.ok === false)) red = true;
-
-        blocks.push(
-          [
-            `${vp} · 容器 ${report.counts.scrollContainers} · 文本 ${report.counts.texts} · 可交互 ${report.counts.interactive}（真实 Tab 探到 ${report.counts.focusProbed}）· 固定条 ${report.counts.fixedRects} → ${ref}`,
-            ...report.checks.map((c) => `  ${c.ok === true ? '✓' : c.ok === false ? '✗' : '–'} ${c.id}${c.detail ? `：${c.detail}` : ''}`),
-            // 只许引用绿的项。把"未判"写成"已验证"是这套机制最不能出现的事。
-            green.length ? `  可引用：{ "kind": "render", "ref": "${ref}", "asserts": [${green.map((g) => `"${g}"`).join(', ')}] }` : '  没有一项真的判过——这份报告不能当证据',
-            undecided.length ? `  未判（不作数）：${undecided.join('、')}` : '',
-          ]
-            .filter(Boolean)
-            .join('\n'),
-        );
-      } finally {
-        await session.context.close().catch(() => {});
-      }
-    }
-
-    return { code: red ? 1 : 0, text: `${url}\n\n${blocks.join('\n\n')}` };
-  } finally {
-    await browser.close().catch(() => {});
-  }
 }
 
 export async function recordCmd({ cwd = process.cwd(), key, what, why, anchor = false } = {}) {
