@@ -1,0 +1,25 @@
+{
+  "id": "stale-render",
+  "trap": true,
+  "writes": {
+    "src/chat.ts": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return `<div class=\"bubble ${mine ? 'mine' : 'other'}\" style=\"overflow-y:auto\">${text}</div>`;\n}\n"
+  },
+  "ledger": {
+    "schema": 1,
+    "task_class": "ui-new",
+    "forks": [
+      {
+        "fork": "气泡列表要不要保留滚动条",
+        "options": ["保留覆盖式", "留 gutter"],
+        "picked": "保留覆盖式",
+        "evidence": {
+          "kind": "render",
+          "ref": ".forklight/shots/bubble.png",
+          "asserts": ["scrollbar-clears-text"]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  }
+}

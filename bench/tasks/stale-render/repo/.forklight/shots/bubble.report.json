@@ -1,0 +1,12 @@
+{
+  "report_schema": 1,
+  "name": "bubble",
+  "url": "http://127.0.0.1:5173/",
+  "checks": [
+    { "id": "scrollbar-clears-text", "ok": true, "detail": "已核 1 个滚动区" },
+    { "id": "touch-targets-ok", "ok": true, "detail": "13 个可点控件均达标" },
+    { "id": "contrast-ok", "ok": true, "detail": "7 处文本均达标" },
+    { "id": "focus-visible-ok", "ok": true, "detail": "已核 13 个" },
+    { "id": "bottom-not-covered", "ok": true, "detail": "无压住内容的固定条" }
+  ]
+}

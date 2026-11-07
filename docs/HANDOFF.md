@@ -34,6 +34,8 @@ forklight 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
    - **补测（2026-11-07）**：口味/信息架构类主张 4 条 × 4 域名（单列表单、卡片 vs 表格、侧边 vs 顶部导航、空状态 CTA）。自动引文筛选下 `verify()` 放行 2/4，另有 medium.com/uxdesign.cc 403、adamsilver.io fetch failed、m3 壳页。但筛选混入标题/FAQ 和与候选方向不符的句子；**2/4 只代表引文字串命中，不证明三个来源在推荐同一做法**。本轮不能据此宣称口味类的强制 precedent 已获验证；PRD 的现行门保持不变，是否改成"尽力核实 + 覆盖率上报"仍待人工核对真实引文上下文。
 1. ~~起 dev server 跑真 SPA~~ —— **已跑（2026-11-07）**。Shinsekai/frontend 用 `pnpm install --frozen-lockfile --trust-lockfile --ignore-scripts --fetch-timeout=900000` 安装（用户明确批准跳过 pnpm 的 lockfile 策略重放，lockfile 的 tarball 完整性仍核验）；Vite `http://127.0.0.1:5173/`。首次冷启动双视口里 1280 宽的 `networkidle` 超时；依赖预构建完成后重跑，390×700 / 1280×800 两份报告都成功生成。分别有 13 / 12 个触摸目标短边不足 44px，CLI **退出 1**；scrollbar 和真实 Tab 焦点检查各两项绿，对比度（渐变）和底部遮挡（无固定条）均未判。Chromium 页面正文是聊天/设置页，`pageerror` 为空，不是 `file://` 空白壳。截图/报告在 `.forklight/shots/127_0_0_1_5173-hP_EiHv5@{390x700,1280x800}.{png,report.json}`（gitignore）。Shinsekai 本身无登录门；另加真浏览器自动化测试证明 `--state` 把 cookie + localStorage 都注入了浏览器上下文，变异 `storageState`→`zzState` 红、恢复绿；**真实受保护页面的登录闭环仍未测**。
 2. **bench：有/无协议对照，拿到静默塌缩率与打断中位数**。陷阱任务要来自第 0、1 步真翻过的车，不要新编。发布文案那句对比必须有数字，没有就照实写"尚未测量"。
+   - **tracer bullet 已跑（2026-11-07）**：`src/bench.mjs` + `bench/tasks/` 三个任务（已发布仓库自报 low、旧截图冒充新证据、申报"无分叉"绕开台账）。假 agent 跑出的机制数字：off 交付 3/3、静默塌缩 3；on 交付 1/3、拦住 2、静默塌缩 1、打断中位数 1。**漏的那 1 条是已知盲区**（口头申报无分叉），bench 如实计入，不藏。
+   - **这些数只能说明门对这三种形状有效，不能进发布文案**：agent 是确定性的假 agent，量的是机制不是模型行为；额外耗时中位数也没测（假 agent 不耗时）。要把"模型静默塌缩率"写进文案，先扩到 20-30 个任务并换成真实模型重跑。
 3. **hook 接线**（PostToolUse → `forklight check`），否则约束力仍依赖 agent 自觉。
 4. **把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录**跑一轮，验证 description 真会触发。
 5. README / LICENSE / `0.1.0` tag。只 commit，push 要用户明说。

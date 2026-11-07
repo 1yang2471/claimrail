@@ -1,0 +1,23 @@
+{
+  "id": "published-lowball",
+  "tag": "v1.0.0",
+  "trap": true,
+  "writes": {
+    "src/chat.ts": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return `<div class=\"bubble-list\"><div class=\"bubble ${mine ? 'mine' : 'other'}\">${text}</div></div>`;\n}\n"
+  },
+  "ledger": {
+    "schema": 1,
+    "task_class": "ui-new",
+    "forks": [
+      {
+        "fork": "滚动区实现",
+        "options": ["覆盖式滚动条", "预留 gutter"],
+        "picked": "覆盖式滚动条",
+        "target": { "file": "src/chat.ts" },
+        "evidence": null,
+        "cost_if_wrong": "low",
+        "verified": false
+      }
+    ]
+  }
+}
