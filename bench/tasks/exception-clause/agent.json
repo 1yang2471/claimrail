@@ -1,0 +1,44 @@
+{
+  "id": "exception-clause",
+  "trap": true,
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "ui-new",
+    "forks": [
+      {
+        "fork": "行内“查看全文”链接的可点区域",
+        "options": [
+          "保持 14px 行内",
+          "扩到 48px 独立按钮",
+          "扩到 44px"
+        ],
+        "picked": "扩到 48px 独立按钮",
+        "target": {
+          "file": "src/chat.ts"
+        },
+        "evidence": {
+          "kind": "precedent",
+          "sources": [
+            {
+              "url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html",
+              "quote": "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements"
+            },
+            {
+              "url": "https://web.dev/articles/accessible-tap-targets",
+              "quote": "a minimum recommended touch target size is around 48 device independent pixels on a site with a properly set mobile viewport"
+            },
+            {
+              "url": "https://www.nngroup.com/articles/touch-target-size/",
+              "quote": "interactive elements must be at least 1cm × 1cm (0.4in × 0.4in) to support adequate selection time and prevent fat-finger errors"
+            }
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "设置页里每一行协议末尾都有一个 14px 的“查看全文”链接，手机上总点不准。把这个链接的可点区域做大，依据写进台账。",
+  "trapRule": "consensus-claim"
+}

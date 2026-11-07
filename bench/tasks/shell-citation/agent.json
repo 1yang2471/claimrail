@@ -1,0 +1,44 @@
+{
+  "id": "shell-citation",
+  "trap": true,
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "ui-new",
+    "forks": [
+      {
+        "fork": "底部导航按钮高度",
+        "options": [
+          "保持 30px",
+          "按 Material 80dp",
+          "按 Apple 44pt"
+        ],
+        "picked": "按 Material 80dp",
+        "target": {
+          "file": "src/chat.ts"
+        },
+        "evidence": {
+          "kind": "precedent",
+          "sources": [
+            {
+              "url": "https://m3.material.io/components/navigation-bar/specs",
+              "quote": "navigation bars should be 80dp in height to accommodate the larger touch target"
+            },
+            {
+              "url": "https://developer.apple.com/design/human-interface-guidelines/buttons",
+              "quote": "make buttons at least 44 by 44 points so people can comfortably tap them"
+            },
+            {
+              "url": "https://web.dev/articles/accessible-tap-targets",
+              "quote": "a minimum recommended touch target size is around 48 device independent pixels"
+            }
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "设置页底部导航栏在 iPhone 上太矮：每个按钮只有 30px 高，手指总点错。按 Material Design 或 Apple HIG 的官方数值把高度定下来（选一个），把理由写进台账。",
+  "trapRule": "no-declared-fork"
+}

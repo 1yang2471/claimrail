@@ -1,6 +1,6 @@
 # forklight 项目规则
 
-新 agent 进来先跑 `node --test`（177 个，约 1.5 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（250 个，约 10 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -38,7 +38,9 @@
 | 引文对照可见正文，不对照传输字节 | `evidence.mjs` 的 `visibleText()`（去 script/style/注释/标签 + 解实体）+ 壳页分诊 `VISIBLE_MIN`。真网络实测 24 URL：17 个可选出引文，其中 9 个原始 HTML 直接命中、**8 个被行内标签切开**、0 个靠实体解码救回。拦住"引文只出现在 `<script>` 字符串里"这类假绿。测试：`test/precedent.test.mjs` 三条 + `test/evidence.test.mjs` web 档一条；变异验证：`visibleText` 退回 `norm(html)` → 红 4 条，只去掉脚本剥离 → 红 2 条 |
 | 采不到正文的页面要说"读不到"，不许算成编造 | `evidence.mjs` 的壳页分诊（可见正文 < `VISIBLE_MIN` 字符）。实测 `m3.material.io` 200 + 62KB HTML 只剩 15 字符、`developer.apple.com` 剩 38 字符——设计系统站普遍是 SPA。老实 agent 与编造 agent 必须拿到不同判词；要真判这一类得渲染，与对比度像素采样同列 v2 |
 | 回访必须声明语言 | `src/cli.mjs` 的 fetch 带 `headers: {'accept-language': 'en'}`（实测 web.dev 不带语言标返回过法语页，英文原句在自己引过的那篇上匹配不上）。`test/cli.test.mjs` 起本地 http server 断言收到该头；变异验证：删掉该行 → 红 |
-| bench 的陷阱任务必须来自真翻过的车 | `bench/tasks/*/trap.md` 要写"为什么这不是编的任务"并指向实测出处；假 agent 跑出的数字只能叫机制自测，不得进发布文案（`test/bench.test.mjs` 钉住"无分叉盲区必须被计入静默塌缩"，防止把已知漏洞算成已拦） |
+| bench 的陷阱任务必须来自真翻过的车 | `bench/tasks/*/trap.md` 要写"为什么这不是编的任务"并指向实测出处；假 agent 跑出的数字只能叫机制自测，不得进发布文案（`test/bench.test.mjs` 钉住"无分叉盲区必须被计入静默塌缩"，防止把已知漏洞算成已拦）。**交付但被列进"交付末尾未验证"（`surfaced`）不算静默塌缩**，单独计 `deliveredSurfaced`；真模型的文字判定要先排除"模型把错误结论引出来再否定"（`bench/classify.mjs` 的 `noticed` 关键词），否则会把反驳算成主张 |
+| 低代价 + 证据不可核实 = 放行但点名 | `gate.decide`：`!evidenceOk && cost !== 'high'` 进 `unverified`，交付说明里必须列出"欠一次人工检查"。这是设计，不是漏拦——但**工具不读交付正文**：真模型实测在门已点名的情况下仍写"3 个来源的引文全部当场核实"。别把"末尾点名"说成"正文也诚实" |
+| 壳页能不能核实，取决于台账里写哪个 URL | `m3.material.io` / `developer.apple.com` 的 HTML 是 SPA 壳（可见正文 15/39 字符），但 Apple 文档另有 JSON 数据接口能取到正文。当前 `verifyPrecedent` 只回访台账给的 URL：写壳页 URL 这一票就不成立，写数据接口 URL 才能核（v2 再考虑自动找接口） |
 | init 要给宿主留指路 | `src/cli.mjs` 的 `writeAgentsPointer`：目标仓库 AGENTS.md 里写 marker 块（`<!-- forklight:begin/end -->`，幂等、不动原有内容）。真机实测：ZCode 0.17.1 无头、技能已加载、Skill 工具可调，光靠 description 连跑三次设计任务都不加载 forklight；写入指路后同一任务产出 3 条分叉台账、自跑 check（退出码 0）与 web 双视口。`test/cli.test.mjs` 两条；变异：关掉写入 → 红 2 |
 | 交付前钩子只许拦一次 | `src/cli.mjs` 的 `hook()`：Stop 事件读 stdin 的 `stop_hook_active` / `stopHookActive`，**续过一轮后不再阻断**（否则永远拦 = 死循环）；无台账的仓库静默放行。`test/cli.test.mjs` 四条；变异：`continuedBefore=false` → 红 2。真机接线：用户级 `~/.zcode/cli/config.json` 的 Stop 钩子，第一次回答被拦后模型续一轮、改成"卡在分叉，请定 A/B" |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的 `field.unknown` 与 `evidence.field.unknown`：只认白名单键。`confidence`/`rationale`/`options_cost` 都进不去 |

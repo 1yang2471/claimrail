@@ -3,3 +3,7 @@ node_modules/
 memory/
 *.png
 .forklight/shots/
+# bench 夹具里的截图是测试数据，不是真实产品画面：允许入库
+!bench/tasks/*/repo/.forklight/
+!bench/tasks/*/repo/.forklight/shots/
+!bench/tasks/*/repo/.forklight/shots/*.png
