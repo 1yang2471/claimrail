@@ -27,6 +27,7 @@
 | 真浏览器路径必须有自动化覆盖 | `test/browser.test.mjs`（真 Chromium 打开对照页；没装 Playwright 则整文件 skip，不伪绿）。`--state` 另用本地 HTTP 页验证 cookie + localStorage 确实注入，变异 `storageState`→`zzState` 测试红、恢复绿 |
 | 副作用扫描不许扫到规则表和测试数据 | `src/observe/effects.mjs` 的 `addedCode` 排除 test/fixtures/docs/规则表自身 |
 | 偏好 log 只追加，规则是缓存 | `src/store.mjs` 坏行直接报错（行号是引用坐标，跳过一行会让所有 `log#n` 错位） |
+| 像素补的背景也要能退回未判 | `src/observe/pixel.mjs` 的 `applyPixelBackgrounds`：采样点颜色不一致（跨渐变）、或读到的"底色"与字色比值 <1.05（说明采到的是字形本身）一律不填，留 `null`。变异：去掉 1.05 守卫 → `test/pixel.test.mjs` 红；拆掉 `renderPage` 里的补背景调用 → `test/browser.test.mjs` 红 |
 | 采不到真值时不许兜底猜测 | `web.mjs` 的 `bgOf`：渐变/图片背景、最底层半透明一律 `null`（真站实测：兜底白色一次造 83 处假红） |
 | 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`；背景自己半透明则未知（真站实测：`rgba(0,0,0,.05)` 被当纯黑，76/103 假红） |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |
@@ -46,7 +47,9 @@
 
 ## 已知的检出边界（别把"未判"当"没问题"）
 
-- `contrast-ok` 在磨砂卡片 + 渐变背景的设计上覆盖率极低（真站 7/111）。这类页面对比度没报红不代表合格，是**判不了**；要判得靠截图像素采样（v2）。
+- `contrast-ok` 曾在磨砂卡片 + 渐变背景上覆盖率极低（真站 7/111），当时只能判"不了"。**v2 已接像素采样**（`src/observe/pixel.mjs` + `png.mjs`，零依赖解 PNG）：
+  截图落地后读文字矩形内、字形之外的留白，多点一致才认作背景；点与点不一致（跨渐变）或全落在字形上（比值 <1.05）一律退回未判，不造红也不造绿。
+  仍判不了的两类：渐变在采样点之间剧烈变化、以及整块被图片背景覆盖的文本。报告里的 `pixelBackgrounds` 会写明补了几处、几处退回未判。
 - 非 git 目录里三个代价输入全部取不到 → 一切按 high。forklight 在 git 之外基本失明，这是边界不是特性。
 - 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。Shinsekai 真 Vite SPA 已实测：双视口各有触摸目标红（13/12 处），scrollbar/focus 绿，对比度/底部遮挡未判；首次依赖预构建时宽屏 `networkidle` 20 秒超时，预热后重跑成功。绿、红、未判必须分开报告。
 - 引文核实只保证**可见正文里有这串字**，不保证那个页面在推荐这个做法。实测 24 个 URL 里有两处命中的是例外条款：W3C 用色页的 "an author cannot use color alone to achieve 3:1 contrast…"、SC 2.5.8 的 "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements…"。语气程序判不了，台账里的 `url + quote` 就是留给 reviewer 抽查上下文的——这是这一档唯一的人防线，别把它当程序保证。
