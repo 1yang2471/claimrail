@@ -55,6 +55,28 @@ async function readJson(path) {
   }
 }
 
+// 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
+// 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
+const AGENTS_BEGIN = '<!-- forklight:begin -->';
+const AGENTS_END = '<!-- forklight:end -->';
+const AGENTS_BLOCK = [
+  AGENTS_BEGIN,
+  '## forklight',
+  '',
+  '动界面、文档、接口之前，先读 forklight 技能，写 `.forklight/decisions.json` 申报分叉与证据；',
+  '交付前跑 `forklight check`——结构不合规先修申报，红的不许交。',
+  AGENTS_END,
+].join('\n');
+
+async function writeAgentsPointer(cwd) {
+  const p = join(cwd, 'AGENTS.md');
+  const old = existsSync(p) ? await readFile(p, 'utf8') : '';
+  if (old.includes(AGENTS_BEGIN)) return '已存在，跳过';
+  const body = old.trim() ? `${old.replace(/\n*$/, '')}\n\n${AGENTS_BLOCK}\n` : `${AGENTS_BLOCK}\n`;
+  await writeFile(p, body, 'utf8');
+  return old.trim() ? '已追加' : '已新建';
+}
+
 export async function init({ cwd = process.cwd() } = {}) {
   await mkdir(join(cwd, '.forklight'), { recursive: true });
   const file = join(cwd, LEDGER_PATH);
@@ -69,12 +91,14 @@ export async function init({ cwd = process.cwd() } = {}) {
   // baseline 只在没有的时候写：重复 init 不许把起点往前推，那等于把已提交的改动洗白
   const hasBase = existsSync(join(cwd, BASELINE_PATH));
   const base = hasBase ? await readBaseline(cwd) : await writeBaseline(cwd);
+  const agents = await writeAgentsPointer(cwd);
 
   return {
     code: 0,
     text: [
       `${created ? '已建' : '已存在，不动'} ${LEDGER_PATH}`,
       `补进 .gitignore：${add.join('、') || '（无新增）'}`,
+      `AGENTS.md：${agents}指路段`,
       base ? `起点记在 ${BASELINE_PATH}：${base.slice(0, 8)}（之后 commit 掉的改动照样会被 check 看到）` : '没找到 HEAD：本次任务请尽早 check，改动一旦提交就无法确定起点',
       '',
       NOTICE,

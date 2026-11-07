@@ -1,6 +1,6 @@
 # 交接（2026-11-06）
 
-新会话先读 `docs/PRD.md`（需求源头，14+ 轮逐条盘问的结论，含明确排除项）和 `AGENTS.md`（每条规则由什么拦住 + 已知检出边界）。本文件只是路标，不复述它们。
+新会话先读 `docs/PRD.md`（需求主体：问题、方案、用户故事、实现决策）与 `docs/PRD-notes.md`（测试决策、排除项、复核笔记），再读 `AGENTS.md`（每条规则由什么拦住 + 已知检出边界）。本文件只是路标，不复述它们。
 
 ## 一句话
 
@@ -37,7 +37,7 @@ forklight 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
    - **tracer bullet 已跑（2026-11-07）**：`src/bench.mjs` + `bench/tasks/` 三个任务（已发布仓库自报 low、旧截图冒充新证据、申报"无分叉"绕开台账）。假 agent 跑出的机制数字：off 交付 3/3、静默塌缩 3；on 交付 1/3、拦住 2、静默塌缩 1、打断中位数 1。**漏的那 1 条是已知盲区**（口头申报无分叉），bench 如实计入，不藏。
    - **这些数只能说明门对这三种形状有效，不能进发布文案**：agent 是确定性的假 agent，量的是机制不是模型行为；额外耗时中位数也没测（假 agent 不耗时）。要把"模型静默塌缩率"写进文案，先扩到 20-30 个任务并换成真实模型重跑。
 3. **hook 接线**（PostToolUse → `forklight check`），否则约束力仍依赖 agent 自觉。
-4. **把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录**跑一轮，验证 description 真会触发。
+4. ~~把 `skill/SKILL.md` 真装进一个 agent 的 skills 目录，验证 description 真会触发~~ —— **已装并验证（2026-11-07）**。skill 通过 junction 装到 `D:/agent-skills/forklight`（ZCode/CodeBuddy/Trae 共用），`zcode skills list` 可见。**结论：description 单独触发不了**——真模型（ZCode 0.17.1 无头）在"把保存按钮改成固定底栏"上连跑两次设计任务都照做、台账一字不写，即使技能描述已加入"动手前先加载"、且确认 Skill 工具可调。改由 `forklight init` 往目标仓库 AGENTS.md 写 marker 指路段后，同一 prompt 立刻写出 3 条分叉台账（含 repo/memory 证据与一条 `evidence: null`），自跑 `forklight check` 退出码 0、`forklight web` 出双视口报告并说明"未判"项。两级验收（硬：台账落盘可校验；强：跑通 check 闭环）都过。
 5. README / LICENSE / `0.1.0` tag。只 commit，push 要用户明说。
 
 ## 已知未修

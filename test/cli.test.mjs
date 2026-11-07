@@ -229,3 +229,34 @@ test('回访带 accept-language: en，且按可见正文核对要点', async () 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 实测（2026-11-07，ZCode 0.17.1 无头）：技能描述已加载、Skill 工具可调，但模型在一个
+// "把保存按钮改成底部固定栏" 的设计任务上就是不加载 forklight（改完样式还自己起了 Chrome
+// 验证）。光靠 description 触发不了，所以 init 要在目标仓库写一段宿主必读的指路。
+test('init 在目标仓库 AGENTS.md 写指路段（没有就建）', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-agents-'));
+  try {
+    await init({ cwd: dir });
+    const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
+    assert.match(agents, /forklight:begin/);
+    assert.match(agents, /decisions\.json/);
+    assert.match(agents, /forklight check/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('重复 init 不重复写指路，也不动已有内容', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-agents2-'));
+  try {
+    await writeFile(join(dir, 'AGENTS.md'), '# 本仓库规则\n\n- 用 pnpm\n', 'utf8');
+    await init({ cwd: dir });
+    await init({ cwd: dir });
+    const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
+    assert.match(agents, /^# 本仓库规则/, '原有内容被改动了');
+    assert.match(agents, /- 用 pnpm/);
+    assert.equal((agents.match(/forklight:begin/g) ?? []).length, 1, '指路段被重复写入');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
