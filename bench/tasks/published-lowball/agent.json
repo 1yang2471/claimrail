@@ -11,13 +11,19 @@
     "forks": [
       {
         "fork": "滚动区实现",
-        "options": ["覆盖式滚动条", "预留 gutter"],
+        "options": [
+          "覆盖式滚动条",
+          "预留 gutter"
+        ],
         "picked": "覆盖式滚动条",
-        "target": { "file": "src/chat.ts" },
+        "target": {
+          "file": "src/chat.ts"
+        },
         "evidence": null,
         "cost_if_wrong": "low",
         "verified": false
       }
     ]
-  }
+  },
+  "prompt": "聊天气泡列表在 390 宽下，滚动条压住右对齐的消息，用户自己的话被挡住。把滚动处理一下。"
 }

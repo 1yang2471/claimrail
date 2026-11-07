@@ -10,16 +10,22 @@
     "forks": [
       {
         "fork": "气泡列表要不要保留滚动条",
-        "options": ["保留覆盖式", "留 gutter"],
+        "options": [
+          "保留覆盖式",
+          "留 gutter"
+        ],
         "picked": "保留覆盖式",
         "evidence": {
           "kind": "render",
           "ref": ".forklight/shots/bubble.png",
-          "asserts": ["scrollbar-clears-text"]
+          "asserts": [
+            "scrollbar-clears-text"
+          ]
         },
         "cost_if_wrong": "low",
         "verified": true
       }
     ]
-  }
+  },
+  "prompt": "聊天气泡列表的滚动条压住内容，帮我改掉这个问题。"
 }
