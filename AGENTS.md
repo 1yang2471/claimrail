@@ -58,7 +58,7 @@
 | 低代价 + 证据不可核实 = 放行但点名 | `gate.decide`：`!evidenceOk && cost !== 'high'` 进 `unverified`，交付说明里必须列出"欠一次人工检查"。这是设计，不是漏拦——但**工具不读交付正文**：真模型实测在门已点名的情况下仍写"3 个来源的引文全部当场核实"。别把"末尾点名"说成"正文也诚实" |
 | 壳页能不能核实，取决于台账里写哪个 URL | `m3.material.io` / `developer.apple.com` 的 HTML 是 SPA 壳（可见正文 15/39 字符），但 Apple 文档另有 JSON 数据接口能取到正文。当前 `verifyPrecedent` 只回访台账给的 URL：写壳页 URL 这一票就不成立，写数据接口 URL 才能核（v2 再考虑自动找接口） |
 | init 要给宿主留指路 | `src/cli.mjs` 的 `writeAgentsPointer`：AGENTS.md 写 marker 块（幂等、不动原内容）。实测光靠 skill description 连跑三次设计任务都不加载；写入指路后同一任务产出 3 条分叉并自跑 check。`test/cli.test.mjs`；变异：关掉写入 → 红 2 |
-| 交付前钩子只许拦一次 | `src/commands/hook.mjs`：读 `stop_hook_active`，**续过一轮后不再阻断**（否则死循环）；没初始化过的仓库静默放行，初始化过但台账被删 → 拦。**放行判定排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮，逼正文逐条声明。`test/cli.test.mjs`、`test/delivery.test.mjs`；变异：去掉 `continuedBefore` / 未验证分支 / 删台账拦截 → 分别红 3/1/1 |
+| 交付前钩子只许拦一次 | `src/commands/hook.mjs`：读 `stop_hook_active`，**续过一轮后不再阻断**（否则死循环）；没初始化过的仓库静默放行，初始化过但台账被删 → 拦。**放行判定排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮，逼正文逐条声明；宿主没给正文时按未判放行（不猜、不死循环）。`test/cli.test.mjs`、`test/delivery.test.mjs`；变异：去掉 `continuedBefore` / 未验证分支 / 删台账拦截 → 分别红 3/1/1 |
 | 未申报本身也拦 | `src/undeclared.mjs`：工作区有改动、台账仍是 init 模板（哈希或占位理由）→ `check` 退出 1；init 脚印（`.claimrail/`、AGENTS.md、.gitignore）不算改动。沿用旧台账由 hook 的 `{tree_hash, ledger_hash}` 快照判，第二次放行并落 `.claimrail/violations.jsonl`。`test/undeclared.test.mjs`、`test/delivery.test.mjs`；变异：关掉模板判定 / 占位理由 / 脚印过滤 / stale / 违规记录 / 删台账拦截 → 全红 |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的白名单：`confidence`/`rationale`/`options_cost` 都进不去。唯一例外 `verified` 只作申报、程序不读（`test/verified.test.mjs` 钉住） |
 | bench 陷阱任务不许编 | `bench/tasks/` 20 个，`trap.md` 都要写明"为什么不是编的"与统计口径；`test/bench.test.mjs` 逐个查。判定规则集中在 `bench/classify.mjs`；`trapRule` 必须已知，漏写由测试拦 |

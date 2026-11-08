@@ -113,8 +113,14 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   // 一句"本次没有任何未验证的事项，全部来源均已核实"两边都能命中，只能按最严重的那条处理。
   const delivery = readDelivery(p);
   if (r.unverified?.length) {
-    const claims = overclaims(delivery ?? '');
-    const declared = delivery ? declaresUnverified(delivery) : false;
+    if (!delivery) {
+      // 宿主没给正文：判不了"有没有逐条声明"。拦下去会在不提供正文的宿主上打成死循环
+      // （stop_hook_active 也未必给）。按"未判"处理：未验证条目仍留在 check 输出里。
+      await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+      return { code: 0, text: `${r.text}\n（宿主没给交付正文，跳过"正文逐条声明"检查；未验证条目见上）` };
+    }
+    const claims = overclaims(delivery);
+    const declared = declaresUnverified(delivery);
     if (claims.length && !declared) {
       return {
         code: 2,

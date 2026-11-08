@@ -90,11 +90,25 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
     assert.equal(c.unverified.length, 1, c.text);
 
     const first = await hook({ cwd: dir });
-    assert.equal(first.code, 2, first.text);
-    assert.match(first.text, /逐条声明未验证项/);
+    // 宿主没给正文：判不了"有没有声明"，按未判放行；拦下去会在不提供正文的宿主上死循环。
+    assert.equal(first.code, 0, first.text);
+    assert.match(first.text, /宿主没给交付正文/);
     assert.match(first.text, /列表行高用 token 还是写死/);
 
-    const second = await hook({ cwd: dir, payload: { stop_hook_active: true } });
+    const overclaim = await hook({ cwd: dir, payload: { last_assistant_message: '全部核实，可以交付。' } });
+    assert.equal(overclaim.code, 2, overclaim.text);
+    assert.match(overclaim.text, /这两句不能同时成立/);
+
+    const declared = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: '这条我没能验证，原因是列表行高没有证据。' },
+    });
+    assert.equal(declared.code, 0, declared.text);
+
+    const second = await hook({
+      cwd: dir,
+      payload: { stop_hook_active: true, last_assistant_message: '全部核实，可以交付。' },
+    });
     assert.equal(second.code, 0, second.text);
     assert.match(second.text, /不再重复阻断/);
   } finally {

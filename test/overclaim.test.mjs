@@ -99,12 +99,14 @@ test('正文已经逐条声明过：放行，不再白拦一轮', async () => {
   }
 });
 
-test('读不到正文时按"没提"处理，但明说读不到，不冒充看过', async () => {
+test('读不到正文时按"未判"放行，不猜也不死循环', async () => {
   const dir = await repoWithUnverified();
   try {
     const r = await hook({ cwd: dir, payload: {} });
-    assert.equal(r.code, 2, r.text);
-    assert.match(r.text, /没能读到交付正文/);
+    // 宿主不提供正文时，钩子判不了"有没有逐条声明"。拦下去会在这种宿主上打成死循环
+    // （stop_hook_active 也未必给）；未验证条目仍留在 check 输出里，所以按未判放行。
+    assert.equal(r.code, 0, r.text);
+    assert.match(r.text, /宿主没给交付正文/);
     assert.doesNotMatch(r.text, /一条都没提/);
   } finally {
     await rm(dir, { recursive: true, force: true });
