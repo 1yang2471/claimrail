@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（348 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（349 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -21,7 +21,7 @@
 | log 行号是引用坐标 | `src/store.mjs`：坏 JSON、坏形状、行内 `at` 与物理行号不符，三种一律硬拦（删一行即让全部既有引用悄悄改指） |
 | 禁用名单不许静默失效 | `src/store.mjs` 的 `readDenied` 读坏了就报错，不能当成"没禁过"（否则被用户作废的规则会复活） |
 | 副作用扫描单位是单文件新增行 | `src/observe/effects.mjs` 的 `addedCode` 返回数组、`scanDiff` 逐文件扫；认不出的 diff header 整段不归属。跨文件拼接会把两个无关文件缝成一条 `recursive-delete` |
-| 诚实申报不该被罚 | `effects.mjs` 的 `SELF_IGNORE` 含 `.claimrail/`、`memory/`、`docs/`、`README/AGENTS.md`、测试/fixtures、规则表自身、`bench/classify.mjs` 与 `bench/tasks/*/agent.json`（判定规则里的 `rm -rf` 字样曾把本轮所有分叉升成 high）。`test/effects.test.mjs`；变异：去掉豁免 → 红 1 |
+| 诚实申报不该被罚 | `effects.mjs` 的 `SELF_IGNORE` 含 `.claimrail/`、`memory/`、`docs/`、`README/AGENTS.md`、测试/fixtures、规则表自身、`bench/classify.mjs`、`bench/tasks/*/{agent.json,trap.md}`（判定规则里的 `rm -rf` 与转述里的 `npm publish` 曾各把本轮所有分叉升成 high）。`test/effects.test.mjs`；变异：去掉任一豁免 → 红 1 |
 | 前端检查默认跑多视口 | `src/commands/web.mjs` 的 `web` 默认 `390x700,1280x800`。注意：`--viewport` 可以覆盖成单个，所以这条是默认值约束，不是硬拦 |
 | 假红防线：容器作用域、贴底定义、截断不作数 | `src/observe/geometry.mjs`：文本按 `container` 归属比较；遮挡只认"贴底 + 覆盖宽度 ≥30%"的条；`raw > 实际条数` 时改判 `null`（`test/geometry.test.mjs`） |
 | 焦点签名按"能不能被看见"归一化 | `src/observe/driver.mjs` 的 `styleSig`：`outline-style:none` 或宽度为 0 时丢弃 outline 颜色/宽度。变异验证：取消归一化 → `test/browser.test.mjs` 红（`a{outline:none}` 又被判成"焦点可见"） |

@@ -12,10 +12,10 @@
       "picked": "从已记录的真实事故新建任务",
       "evidence": {
         "kind": "repo",
-        "ref": "docs/HANDOFF.md:17-18",
+        "ref": "docs/HANDOFF.md:36",
         "asserts": [
-          "覆盖式滚动条",
-          "scrollbar-gutter"
+          "陷阱任务要来自第 0、1 步真翻过的车",
+          "不要新编"
         ]
       },
       "target": {
@@ -47,12 +47,18 @@
         "复用为主，只有实测需要才加"
       ],
       "picked": "复用为主，只有实测需要才加",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/HANDOFF.md:36",
+        "asserts": [
+          "陷阱任务要来自第 0、1 步真翻过的车"
+        ]
+      },
       "target": {
-        "file": "bench/classify.mjs"
+        "file": "docs/HANDOFF.md"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     },
     {
       "fork": "副作用扫描把规则表里的删除字样当真动作怎么办",
@@ -72,7 +78,7 @@
       "target": {
         "file": "src/observe/effects.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     }
   ]

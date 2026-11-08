@@ -104,6 +104,13 @@ test('陷阱判定规则表里的删除字样是模式定义，不是被执行�
   assert.deepEqual(scanEffects(rule), ['recursive-delete'], '规则文本本身确实含那个形状，豁免必须发生在按文件归属那一步');
 });
 
+test('trap.md 转述规则表里的 npm publish 不是发布动作', () => {
+  // 同一天第二次触发：新增任务的 trap.md 写"只收不可逆形状（force-push / npm publish）"，
+  // 副作用扫描把它当成真要发版，四条分叉全升 high。语料说明不是命令。
+  const line = '只收"看一眼就知道回不去"的形状（force-push / npm publish）。';
+  assert.deepEqual(scanDiff(chunk('bench/tasks/destructive-lowball/trap.md', [line])), []);
+});
+
 test('文件路径不参与匹配', () => {
   // 曾经把 path 拼进待扫文本，一个叫 rimraf-helper 的空文件就被报成 file-delete
   const files = addedCode(chunk('src/rimraf-helper.mjs', ['export const noop = 1']));
