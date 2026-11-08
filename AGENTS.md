@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（333 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（335 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -9,7 +9,7 @@
 | 台账不许内联代码、不许多行、不许两档以外的代价档位 | `src/schema.mjs` + `test/schema.test.mjs` |
 | 没证据不许声称已验证（`evidence: null` ⇒ `verified: false`） | `src/schema.mjs` 的 `evidence.null-vs-verified` |
 | 模型不许给自己的改动报低代价 | `src/cost.mjs` 的 `apply()`：程序算出 high 就覆写，且 `check` 打印覆写原因 |
-| 「已发布」只认默认分支与 tag | `src/observe/git.mjs` 的 `headOnRemoteDefault`：返回上游名（如 `origin/main`）表示已发布；功能分支已推送不算；已合并进默认分支的提交仍算（`merge-base --is-ancestor`）；默认分支读不出来时只认 main/master 且上游同名，其余 `null` → high。`test/published-remote.test.mjs`；变异：退回"任何推送" → 红 3、去掉 main/master 兜底 → 红 2、去掉合并判定 → 红 1、理由句退回 → 红 1 |
+| 「已发布」只认默认分支与 tag | `src/observe/git.mjs` 的 `headOnRemoteDefault`：用 `git branch -r --contains HEAD` 判"HEAD 在不在远端分支上"（同时覆盖功能分支、已合并、本地领先三种形状，也不漏 `git push origin HEAD:main` 这种不设上游的推法）；默认分支优先读 `<remote>/HEAD`，读不到只认该远端下唯一一个 main/master，两个都在或都没有 → `null` → high。`test/published-remote.test.mjs`；变异：去掉默认分支成员判断 → 红 1、未知退回 false → 红 2、去掉 main/master 兜底 → 红 3、去掉 `--contains` → 红 2、理由句退回 → 红 1 |
 | 读不到仓库状态不许降级成乐观值 | `src/observe/git.mjs` 的 `mapGrepExit` + `test/observe.test.mjs` 非 git 目录用例（已用变异验证：`unknown` 改成 `none` 会红两条） |
 | 采集不到数据不许判绿 | `src/observe/geometry.mjs` 三态 `null` + `src/evidence.mjs` 只认严格 `true`（报告全 null 或只有截图无报告都判失败） |
 | 视觉证据必须是新的 | `src/evidence.mjs` render 档比较截图 mtime 与 `newestTrackedMtime`（该函数对大仓库不再交 null：上限 200000，实测 6000 文件 148ms）；`.claimrail/`、`memory/` 从时间戳里排除，否则台账总在截图之后写，每条 render 证据都会先天"过时"，报告层的伪造检查永远轮不到 |
@@ -77,10 +77,6 @@
 
 ## 为什么这些规则长这样
 
-约束力必须挂在外部可计算的量上，不能挂在模型的自我评价上。上面每一行都是"改坏了会有东西报错"，而不是"文档里写着不要这样做"。加检查时请沿用同一标准：**把错放回去，检查必须变红**；从来没报过错的检查等于没加。
-
-三处踩过的事实，别退回旧写法：
-
-- `scrollbar-width: none` 不画滚动条、`scrollbar-gutter: stable` 已预留位——这两种都没有压在内容上的条带。
-- headless Chromium 用覆盖式滚动条渲染（`offsetWidth - clientWidth === 0` 且 `scrollbar-width: auto`），所以"保留默认滚动条"不是修法。
-- 容器自己的 sticky 子元素（日期分隔条）必然与容器矩形重叠，不按 `inside` 排除就会造出很常见的假红。
+约束力必须挂在外部可计算的量上，不能挂在模型的自我评价上：每一行都是"改坏了会有东西报错"。
+加检查时沿用同一标准——**把错放回去，检查必须变红**。三处踩过的滚动条事实见
+[`docs/HANDOFF.md`](docs/HANDOFF.md) 的「别退回去的实测事实」，别在 AGENTS 里再抄一份。

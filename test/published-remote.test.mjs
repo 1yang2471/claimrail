@@ -95,6 +95,23 @@ test('没有上游：确定未发布，不是未知', async () => {
   });
 });
 
+test('没有上游但 git push origin HEAD:main：仍算发布，别漏掉这种推法', async () => {
+  await withRepo({ branch: 'main' }, async (dir) => {
+    g(dir, ['checkout', '-q', '-b', 'feat']);
+    g(dir, ['commit', '-q', '--allow-empty', '-m', 'feat']);
+    g(dir, ['push', '-q', 'origin', 'HEAD:main']);
+    assert.equal(await headOnRemoteDefault(dir), 'origin/main');
+  });
+});
+
+test('origin/HEAD 缺失且 main/master 同时存在：返回未知，不猜哪个是默认', async () => {
+  await withRepo({ branch: 'main' }, async (dir) => {
+    g(dir, ['branch', 'master']);
+    g(dir, ['push', '-q', 'origin', 'master']);
+    assert.equal(await headOnRemoteDefault(dir), null);
+  });
+});
+
 test('理由句说「已推送/已发布」并带上游名——不再把功能分支说成已发布', async () => {
   await withRepo({ branch: 'main' }, async (dir) => {
     await mkdir(join(dir, '.claimrail'), { recursive: true });

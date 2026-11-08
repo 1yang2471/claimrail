@@ -8,7 +8,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 22 个模块 / 2850+ 行 src / `node --test` 333 项（331 通过 + 2 skip，两条真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
+- 22 个模块 / 2850+ 行 src / `node --test` 335 项（333 通过 + 2 skip，两条真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
 - 提交基线 `de2cb59`；之后本轮三条：precedent 实测修正 / 口味类补测降级 / 真 SPA + `--state` 实测（`git log --oneline -4` 可查）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 
@@ -77,4 +77,4 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 ## 设计复核（2026-11-08，第二轮 grill-me）
 
 见 [`AUDIT-2026-11-08.md`](AUDIT-2026-11-08.md)：四项活体探针，按用户决定落地
-"申报无分叉的审计项"（`emptyDeclaration`）与"published 只认默认分支"，测试 318 → 333。
+"申报无分叉的审计项"（`emptyDeclaration`）与"published 只认默认分支"，测试 318 → 335。

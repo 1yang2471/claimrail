@@ -47,67 +47,55 @@ export async function tagPointsAtHead(cwd) {
   return r.stdout.split('\n').filter(Boolean);
 }
 
-// 上游读不出来必须是 null（未知），不能当成"从没推过"。
-// 曾经的写法直接读 stdout，配了个不存在的 remote 时输出空串 → false → published 为空 → 判 low。
-async function currentUpstream(cwd) {
-  const branchRes = await gitRaw(['rev-parse', '--abbrev-ref', 'HEAD'], cwd);
-  if (branchRes.code !== 0) return null;
-  const branch = branchRes.stdout.trim();
-  if (!branch || branch === 'HEAD') return null;
-
-  const up = await gitRaw(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`], cwd);
-  if (up.code !== 0) {
-    const text = `${up.stderr}${up.stdout}`.toLowerCase();
-    // "no upstream configured" 才是真的从没推过；其余（坏 remote 配置等）是未知
-    return text.includes('no upstream') || text.includes('unknown branch or revision')
-      ? { branch, upstream: null }
-      : null;
-  }
-  const upstream = up.stdout.trim();
-  if (!upstream) return null;
-  return { branch, upstream };
+// 远端跟踪分支列表（不含 origin/HEAD 这类符号别名）。任何一次 git 读失败都交 null。
+async function remoteBranches(cwd, extra = []) {
+  const r = await gitRaw(['branch', '-r', ...extra, '--format=%(refname:short)'], cwd);
+  if (r.code !== 0) return null;
+  return r.stdout
+    .split('\n')
+    .map((s) => s.trim())
+    .filter((s) => s && !s.endsWith('/HEAD'));
 }
 
 // 远端默认分支在本地跟踪引用里的名字（origin/main）。优先读 <remote>/HEAD 符号引用；
-// 读不到就交 null——调用方据此返回"未知"，不拿 main/master 硬套。
-async function defaultRemoteRef(cwd, remote) {
+// 读不到时只认"该远端下唯一一个 main/master"——两个都在（历史遗留）就不猜。
+// all 是全部远端分支，用来排除指向已删除分支的过期符号引用。
+async function defaultRemoteRef(cwd, remote, all) {
   const r = await gitRaw(['symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`], cwd);
-  if (r.code !== 0) return null;
-  const name = r.stdout.trim();
-  return name || null;
+  if (r.code === 0) {
+    const name = r.stdout.trim();
+    if (name && all.includes(name)) return name;
+  }
+  const candidates = all.filter((b) => b === `${remote}/main` || b === `${remote}/master`);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
-// HEAD 是否已经"发布"到远端默认分支。返回上游名（如 origin/main）表示已发布；
+// HEAD 是否已经"发布"到远端默认分支。返回远端分支名（如 origin/main）表示已发布；
 // false 表示没有；null 表示读不出来（→ cost high）。
 //
+// 判据不是"当前分支有没有上游"：`git push origin HEAD:main` 不设置上游，但 HEAD 确实
+// 已经在默认分支上。所以直接问 git"哪些远端分支包含 HEAD"——这一步同时覆盖了
+// "推了功能分支"（不包含默认分支）、"功能分支已合并"（包含默认分支）、
+// "本地领先上游"（没有任何远端分支包含 HEAD）三种形状。
+//
 // 2026-11-08 收窄：以前任何已推送的提交都算发布，于是"推了个功能分支"也会在理由句里
-// 写成「已发布」，把人指去查发布记录。现在只认默认分支——包括已合并进默认分支的提交
-// （只看上游是不是默认分支会漏掉这一种）。默认分支读不出来时：
-//   - 当前分支是 main/master 且上游就是 <remote>/<同名>：按已发布处理（最常见形状）
-//   - 其余：返回 null，交 high 保守处理，不猜
+// 写成「已发布」，把人指去查发布记录。现在只认默认分支。默认分支读不出来、而 HEAD
+// 又确实在某个远端分支上时返回 null（→ high），不拿 main/master 硬猜。
 export async function headOnRemoteDefault(cwd) {
-  const cur = await currentUpstream(cwd);
-  if (!cur) return null;
-  if (!cur.upstream) return false;
+  const [all, containing] = await Promise.all([remoteBranches(cwd), remoteBranches(cwd, ['--contains', 'HEAD'])]);
+  if (all === null || containing === null) return null;
+  if (containing.length === 0) return false;
 
-  const ahead = await gitRaw(['rev-list', '--count', `${cur.upstream}..HEAD`], cwd);
-  if (ahead.code !== 0) return null;
-  const n = Number(ahead.stdout.trim());
-  if (!Number.isFinite(n)) return null;
-  if (n !== 0) return false; // 本地领先上游：HEAD 本身没推上去
-
-  const remote = cur.upstream.split('/')[0];
-  const def = await defaultRemoteRef(cwd, remote);
-  if (def) {
-    const anc = await gitRaw(['merge-base', '--is-ancestor', 'HEAD', def], cwd);
-    if (anc.code === 0) return def;
-    if (anc.code === 1) return false;
-    return null;
+  let unknown = false;
+  for (const remote of new Set(containing.map((b) => b.split('/')[0]))) {
+    const def = await defaultRemoteRef(cwd, remote, all);
+    if (!def) {
+      unknown = true;
+      continue;
+    }
+    if (containing.includes(def)) return def;
   }
-  if ((cur.branch === 'main' || cur.branch === 'master') && cur.upstream === `${remote}/${cur.branch}`) {
-    return cur.upstream;
-  }
-  return null;
+  return unknown ? null : false;
 }
 
 // baseline 由 init 记录。没有它，"先把改动 commit 掉再 check"就能让
