@@ -23,6 +23,11 @@
     "verification",
     "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1yang2471/claimrail.git"
+  },
+  "homepage": "https://github.com/1yang2471/claimrail#readme",
   "peerDependencies": {
     "playwright": "^1.40.0"
   },
