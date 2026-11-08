@@ -1,6 +1,6 @@
 import { publishedFrom } from './published.mjs';
 import { scanDiff } from './effects.mjs';
-import { tagPointsAtHead, headOnRemote, grepCount, fileRefs, targetResolves, diffSince, changedLines, worktreeScanText } from './git.mjs';
+import { tagPointsAtHead, headOnRemoteDefault, grepCount, fileRefs, targetResolves, diffSince, changedLines, worktreeScanText } from './git.mjs';
 
 // Observation：cost.grade 唯一的输入。三个值都必须从仓库里读出来，
 // 这一层是整套协议里唯一接触真实世界的地方。读不出来就交 null，
@@ -11,7 +11,7 @@ import { tagPointsAtHead, headOnRemote, grepCount, fileRefs, targetResolves, dif
 export async function observe(target, { cwd, diffText = null, changed = null, base = null, declaredPublished = [] } = {}) {
   const [tagNames, onRemote, changedNow] = await Promise.all([
     tagPointsAtHead(cwd),
-    headOnRemote(cwd),
+    headOnRemoteDefault(cwd),
     changed ?? changedLines(cwd, base),
   ]);
 

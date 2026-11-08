@@ -15,7 +15,7 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 | Claim | How the program checks it |
 | --- | --- |
 | "Everyone does it this way" | Re-fetches ≥3 independent registrable domains; the quote must appear in the page's *visible text* — inside `<script>` does not count |
-| "It's easy to revert" | Cost is computed from fan-in, whether the artifact is published, and side effects; the model may only raise it |
+| "It's easy to revert" | Cost is computed from fan-in, whether HEAD is on the published default branch or tagged, and side effects; the model may only raise it |
 | "The screenshot proves it's fine" | Screenshot must be newer than the last code change; `null` (undecided) items in the report never count as passing |
 | "I followed the existing pattern" | Re-reads the cited `file:line`; lines added/modified in this session don't count as an existing pattern |
 | "I remember you rejected X" | `log#n` must exist and match; a misaligned line number is a hard error |
@@ -101,7 +101,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 325 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 333 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

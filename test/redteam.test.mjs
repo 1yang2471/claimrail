@@ -82,7 +82,7 @@ test('伪造三：先 commit 再 check 绕开副作用扫描 → 未跟踪与暂
     await ledger(dir, [fork({ target: { file: 'src/base.mjs', symbol: 'a' }, verified: false })]);
 
     const r = await check({ cwd: dir });
-    assert.match(r.text, /已发布或有副作用：recursive-delete|命中 recursive-delete/, r.text);
+    assert.match(r.text, /已推送\/已发布或有副作用：recursive-delete|命中 recursive-delete/, r.text);
     assert.equal(r.code, 1, r.text);
   });
 });
@@ -291,7 +291,7 @@ test('诚实台账不该因为描述危险选项而被自己扫成 high', async 
   await withRepo(async (dir) => {
     await ledger(dir, [fork({ fork: '发布前要不要 rm -rf 旧缓存并 git push --force 重写历史', options: ['rm -rf 旧缓存', '保留缓存'], picked: '保留缓存' })]);
     const r = await check({ cwd: dir });
-    assert.doesNotMatch(r.text, /命中 recursive-delete|已发布或有副作用：recursive-delete/, r.text);
+    assert.doesNotMatch(r.text, /命中 recursive-delete|已推送\/已发布或有副作用：recursive-delete/, r.text);
   });
 });
 

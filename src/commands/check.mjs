@@ -162,7 +162,7 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {
         const missing = whyUnknown(obs, { gitRepo });
         const hit = [...obs.published ?? [], ...obs.irreversible ?? []];
-        const reason = missing.length ? missing.join('；') : `已发布或有副作用：${hit.join('、')}`;
+        const reason = missing.length ? missing.join('；') : `已推送/已发布或有副作用：${hit.join('、')}`;
         overrides.push(`${fork.fork}：申报 low → 程序 high（${reason}）`);
       }
     }

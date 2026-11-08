@@ -13,9 +13,11 @@ test('无 tag 且未推送 = 干净的未发布，不是未知', () => {
   assert.deepEqual(publishedFrom({ tagNames: [], onRemote: false }), []);
 });
 
-test('打过 tag 或已推上游都算收不回来', () => {
+test('打过 tag 或已推到默认分支都算收不回来', () => {
   assert.deepEqual(publishedFrom({ tagNames: ['v1.2.0'], onRemote: false }), ['tag:v1.2.0']);
-  assert.deepEqual(publishedFrom({ tagNames: [], onRemote: true }), ['pushed:HEAD']);
+  assert.deepEqual(publishedFrom({ tagNames: [], onRemote: true }), ['pushed:HEAD']); // 旧调用方
+  // 上游名要原样进理由：pushed:origin/main 比 pushed:HEAD 更能指出"发布到哪了"
+  assert.deepEqual(publishedFrom({ tagNames: [], onRemote: 'origin/main' }), ['pushed:origin/main']);
 });
 
 test('手工声明只能补充，不能顶替 git 读取', () => {
