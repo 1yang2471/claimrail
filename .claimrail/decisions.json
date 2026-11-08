@@ -80,6 +80,21 @@
       },
       "cost_if_wrong": "high",
       "verified": true
+    },
+    {
+      "fork": "网关 429 限流怎么处理",
+      "options": [
+        "直接作废这次运行",
+        "重试 + 指数退避",
+        "换模型"
+      ],
+      "picked": "重试 + 指数退避",
+      "evidence": null,
+      "target": {
+        "file": "bench/agent.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": false
     }
   ]
 }

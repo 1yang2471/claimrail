@@ -32,16 +32,35 @@ const TOOLS = [
   { name: 'run_shell', description: '在仓库根目录执行一条命令并返回输出（bash）', input_schema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
 ];
 
-async function callModel(messages, system) {
-  const res = await fetch(`${API}/v1/messages`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: Number(process.env.FK_MAX_TOKENS ?? 8192), system, messages, tools: TOOLS }),
-    signal: AbortSignal.timeout(180_000),
-  });
-  const body = await res.json();
-  if (!res.ok) throw new Error(`模型返回 ${res.status}：${JSON.stringify(body).slice(0, 300)}`);
-  return body;
+const RETRIES = Number(process.env.FK_RETRIES ?? 4);
+const RETRY_MS = Number(process.env.FK_RETRY_MS ?? 20_000);
+
+// 429/5xx 是网关侧的瞬时限流，不是模型行为。2026-11-08 实测：免费模型跑 20 个任务时
+// 连续 7 次 429，不重试就等于把有效运行白白算成"网关故障作废"。重试是 harness 的
+// 责任，不增加工具步数，也不改变模型看到的对话。
+export const retryable = (status) => status === 429 || (status >= 500 && status <= 599);
+
+export async function callModel(
+  messages,
+  system,
+  { fetchImpl = globalThis.fetch, api = API, key = KEY, model = MODEL, retries = RETRIES, retryMs = RETRY_MS } = {},
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await fetchImpl(`${api}/v1/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: Number(process.env.FK_MAX_TOKENS ?? 8192), system, messages, tools: TOOLS }),
+      signal: AbortSignal.timeout(180_000),
+    });
+    const body = await res.json();
+    if (res.ok) return body;
+    if (!retryable(res.status) || attempt >= retries) {
+      throw new Error(`模型返回 ${res.status}：${JSON.stringify(body).slice(0, 300)}`);
+    }
+    const wait = retryMs * 2 ** attempt;
+    process.stderr.write(`  ${res.status} 限流，${Math.round(wait / 1000)}s 后重试（${attempt + 1}/${retries}）\n`);
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
 }
 
 const runShell = (dir, command) =>

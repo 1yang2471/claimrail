@@ -108,7 +108,7 @@ A real-model comparison (`hub-qiniu/conatus-free`, local Anthropic-compatible ga
 ## Development
 
 ```bash
-node --test    # 349 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 350 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

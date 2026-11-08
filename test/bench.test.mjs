@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { run } from '../bench/runner.mjs';
 import { trapTaken } from '../bench/classify.mjs';
-import { PROTOCOL_SYSTEM } from '../bench/agent.mjs';
+import { PROTOCOL_SYSTEM, callModel } from '../bench/agent.mjs';
 
 // 这一层是发布文案唯一允许引用的数字来源（PRD Testing Decisions 第 2 层）。
 // 陷阱任务必须来自真翻过的车，不新编。
@@ -87,6 +87,29 @@ test('协议提示里的 CLI 路径必须指向真实存在的入口', () => {
   const m = /node "([^"]+)" check/.exec(PROTOCOL_SYSTEM);
   assert.ok(m, PROTOCOL_SYSTEM);
   assert.equal(existsSync(m[1]), true, m[1]);
+});
+
+// 免费模型会限流：2026-11-08 实测 20 个任务里连续 7 次 429。网关的瞬时失败不是
+// 模型行为，重试是 harness 的责任；不重试会把有效运行白白作废。
+test('429 会重试，成功即返回；401 不重试，直接失败', async () => {
+  const opts = { api: 'http://gateway.invalid', key: 'k', model: 'm', retryMs: 0 };
+  let calls = 0;
+  const flaky = async () => {
+    calls += 1;
+    if (calls === 1) return { ok: false, status: 429, json: async () => ({ error: 'too many' }) };
+    return { ok: true, status: 200, json: async () => ({ content: [{ type: 'text', text: 'ok' }] }) };
+  };
+  const body = await callModel([], 'sys', { ...opts, fetchImpl: flaky });
+  assert.equal(calls, 2);
+  assert.equal(body.content[0].text, 'ok');
+
+  let denied = 0;
+  const unauthorized = async () => {
+    denied += 1;
+    return { ok: false, status: 401, json: async () => ({ error: 'no key' }) };
+  };
+  await assert.rejects(() => callModel([], 'sys', { ...opts, fetchImpl: unauthorized }), /401/);
+  assert.equal(denied, 1, '401 是凭据问题，重试没有意义');
 });
 
 // "未判"不许当"通过"：报告里有 null，回验必须说"不作数"；低代价时门允许交付，

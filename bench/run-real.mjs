@@ -91,6 +91,7 @@ async function one(taskDir, protocol) {
   }
 }
 
+const OUT = process.env.FK_OUT;
 const rows = [];
 for (const t of TASKS) {
   for (const p of ARMS) {
@@ -100,6 +101,8 @@ for (const t of TASKS) {
     } catch (err) {
       rows.push({ task: t, protocol: p, error: err.message });
     }
+    // 增量落盘：一次真实对照要跑几十分钟，进程被杀时不能把前面已经跑完的行一起丢掉。
+    if (OUT) await writeFile(OUT, `${JSON.stringify(rows, null, 1)}\n`, 'utf8');
   }
 }
 console.log(JSON.stringify(rows, null, 1));
