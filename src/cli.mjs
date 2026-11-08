@@ -15,7 +15,7 @@ import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, re
 import { web } from './commands/web.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from './paths.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
-import { check, hook, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
+import { check, hook, readIncoming, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
 
 export { web, parse, help, unknownCmd, LEDGER_PATH, check, hook };
 export { readJson, writeBaseline, readBaseline } from './commands/check.mjs';

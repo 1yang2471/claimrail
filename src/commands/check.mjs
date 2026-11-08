@@ -190,7 +190,7 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
 }
 
 // 宿主从 stdin 发事件 JSON（Stop 的 payload 里有 stop_hook_active / stopHookActive）。
-async function readIncoming() {
+export async function readIncoming() {
   if (process.stdin.isTTY) return null;
   try {
     // 上限：宿主不关闭 stdin 时，钩子会一直挂着（宿主那边只能等超时）。

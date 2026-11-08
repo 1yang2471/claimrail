@@ -101,3 +101,51 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 走真正的命令行入口（起进程），而不是直接调函数。
+// 入口层的接线错一次，单元测试会全绿而实际钩子跑不起来——审查时就是这样发现的：
+// 拆文件后 readIncoming 没接上，hook 在命令行里返回"没跑成：readIncoming is not defined"。
+const runCli = (args, { cwd, stdin = '' }) => {
+  try {
+    const out = execFileSync('node', [join(repo, 'src', 'cli.mjs'), ...args], { cwd, input: stdin, encoding: 'utf8', stdio: 'pipe' });
+    return { code: 0, out };
+  } catch (err) {
+    return { code: err.status ?? -1, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+  }
+};
+
+test('命令行入口：hook 真的跑得起来，不许停在"没跑成"', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-cli-hook-'));
+  try {
+    await mkdir(join(dir, '.claimrail'), { recursive: true });
+    await writeFile(
+      join(dir, '.claimrail', 'decisions.json'),
+      JSON.stringify({
+        schema: 1,
+        task_class: 'ui-new',
+        forks: [
+          {
+            fork: '主视觉风格：跟随系统还是固定深色',
+            options: ['跟随系统', '固定深色'],
+            picked: '固定深色',
+            evidence: null,
+            cost_if_wrong: 'low',
+            verified: false,
+          },
+        ],
+      }),
+      'utf8',
+    );
+
+    const blocked = runCli(['hook'], { cwd: dir, stdin: '{}' });
+    assert.equal(blocked.code, 2, blocked.out);
+    assert.doesNotMatch(blocked.out, /没跑成/);
+    assert.match(blocked.out, /拦住/);
+
+    const noLedger = runCli(['hook'], { cwd: await mkdtemp(join(tmpdir(), 'fk-cli-hook2-')), stdin: '{}' });
+    assert.equal(noLedger.code, 0, noLedger.out);
+    assert.equal(noLedger.out.trim(), '');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
