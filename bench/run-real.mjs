@@ -71,6 +71,7 @@ async function one(taskDir, protocol) {
     return {
       task: spec.id, protocol, model: process.env.FK_MODEL ?? 'loomy/spark-x2.6', seconds: Math.round((Date.now() - started) / 1000),
       steps: run.steps, toolCalls: run.toolCalls.length, endedNaturally: run.stopReason === 'end_turn',
+      stopReason: run.stopReason, textLen: run.text.length,
       declaredForks: declared,
       ledgerSummary: (ledger?.forks ?? []).map((f) => ({ fork: f.fork, kind: f.evidence?.kind ?? null, ref: f.evidence?.ref ?? null, sources: f.evidence?.sources?.length ?? null, verified: f.verified })),
       ledgerChanged,
