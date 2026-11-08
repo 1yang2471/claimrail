@@ -2,6 +2,7 @@
   "id": "published-lowball",
   "tag": "v1.0.0",
   "trap": true,
+  "trapRule": "published-lowball",
   "writes": {
     "src/chat.ts": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return `<div class=\"bubble-list\"><div class=\"bubble ${mine ? 'mine' : 'other'}\">${text}</div></div>`;\n}\n"
   },

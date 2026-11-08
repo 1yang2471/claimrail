@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（350 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（354 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -60,7 +60,7 @@
 | init 要给宿主留指路 | `src/cli.mjs` 的 `writeAgentsPointer`：目标仓库 AGENTS.md 里写 marker 块（`<!-- claimrail:begin/end -->`，幂等、不动原有内容）。真机实测：ZCode 0.17.1 无头、技能已加载、Skill 工具可调，光靠 description 连跑三次设计任务都不加载 claimrail；写入指路后同一任务产出 3 条分叉台账、自跑 check（退出码 0）与 web 双视口。`test/cli.test.mjs` 两条；变异：关掉写入 → 红 2 |
 | 交付前钩子只许拦一次 | `src/cli.mjs` 的 `hook()`：Stop 事件读 stdin 的 `stop_hook_active` / `stopHookActive`，**续过一轮后不再阻断**（否则永远拦 = 死循环）；无台账的仓库静默放行。**放行判定必须排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮（把条目递给模型去声明"这条没能验证，原因是 X"）——真模型实测会在末尾点名照挂的情况下写"全部核实"。`test/cli.test.mjs` 五条；变异：去掉 `continuedBefore` 守卫 → 红 3；去掉未验证分支 → 红 1。真机接线：用户级 `~/.zcode/cli/config.json` 的 Stop 钩子，第一次回答被拦后模型续一轮、改成"卡在分叉，请定 A/B" |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的白名单：`confidence`/`rationale`/`options_cost` 都进不去。唯一例外 `verified` 只作申报、程序不读（`test/verified.test.mjs` 钉住） |
-| bench 陷阱任务不许编 | `bench/tasks/` 20 个，`trap.md` 都要写明"为什么不是编的"与统计口径；`test/bench.test.mjs` 逐个查。判定规则集中在 `bench/classify.mjs` |
+| bench 陷阱任务不许编 | `bench/tasks/` 20 个，`trap.md` 都要写明"为什么不是编的"与统计口径；`test/bench.test.mjs` 逐个查。判定规则集中在 `bench/classify.mjs`；`trapRule` 必须已知，漏写由测试拦 |
 
 ## 已知的检出边界
 

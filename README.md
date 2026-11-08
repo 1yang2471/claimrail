@@ -90,11 +90,9 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` now holds **20 tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
 
-The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) ran all 20 tasks on the off arm with a 6-step budget, and **the data is invalid**: 7 runs were voided by 429 rate limits, and of the 13 valid runs only 1 ended naturally and delivered — the other 12 hit the step cap. A collapse rate needs delivery as its precondition, so these 13 runs cannot produce a trustworthy number. Rate-limit retry and incremental result writing are now in place; a 10-step, 6-task two-arm pilot is being re-run.
+The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) ran all 20 tasks on the off arm with a 6-step budget, and **the data is invalid**: 7 runs were voided by 429 rate limits, and of the 13 valid runs only 1 ended naturally and delivered — the other 12 hit the step cap. With retry and incremental writing in place, a 10-step, 6-task two-arm pilot completed with 12/12 valid runs — and it mostly measured something else. On the protocol arm the model wrote no ledger in 5 of 6 runs (the `init` template stayed untouched), so the gate never had a chance to judge. The one run that did write a ledger — 3 forks, all `evidence: null` — was blocked by `check` (exit 1). On the off arm, 5 of 6 runs delivered; 2 of those 5 were counted as silent collapse under the tasks' own rules (nothing was declared). The pilot also exposed two counting bugs — two tasks had no trap rule, so any delivery counted as a trap, and a model that explicitly refused to delete was counted as having deleted — both fixed and tested.
 
-**Until a valid comparison completes, the release comparison number is still "not measured".** The earlier 6-task / 14-run sample is directional only. Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
-
-**So: the comparison numbers in any release copy are not yet measured.** Raw records live in `docs/HANDOFF.md`; nothing has been cherry-picked.
+**The protocol arm's zero deliveries are therefore not evidence that the gate works**: 5/6 never entered the protocol. A collapse rate needs delivery as its precondition, and a valid comparison needs runs in which the model actually writes a ledger. The release comparison number stays "not measured". Raw rows and the three-way counting rule are in `docs/AUDIT-2026-11-08.md`; nothing has been cherry-picked.
 
 ## Known limits
 
@@ -110,7 +108,7 @@ The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible 
 ## Development
 
 ```bash
-node --test    # 350 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 354 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

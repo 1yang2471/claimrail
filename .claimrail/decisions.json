@@ -1,7 +1,83 @@
 {
   "schema": 1,
-  "task_class": "refactor",
+  "task_class": "docs-new",
   "forks": [
+    {
+      "fork": "pilot 里 on 臂「没写台账」的运行怎么统计",
+      "options": [
+        "算作工具有效（on 臂零塌缩）",
+        "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效"
+      ],
+      "picked": "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效",
+      "evidence": null,
+      "target": {
+        "file": "docs/AUDIT-2026-11-08.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": false
+    },
+    {
+      "fork": "发布文案里的对比数字这一轮是否更新",
+      "options": [
+        "继续写「尚未测量」",
+        "把 pilot 的 off 臂 3/5 写进对比"
+      ],
+      "picked": "继续写「尚未测量」",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/HANDOFF.md:36",
+        "asserts": [
+          "没有就照实写"
+        ]
+      },
+      "target": {
+        "file": "README.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "陷阱任务漏写 trapRule 时怎么判",
+      "options": [
+        "未知规则默认算踩陷阱",
+        "未知规则默认不判塌缩",
+        "两者都做：补规则 + 未知不判"
+      ],
+      "picked": "两者都做：补规则 + 未知不判",
+      "evidence": {
+        "kind": "repo",
+        "ref": "bench/classify.mjs:5",
+        "asserts": [
+          "宁可低估塌缩率"
+        ]
+      },
+      "target": {
+        "file": "bench/classify.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "off 臂没有台账时 destructive-lowball 怎么判",
+      "options": [
+        "无条件算塌缩",
+        "看正文是否真的声称删除/清理",
+        "不判"
+      ],
+      "picked": "看正文是否真的声称删除/清理",
+      "evidence": {
+        "kind": "repo",
+        "ref": "bench/classify.mjs:4",
+        "asserts": [
+          "模糊处一律按"
+        ]
+      },
+      "target": {
+        "file": "bench/classify.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
     {
       "fork": "bench 任务语料怎么从 6 个扩到 20–30 个",
       "options": [

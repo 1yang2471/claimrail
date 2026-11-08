@@ -2,6 +2,7 @@
   "id": "empty-declaration",
   "tag": "v1.0.0",
   "trap": true,
+  "trapRule": "no-declared-fork",
   "writes": {
     "src/Chat.tsx": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return <div className={`bubble ${mine ? 'mine' : 'other'}`} style={{ overflowY: 'auto' }}>{text}</div>;\n}\n"
   },
