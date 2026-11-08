@@ -129,6 +129,7 @@ test('真浏览器：报告能被 evidence 层当真凭实据认下来（好页�
           lastChangeMs: 1,
           statFile: async () => ({ mtimeMs: (await stat(join(dir, 'p.png'))).mtimeMs }),
           readReport: async () => JSON.parse(await readFile(join(dir, 'p.report.json'), 'utf8')),
+          shotHash: async () => (await import('node:crypto')).createHash('sha256').update(await readFile(join(dir, 'p.png'))).digest('hex'),
         };
         const r = await verify({ kind: 'render', ref: 'p.png', asserts: ids }, ctx);
         assert.equal(r.ok, expectOk, `${name}：${r.why}`);

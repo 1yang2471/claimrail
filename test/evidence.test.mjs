@@ -6,9 +6,11 @@ import { verify, verifyAll, RENDER_CHECK_IDS } from '../src/evidence.mjs';
 // 结果 trouble-maker 当场复现出三条伪造路径（编报告 id、引用自己刚写的代码、
 // 单字符断言）——测的是正常请求，没测核心主张。
 
+const SHOT_SHA = 'a'.repeat(64);
 const passing = (over = {}) => ({
   report_schema: 1,
   name: 'chat',
+  shot_sha256: SHOT_SHA,
   checks: RENDER_CHECK_IDS.map((id) => ({ id, ok: true, detail: '' })),
   ...over,
 });
@@ -17,6 +19,7 @@ const renderCtx = (over = {}) => ({
   lastChangeMs: 1000,
   statFile: async () => ({ mtimeMs: 2000 }),
   readReport: async () => passing(),
+  shotHash: async () => SHOT_SHA,
   ...over,
 });
 
@@ -206,4 +209,27 @@ test('报告不带 name：算"不是同一次采集"，不许靠不写绕开同�
   const r = await verify({ kind: 'render', ref: 'shots/chat.png', asserts: goodAsserts }, renderCtx({ readReport: async () => passing({ name: undefined }) }));
   assert.equal(r.ok, false);
   assert.match(r.why, /不是同一次采集/);
+});
+
+// 调研（craft-anything 的 checks/ 落盘链）得到的启发：每一轮的"判过"必须与它测的那张图
+// 绑死。以前只靠文件名 + mtime：把同名的旧报告换回来、或者换一张图，检查照样过。
+test('报告必须与截图哈希绑定：换图或换报告都会露馅', async () => {
+  const bundle = { kind: 'render', ref: 'shots/chat.png', asserts: goodAsserts };
+
+  // 正常：哈希一致
+  assert.equal((await verify(bundle, renderCtx())).ok, true);
+
+  // 换一张图（报告的哈希对不上现在的截图）
+  const swapped = await verify(bundle, renderCtx({ shotHash: async () => 'b'.repeat(64) }));
+  assert.equal(swapped.ok, false);
+  assert.match(swapped.why, /不是同一次采集/);
+
+  // 报告没绑哈希：不许当成"没这项检查"就放过
+  const unbounded = await verify(bundle, renderCtx({ readReport: async () => passing({ shot_sha256: undefined }) }));
+  assert.equal(unbounded.ok, false);
+  assert.match(unbounded.why, /没有绑定截图/);
+
+  // 截图读不出来（哈希取不到）：同样不认
+  const noShot = await verify(bundle, renderCtx({ shotHash: async () => null }));
+  assert.equal(noShot.ok, false);
 });

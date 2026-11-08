@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（310 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（318 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -38,6 +38,9 @@
 | 透明文字没有对比度可言 | `geometry.mjs` 的 `contrastOk`：`rgba(0,0,0,0)` 合成到底色上得到 1.00，报"不足 4.5:1"是纯假红（sr-only、图标字体常见）。它不算合格，也不冒充"已核"。`test/geometry.test.mjs`；变异：去掉守卫 → 红 |
 | 非 git 目录是显式降级模式，不是实测 | `src/observe/git.mjs` 的 `gitState` 分三种：repo / none（确实不是仓库）/ unknown（git 本身用不了：坏 GIT_DIR、safe.directory）。三者文案必须不同——把"仓库读不出来"说成"这里不是仓库"会把人指去 `git init` 一个本来就是仓库的目录。降级时要说清丢的是什么：repo 档仍读得了文件与行，丢的是"先干后证"（引用的行是不是本次刚写的）。`test/cli.test.mjs`；变异：不区分 none/unknown → 红 |
 | 退出码不许说谎 | `src/commands/web.mjs`：五项全未判时退出码是 1（这份报告本来就不能当证据），不是 0；`claimrail check` 退出码 0 只在"确实有绿项"时成立。`test/web.test.mjs` |
+| 报告必须绑住它测的那张图 | `src/observe/web.mjs` 写 `shot_sha256`；`src/evidence.mjs` 回验时重算截图哈希（`ctx.shotHash`）比对。只靠文件名 + mtime 不够：换一张图或换一份同名报告都能混过去。缺 `shot_sha256` 一律失败（手写报告不能靠"不写"绕开）。`test/evidence.test.mjs`、`test/web.test.mjs`；变异：去掉缺字段守卫 / 去掉哈希比对 / 报告不写哈希 → 各红一次 |
+| 报告要说清"没覆盖到哪里" | `src/observe/web.mjs` 的 `limitations`：四类采集截断、未判底色、采样疑似压字、像素采样关闭/失败、焦点没探或只探了一部分。`web` 命令把它打到屏幕上——只写进 report.json 等于没写。`test/web.test.mjs`；变异：去掉一条 → 红 |
+| 判定要能结构化交出去 | `src/commands/check.mjs` 返回 `data`（schema=1：action / metrics / degraded / overrides / questions / unverified / violations / notEnabled）；`--json` 在入口打印它，文本是同一份决策的视图。`test/args.test.mjs`、`test/hook.test.mjs`；变异：删解析 / 删 data / 删入口分支 → 各红 |
 | 报告必须带 name | `src/evidence.mjs` 的 render 档：报告不带 `name` 就当"不是同一次采集"——工具自己的产物永远带 name，"没写"只可能是手写报告在绕开这道检查。`test/evidence.test.mjs`；变异：name 变回可选 → 红 |
 | init 不许替目标仓库决定忽略什么 | `src/cli.mjs` 的 `init`：只写 `memory/` 与 `.claimrail/shots/`，不再写 `*.png` 通配——那会把用户仓库里所有真实图片一起静默排除在提交之外。`test/cli.test.mjs`；变异：写回 *.png → 红 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |

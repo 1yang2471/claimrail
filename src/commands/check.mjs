@@ -2,6 +2,7 @@
 // 拆成两个文件只会让"读 check 的人找不到 hook 在哪"。
 // 从 cli.mjs 搬出来是因为提交钩子按 token 拒收超大文件（20KB），而这两个函数是同一件事的两面。
 import { readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -75,6 +76,15 @@ function makeCtx({ cwd, allowNet, changed }) {
       }
     },
     readReport: async (p) => (await readJson(join(cwd, p))).value ?? null,
+    // 截图本体的哈希：报告里写了 shot_sha256，这里重算一遍对比——
+    // 换一张图或换一份同名报告都会在这一步露馅（落盘链的最后一环）。
+    shotHash: async (p) => {
+      try {
+        return createHash('sha256').update(await readFile(join(cwd, p))).digest('hex');
+      } catch {
+        return null;
+      }
+    },
     fetch: async (url) => {
       if (!allowNet) return null;
       // 死链/DNS 失败必须变成这一条证据失败，而不是把整份 check 炸掉：
@@ -171,10 +181,35 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       noForkReason: raw.value.no_fork_reason ?? null,
     });
 
+    // 结构化判定：宿主与脚本该拿这个（调研自 craft-anything 的 MCP/结构化证据面）。
+    // 文本只是同一份数据的视图；两边永远来自同一次 decide()，不各算一遍。
+    const item = (f) => ({
+      fork: f.fork,
+      picked: f.picked,
+      options: f.options ?? [],
+      cost: f.cost ?? null,
+      why: f.evidenceWhy ?? '',
+      where: f.where ?? null,
+    });
+    const data = {
+      schema: 1,
+      action: d.action,
+      task_class: raw.value.task_class,
+      total: d.total,
+      metrics: d.metrics,
+      degraded: git === 'repo' ? null : git === 'none' ? 'no-git' : 'git-unknown',
+      overrides,
+      questions: d.questions.map(item),
+      unverified: d.unverified.map(item),
+      violations: d.violations.map((f) => ({ ...item(f), rule: f.rule, cheaper: f.cheap })),
+      notEnabled: d.notEnabled.map(item),
+    };
+
     return {
       code: d.action === 'proceed' ? 0 : 1,
-      // unverified 单独给结构化一份：hook 要按条目回给模型"逐条声明"，别让它解析渲染文本
+      // 兼容旧调用方：unverified 保留平铺的一份（hook 与既有测试按它判断）
       unverified: d.unverified.map((f) => ({ fork: f.fork, picked: f.picked, why: f.evidenceWhy })),
+      data,
       text: [
         `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
         ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),

@@ -16,6 +16,16 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // 新用户第一屏就是 --help。之前 parse() 把不认识的第一个词当 check，位置参数当台账路径，
 // 于是 `claimrail --help` 会去读一份叫 "--help" 的台账、`claimrail foo` 读 "foo"。
+// 调研（craft-anything 的 MCP/结构化证据面）得到的启发：宿主该拿结构化结果，
+// 文本只是视图层。--json 让 check 把同一份判定以 JSON 交出去。
+test('parse：check --json 认这个开关，别的命令不误认', () => {
+  assert.equal(parse(['check', '--json']).flags.json, true);
+  assert.equal(parse(['check']).flags.json, false);
+  // 不是位置参数、不会被当成台账路径（注意用 LEDGER_PATH 比，别硬写分隔符——
+  // Windows 上是反斜杠，写死 '/' 的断言在别的平台上就是假红）
+  assert.equal(parse(['check', '--json']).flags.ledger, LEDGER_PATH);
+});
+
 test('parse：--help / -h 走帮助，不当成 check', () => {
   for (const argv of [['--help'], ['-h'], ['help'], ['check', '--help']]) {
     const r = parse(argv);

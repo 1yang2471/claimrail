@@ -76,6 +76,8 @@ test('端到端：截图是新的，但判红——证据不成立，门照样�
       lastChangeMs: Date.now() - 1000,
       statFile: async (p) => ({ mtimeMs: (await stat(join(dir, p))).mtimeMs }),
       readReport: async (p) => JSON.parse(await readFile(join(dir, p), 'utf8')),
+      // 报告里写了 shot_sha256，这里重算截图哈希——落盘链在测试里也要按真实路径走
+      shotHash: async (p) => (await import('node:crypto')).createHash('sha256').update(await readFile(join(dir, p))).digest('hex'),
     };
 
     const r = await verify({ kind: 'render', ref: 'chat.png', asserts: ['scrollbar-clears-text', 'bottom-not-covered'] }, ctx);
@@ -96,6 +98,8 @@ test('端到端：修好之后同一份检查转绿，证据才成立', async ()
       lastChangeMs: Date.now() - 1000,
       statFile: async (p) => ({ mtimeMs: (await stat(join(dir, p))).mtimeMs }),
       readReport: async (p) => JSON.parse(await readFile(join(dir, p), 'utf8')),
+      // 报告里写了 shot_sha256，这里重算截图哈希——落盘链在测试里也要按真实路径走
+      shotHash: async (p) => (await import('node:crypto')).createHash('sha256').update(await readFile(join(dir, p))).digest('hex'),
     };
     const r = await verify({ kind: 'render', ref: 'chat-fixed.png', asserts: ['scrollbar-clears-text', 'bottom-not-covered', 'touch-targets-ok', 'contrast-ok'] }, ctx);
     assert.equal(r.ok, true, r.why);
@@ -109,6 +113,8 @@ test('采集器空转产不出证据：全 null 的报告不能当作"已经看�
       lastChangeMs: Date.now() - 1000,
       statFile: async (p) => ({ mtimeMs: (await stat(join(dir, p))).mtimeMs }),
       readReport: async (p) => JSON.parse(await readFile(join(dir, p), 'utf8')),
+      // 报告里写了 shot_sha256，这里重算截图哈希——落盘链在测试里也要按真实路径走
+      shotHash: async (p) => (await import('node:crypto')).createHash('sha256').update(await readFile(join(dir, p))).digest('hex'),
     };
     const r = await verify({ kind: 'render', ref: 'blank.png', asserts: ['scrollbar-clears-text', 'contrast-ok'] }, ctx);
     assert.equal(r.ok, false);
@@ -149,5 +155,46 @@ test('web 命令：有红项退出 1，全绿退出 0', async () => {
     const bad = await runWeb(defectData, { cwd: dir });
     assert.equal(bad.code, 1, bad.text);
     assert.match(bad.text, /退出码 1：有检查项判红/);
+  });
+});
+
+// 调研（craft-anything 的 evidence record 带 limitations）得到的启发：
+// 报告要说清"这一轮没覆盖到哪里"，而不是让读者自己从 detail 里猜。
+test('度量报告要带 limitations：截断、未判底色、焦点没探都要点名', async () => {
+  await withDir(async (dir) => {
+    const truncated = {
+      ...defectData,
+      raw: { texts: 401, interactive: 121, scrollContainers: 61, fixedRects: 41 },
+    };
+    const report = await renderPage(fakePage(truncated), { outDir: dir, name: 'lim', pixel: false });
+    const lim = report.limitations.join(String.fromCharCode(10));
+    assert.match(lim, /文本采集被截断/);
+    assert.match(lim, /可交互元素采集被截断/);
+    assert.match(lim, /滚动容器采集被截断/);
+    assert.match(lim, /固定元素采集被截断/);
+    assert.match(lim, /焦点探测/, lim);
+
+    const clean = await renderPage(fakePage(defectData), { outDir: dir, name: 'clean', pixel: false, focusSamples: [] });
+    assert.ok(Array.isArray(clean.limitations), 'limitations 必须是数组');
+  });
+});
+
+test('报告写明它测的是哪张图：shot_sha256 与截图内容一致', async () => {
+  await withDir(async (dir) => {
+    const report = await renderPage(fakePage(defectData), { outDir: dir, name: 'hash', pixel: false });
+    const { createHash } = await import('node:crypto');
+    const real = createHash('sha256').update(await readFile(join(dir, 'hash.png'))).digest('hex');
+    assert.equal(report.shot_sha256, real);
+    const onDisk = JSON.parse(await readFile(join(dir, 'hash.report.json'), 'utf8'));
+    assert.equal(onDisk.shot_sha256, real);
+  });
+});
+
+test('web 命令把 limitations 打到屏幕上，不只留在报告里', async () => {
+  await withDir(async (dir) => {
+    const truncated = { ...defectData, raw: { texts: 401, interactive: 121, scrollContainers: 61, fixedRects: 41 } };
+    const r = await runWeb(truncated, { cwd: dir });
+    assert.match(r.text, /本轮没覆盖到/);
+    assert.match(r.text, /文本采集被截断/);
   });
 });

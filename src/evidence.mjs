@@ -237,6 +237,16 @@ export async function verify(evidence, ctx) {
       return { ok: false, why: `报告 name "${report.name}" 与截图 "${basename(ref)}" 不是同一次采集` };
     }
 
+    // 落盘链的最后一环：报告必须写明它测的是哪张图，截图本体的哈希要能对上。
+    // 只靠文件名 + mtime 不够——把同名旧报告换回来、或换一张图，检查照样过。
+    if (!report.shot_sha256) {
+      return { ok: false, why: '报告没有绑定截图（缺 shot_sha256）：报告与截图不是同一次采集' };
+    }
+    const actualShot = ctx.shotHash ? await ctx.shotHash(ref) : null;
+    if (actualShot !== report.shot_sha256) {
+      return { ok: false, why: `截图与报告不是同一次采集（哈希对不上：报告 ${String(report.shot_sha256).slice(0, 12)}，截图 ${String(actualShot).slice(0, 12)}）` };
+    }
+
     const ids = report.checks.map((c) => c.id);
     const bogus = ids.filter((id) => !RENDER_CHECK_IDS.includes(id));
     if (bogus.length) return { ok: false, why: `报告里有未知检查项：${bogus.join('、')}` };

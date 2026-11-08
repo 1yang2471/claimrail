@@ -35,6 +35,8 @@ claimrail invalidate <key>  # retract a rule; the raw log is untouched
 claimrail --help            # all commands and flags
 ```
 
+`check --json` prints the same verdict as structured JSON (for hosts and scripts) — the text is a view of that one decision, not a second calculation.
+
 `check` does not touch the network by default. The `precedent` and `web` evidence tiers need real re-fetching, so they require `--allow-net` — an explicit outbound request.
 
 `web` depends on Playwright (an optional peer dependency). Without it, `web` fails loudly rather than pretending to have checked.
@@ -99,7 +101,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 310 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 318 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

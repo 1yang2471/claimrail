@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { check, hook } from '../src/cli.mjs';
-import { repoWithEvidence } from './helpers.mjs';
+import { repoWithEvidence, repoWithUnverified } from './helpers.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = (name) => join('test', 'fixtures', name);
@@ -145,6 +145,34 @@ test('命令行入口：hook 真的跑得起来，不许停在"没跑成"', asyn
     const noLedger = runCli(['hook'], { cwd: await mkdtemp(join(tmpdir(), 'fk-cli-hook2-')), stdin: '{}' });
     assert.equal(noLedger.code, 0, noLedger.out);
     assert.equal(noLedger.out.trim(), '');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 结构化判定（host 面）：同一个 check，既可读文本也可取 JSON。
+// 这条走真命令行入口，钉住 --json 的输出形状与退出码语义不变。
+test('命令行入口：check --json 输出可解析的结构化判定', async () => {
+  const dir = await repoWithUnverified(); // 真 git 仓库：target 能测出引用数，代价判 low
+  try {
+    const r = runCli(['check', '--json'], { cwd: dir });
+    assert.equal(r.code, 0, r.out); // 低代价 + 无证据 = 放行但点名
+    const data = JSON.parse(r.out);
+    assert.equal(data.schema, 1);
+    assert.equal(data.action, 'proceed');
+    assert.equal(data.metrics.unverified, 1);
+    assert.equal(data.unverified.length, 1);
+    assert.match(data.unverified[0].fork, /列表行高/);
+    assert.equal(typeof data.unverified[0].picked, 'string');
+    assert.equal(typeof data.unverified[0].why, 'string');
+    assert.ok(Array.isArray(data.questions) && Array.isArray(data.violations) && Array.isArray(data.notEnabled));
+    assert.ok(Array.isArray(data.overrides));
+    assert.equal(data.degraded, null, '真仓库不该报降级');
+
+    // 要求了 JSON 但台账读不到：仍然给 JSON（带 error），不许混出一段中文
+    const missing = runCli(['check', '--json', '--ledger', 'nope.json'], { cwd: dir });
+    assert.equal(missing.code, 1);
+    assert.equal(JSON.parse(missing.out).action, 'error');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

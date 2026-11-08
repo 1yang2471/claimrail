@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm, writeFile, readFile, mkdir, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -325,7 +326,12 @@ test('空报告全 null 也不能当证据：未判就是未判', async () => {
     await mkdir(mk, { recursive: true });
     await writeFile(join(mk, 'e.png'), 'PNG');
     const ids = ['scrollbar-clears-text', 'touch-targets-ok', 'contrast-ok', 'focus-visible-ok', 'bottom-not-covered'];
-    await writeFile(join(mk, 'e.report.json'), JSON.stringify({ report_schema: 1, name: 'e', checks: ids.map((id) => ({ id, ok: null, detail: '未采到' })) }));
+    // 报告要绑上截图的哈希，否则这一轮先栽在"没绑定"上，测不到"全 null 不作数"这条
+    const shot = createHash('sha256').update('PNG').digest('hex');
+    await writeFile(
+      join(mk, 'e.report.json'),
+      JSON.stringify({ report_schema: 1, name: 'e', shot_sha256: shot, checks: ids.map((id) => ({ id, ok: null, detail: '未采到' })) }),
+    );
     await ledger(dir, [fork({ evidence: { kind: 'render', ref: '.claimrail/shots/e.png', asserts: ['contrast-ok'] }, verified: true })]);
     const r = await check({ cwd: dir });
     assert.equal(r.code, 1, r.text);

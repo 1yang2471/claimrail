@@ -34,6 +34,8 @@ claimrail rules             # 现行规则 + 原始否决 + 来源
 claimrail invalidate <key>  # 作废一条规则；原始 log 一条不动
 ```
 
+`check --json` 把同一份判定以结构化 JSON 交出去（给宿主和脚本用）——文本只是这份结论的视图，不是第二次计算。
+
 `check` 默认不联网。`precedent` / `web` 两档要真回访时加 `--allow-net`——这是外发查询，默认需要你同意。
 
 `web` 依赖 Playwright（`peerDependencies` 里的可选项）。没装时 `web` 明确报错，不会伪绿。
@@ -98,7 +100,7 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现�
 ## 开发
 
 ```bash
-node --test    # 310 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 318 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

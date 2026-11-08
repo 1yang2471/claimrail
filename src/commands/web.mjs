@@ -73,6 +73,9 @@ export async function web({
             report.pixelBackgrounds?.inkSuspected
               ? `  采样疑似压到字形、退回未判：${report.pixelBackgrounds.inkSuspected} 处`
               : '',
+            // 这一轮"没覆盖到哪里"必须上屏（调研自 craft-anything 的 limitations 表达）。
+            // 只写进 report.json 等于没写：交付时没人会去翻文件。
+            report.limitations?.length ? `  本轮没覆盖到：${report.limitations.join('；')}` : '',
           ]
             .filter(Boolean)
             .join('\n'),

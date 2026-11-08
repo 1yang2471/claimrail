@@ -56,3 +56,37 @@ export const repoWithEvidence = async () => {
   );
   return dir;
 };
+
+// 自造一个"低代价 + 无证据"的临时 git 仓库：check 会放行但点名未验证。
+// 用在 hook / --json 这两类需要"门放行、有条目要声明"的用例里。
+export const repoWithUnverified = async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-unv-'));
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+  g(['init', '-q']);
+  g(['config', 'user.email', 't@t']);
+  g(['config', 'user.name', 't']);
+  await writeFile(join(dir, 'package.json'), '{"name":"probe"}', 'utf8');
+  g(['add', '-A']);
+  g(['commit', '-qm', 'init']);
+  await mkdir(join(dir, '.claimrail'), { recursive: true });
+  await writeFile(
+    join(dir, '.claimrail', 'decisions.json'),
+    JSON.stringify({
+      schema: 1,
+      task_class: 'refactor',
+      forks: [
+        {
+          fork: '列表行高用 token 还是写死',
+          options: ['token', '写死 24px'],
+          picked: 'token',
+          target: { file: 'package.json' },
+          evidence: null,
+          cost_if_wrong: 'low',
+          verified: false,
+        },
+      ],
+    }),
+    'utf8',
+  );
+  return dir;
+};

@@ -14,7 +14,7 @@ const HELP = [
   '',
   '命令：',
   '  init                        建 .claimrail/decisions.json、补 .gitignore、在 AGENTS.md 写指路段、记 baseline',
-  '  check [台账路径]            交付前校验。退出码 0 放行 / 1 拦住',
+  '  check [台账路径] [--json]   交付前校验。退出码 0 放行 / 1 拦住；--json 输出结构化判定',
   '  web --url <地址>            双视口截图 + 五项几何检查（需 playwright）',
   '  hook                       宿主钩子（从 stdin 读事件）。退出码 2 = 拦住并续一轮',
   '  record --key <类别> --what <要什么> [--why <为什么>] [--anchor]   记一次否决或参照物',
@@ -29,6 +29,7 @@ const HELP = [
   '  --viewport <列表> web 的视口，默认 390x700,1280x800',
   '  --state <文件>    web 的 Playwright storageState（登录态）',
   '  --out <目录>      web 的截图输出目录',
+ '  --json            check 输出结构化判定（JSON），供宿主/脚本消费；文本只是视图',
   '',
   '退出码：0 放行 / 1 拦住（含参数错误）/ 2 仅 hook：拦住并续一轮',
 ].join('\n');
@@ -70,6 +71,7 @@ export function parse(argv) {
     what: undefined,
     why: undefined,
     anchor: false,
+    json: false,
     unknown: cmd === 'unknown' ? first : undefined,
   };
   let ledgerGiven = false;
@@ -90,6 +92,7 @@ export function parse(argv) {
     else if (a === '--what') flags.what = argv[++i];
     else if (a === '--why') flags.why = argv[++i];
     else if (a === '--anchor') flags.anchor = true;
+    else if (a === '--json') flags.json = true;
     else if (!a.startsWith('--')) {
       // check 的位置参数是台账，invalidate 的位置参数是被废的 key，两者不重叠
       if (cmd === 'check' && !ledgerGiven) {

@@ -161,7 +161,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // 兜底：log 损坏、权限问题这类必须报非零，不能静默当成"跑过了"
     res = { code: 1, text: `没跑成：${err.message}` };
   }
-  if (cmd === 'hook') { if (res.text) console.error(res.text); }
-  else console.log(res.text);
+  if (cmd === 'hook') {
+    if (res.text) console.error(res.text);
+  } else if (flags.json && res.data) {
+    // 结构化视图：宿主/脚本消费这份；文本视图仍然保留给人看
+    console.log(JSON.stringify(res.data, null, 2));
+  } else if (flags.json) {
+    // 要求了 JSON 却拿不到结构化结果（例如台账读不到）：照样给 JSON，别混出一段中文
+    console.log(JSON.stringify({ schema: 1, error: String(res.text ?? ''), action: 'error' }, null, 2));
+  } else {
+    console.log(res.text);
+  }
   process.exitCode = res.code;
 }

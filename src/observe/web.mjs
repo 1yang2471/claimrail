@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { runChecks } from './geometry.mjs';
 import { applyFocusProbe } from './focus.mjs';
 import { decodePng } from './png.mjs';
@@ -167,13 +168,23 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
   const interactive = samples ? applyFocusProbe(data.interactive, samples) : data.interactive;
   await page.screenshot({ path: png });
 
+  // 把截图本体读一次：既用来算"这一份报告测的是哪张图"的哈希，也用来做像素采样。
+  // 哈希是落盘链的最后一环——以前只靠文件名与 mtime，换一张图或换一份报告都能混过去。
+  let shotBuf = null;
+  try {
+    shotBuf = await readFile(png);
+  } catch {
+    shotBuf = null; // 读不出来就交 null：报告声明"没绑上"，回验时会被拒
+  }
+  const shotSha256 = shotBuf ? createHash('sha256').update(shotBuf).digest('hex') : null;
+
   // 对比度在渐变/图片背景上 CSS 采不到色值。截图已经落地，就顺手读像素把那一类补上——
   // 补不上的仍然留 null（未判），绝不猜。采样本身失败（截图解不了）也只是退回原样。
   let texts = data.texts;
   let pixelFill = null;
-  if (pixel && data.texts?.length) {
+  if (pixel && data.texts?.length && shotBuf) {
     try {
-      const img = decodePng(await readFile(png));
+      const img = decodePng(shotBuf);
       const r = applyPixelBackgrounds({ ...data, texts }, img);
       texts = r.texts;
       pixelFill = { filled: r.filled, inkSuspected: r.inkSuspected, total: r.total };
@@ -182,10 +193,34 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
     }
   }
 
+  // 这一轮"没覆盖到哪里"要说在明面上（调研自 craft-anything 的 evidence record 带
+  // limitations）。不写的话，读者只能从每项 detail 里自己拼，或者干脆当成全查过了。
+  const limitations = [];
+  const raw = data.raw ?? {};
+  const trunc = (key, label) => {
+    const got = { scrollContainers: data.scrollContainers.length, texts: data.texts.length, interactive: data.interactive.length, fixedRects: data.fixedRects.length }[key];
+    if (typeof raw[key] === 'number' && raw[key] > got) limitations.push(`${label}采集被截断（${raw[key]} > ${got}），超出部分未判`);
+  };
+  trunc('texts', '文本');
+  trunc('interactive', '可交互元素');
+  trunc('scrollContainers', '滚动容器');
+  trunc('fixedRects', '固定元素');
+  const noBg = texts.filter((t) => !t.background).length;
+  if (noBg) limitations.push(`${noBg} 处文本没有可判定的底色，对比度未判`);
+  if (pixelFill?.inkSuspected) limitations.push(`${pixelFill.inkSuspected} 处像素采样疑似压到字形，退回未判`);
+  if (pixelFill?.error) limitations.push(`像素采样失败（${pixelFill.error}），图片/渐变背景未补`);
+  if (!pixel) limitations.push('像素采样被关闭（--no-pixel），渐变/图片背景未补');
+  if (!samples) limitations.push('焦点探测没跑（没有真实键盘事件），focus-visible 未判');
+  else if (samples.length < data.interactive.filter((el) => el.focusable !== false).length) {
+    limitations.push(`焦点探测只覆盖 ${samples.length} 个元素，其余未判`);
+  }
+
   const report = {
     report_schema: 1,
     name,
     label,
+    // 这份报告测的是哪张图。回验时重算截图哈希对比，换图/换报告都过不去。
+    shot_sha256: shotSha256,
     viewport: data.viewport,
     counts: {
       scrollContainers: data.scrollContainers.length,
@@ -196,6 +231,7 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
       ...(data.raw ?? {}),
     },
     ...(pixelFill ? { pixelBackgrounds: pixelFill } : {}),
+    limitations,
     checks: runChecks({ ...data, texts, interactive }),
   };
   await writeFile(join(outDir, `${name}.report.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
