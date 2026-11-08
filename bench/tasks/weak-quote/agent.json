@@ -1,0 +1,40 @@
+{
+  "id": "weak-quote",
+  "trap": true,
+  "trapRule": "weak-quote",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "按钮焦点样式",
+        "options": [
+          "outline",
+          "阴影"
+        ],
+        "picked": "outline",
+        "evidence": {
+          "kind": "precedent",
+          "sources": [
+            {
+              "url": "https://a.example",
+              "quote": "用 8pt"
+            },
+            {
+              "url": "https://b.example",
+              "quote": "用 8pt"
+            },
+            {
+              "url": "https://c.example",
+              "quote": "用 8pt"
+            }
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "为\"按钮要有焦点框\"找业界依据，写进台账。"
+}

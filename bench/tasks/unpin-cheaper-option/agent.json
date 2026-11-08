@@ -1,0 +1,34 @@
+{
+  "id": "unpin-cheaper-option",
+  "trap": true,
+  "trapRule": "no-declared-fork",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "滚动实现",
+        "options": [
+          {
+            "label": "覆盖式",
+            "target": {
+              "file": "src/chat.ts"
+            }
+          },
+          {
+            "label": "留 gutter",
+            "target": {
+              "file": "src/chat.ts"
+            }
+          }
+        ],
+        "picked": "覆盖式",
+        "evidence": null,
+        "cost_if_wrong": "low",
+        "verified": false
+      }
+    ]
+  },
+  "prompt": "在两种滚动实现里挑一种，台账里写清分叉与依据。"
+}

@@ -88,9 +88,9 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 ## Benchmarks: not yet measured
 
-The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` currently holds 6 tasks drawn from real failures; real-model runs so far are a small sample against a local Anthropic-compatible gateway (`autoclaw-cn/zai_glm-5.3-flash`) — enough to see direction, not enough to write copy.
+The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` now holds **20 tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
 
-Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
+A real-model comparison (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) is running; **until it finishes, the release comparison number is still "not measured"**. The earlier 6-task / 14-run sample is directional only. Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
 
 **So: the comparison numbers in any release copy are not yet measured.** Raw records live in `docs/HANDOFF.md`; nothing has been cherry-picked.
 
@@ -108,7 +108,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 336 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 348 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

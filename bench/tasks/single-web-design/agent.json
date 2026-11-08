@@ -1,0 +1,31 @@
+{
+  "id": "single-web-design",
+  "trap": true,
+  "trapRule": "design-web-single",
+  "taskClass": "ui-new",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "ui-new",
+    "forks": [
+      {
+        "fork": "配色",
+        "options": [
+          "冷色",
+          "暖色"
+        ],
+        "picked": "冷色",
+        "evidence": {
+          "kind": "web",
+          "ref": "https://a.example/colors",
+          "asserts": [
+            "冷色更专业"
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "给聊天页定一套配色，把依据写进台账。"
+}

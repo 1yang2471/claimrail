@@ -36,6 +36,12 @@ const SELF_IGNORE = [
   /(^|\/)(README|AGENTS)\.md$/,
   /\.test\.[cm]?js$/,
   /(^|\/)src\/observe\/effects\.mjs$/,
+  // bench/classify.mjs 里写的是"陷阱判定规则"（含删除字样），同样是规则表不是动作。
+  // 2026-11-08 实测：往它加一条规则，文本里的 rm -rf 就把本次所有分叉升成 high。
+  /(^|\/)bench\/classify\.mjs$/,
+  // bench 的任务夹具里故意放着"要删缓存"这类分叉描述，用来测代价模型；
+  // 它们是语料，不是会被执行的脚本。
+  /(^|\/)bench\/tasks\/.*\/agent\.json$/,
 ];
 
 // 逐文件返回新增行。返回数组而不是拼好的字符串，是为了让 scanDiff 能按文件边界扫描：

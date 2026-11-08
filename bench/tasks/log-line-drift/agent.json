@@ -1,0 +1,34 @@
+{
+  "id": "log-line-drift",
+  "trap": true,
+  "trapRule": "memory-mismatch",
+  "memoryLog": [
+    "卡片上下间距至少 16px",
+    "不要用覆盖式滚动条"
+  ],
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "气泡间距",
+        "options": [
+          "8px",
+          "16px"
+        ],
+        "picked": "16px",
+        "evidence": {
+          "kind": "memory",
+          "ref": "log#3",
+          "asserts": [
+            "16px"
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "按之前记下的偏好把气泡间距调好，并在台账里引用那条偏好记录。"
+}

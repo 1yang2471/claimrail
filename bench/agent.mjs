@@ -8,6 +8,11 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// CLI 路径从模块位置推导，不写死绝对路径：仓库改名或换机器时，写死的那条会让
+// 协议臂的模型去跑一个不存在的文件，测到的就不是协议本身了（2026-11-08 实际发现）。
+const CLI = fileURLToPath(new URL('../src/cli.mjs', import.meta.url));
 
 const API = process.env.FK_API_BASE ?? 'http://127.0.0.1:3425';
 const MODEL = process.env.FK_MODEL ?? 'loomy/spark-x2.6';
@@ -96,7 +101,7 @@ export const PROTOCOL_SYSTEM = `你是执行任务的编码 agent。用工具在
    evidence 五档：repo{ref:"file:line",asserts:[要点]}、memory{ref:"log#n",asserts}、render{ref:截图,asserts}、precedent{sources:[{url,quote}],adoption?}、web{ref,asserts}。
    没有证据就写 evidence:null 且 verified:false——"没查"是合法状态，"没查却说查了"不是。
    options 只写得出一种，说明你还没找到分叉。
-2. 交付前在仓库根运行：node "D:/workspace/claimrail/src/cli.mjs" check
+2. 交付前在仓库根运行：node "${CLI}" check
    退出码 0 才算过。被拦住（block）就按它列出的分叉去拿证据或停下来问人，不许改台账措辞绕过。
    check 最多运行两次；第二次仍被拦，就停下来把要用户定的事一次问完，不要继续硬试。
    没有分叉时写 "forks": [] 并给 no_fork_reason。`;

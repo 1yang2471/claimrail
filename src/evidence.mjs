@@ -52,7 +52,9 @@ const basename = (ref) => String(ref).split(/[\\/]/).pop().replace(/\.png$/i, ''
 const MIN_SOURCES = 3;
 const MIN_QUOTE = 12;
 
-const registrable = (url) => {
+// 按注册域去重的同一份实现：bench 的"同域转载不算三票"判定也用它，
+// 两处各写一份迟早会漂（一处认 www、一处不认，判定就对不上）。
+export const registrableDomain = (url) => {
   try {
     const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
     const parts = host.split('.');
@@ -101,7 +103,7 @@ async function verifyPrecedent(evidence, ctx) {
   const problems = [];
 
   for (const s of sources) {
-    const host = registrable(s.url);
+    const host = registrableDomain(s.url);
     if (!host) {
       problems.push(`URL 不合法：${s.url}`);
       continue;

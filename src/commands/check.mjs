@@ -8,7 +8,7 @@ import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { validateLedger } from '../schema.mjs';
-import { grade } from '../cost.mjs';
+import { grade, FAN_IN_HIGH } from '../cost.mjs';
 import { verifyAll } from '../evidence.mjs';
 import { enrich, decide, render } from '../gate.mjs';
 import { observe, whyUnknown } from '../observe/index.mjs';
@@ -158,12 +158,21 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     for (const fork of raw.value.forks) {
       const obs = await observe(fork.target, { cwd, diffText: diff, changed: changedNow, base });
       observations.push(obs);
-      // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
+      // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦。
+      // 三种 high 的来源要分开说：读不到值、已发布/有副作用、引用数达到门槛。
+      // 只拼后两种会漏掉 fan-in（2026-11-08 实测：冒号后空白，照着它查不到 fan-in）。
       if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {
         const missing = whyUnknown(obs, { gitRepo });
         const hit = [...obs.published ?? [], ...obs.irreversible ?? []];
-        const reason = missing.length ? missing.join('；') : `已推送/已发布或有副作用：${hit.join('、')}`;
-        overrides.push(`${fork.fork}：申报 low → 程序 high（${reason}）`);
+        const reasons = missing.length
+          ? missing
+          : [
+              ...(hit.length ? [`已推送/已发布或有副作用：${hit.join('、')}`] : []),
+              ...(typeof obs.fanIn === 'number' && obs.fanIn >= FAN_IN_HIGH
+                ? [`引用数 ${obs.fanIn} 处达到 ${FAN_IN_HIGH} 的门槛`]
+                : []),
+            ];
+        overrides.push(`${fork.fork}：申报 low → 程序 high（${reasons.join('；') || '程序判 high'}）`);
       }
     }
 

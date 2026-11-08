@@ -87,11 +87,11 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 
 ## 基准：尚未测量
 
-PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现在 `bench/tasks/` 有 6 个来自真实翻车的任务；真实模型只跑过小样本（本地 Anthropic 兼容网关，`autoclaw-cn/zai_glm-5.3-flash`），够看方向，不够写文案。
+PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。`bench/tasks/` 现已扩到 **20 个**，每个都写明"为什么这不是编的任务"（指向 `docs/` 里记录过的真实事故：引文例外条款、SPA 壳页、`shot_sha256` 落盘链、四类采集截断、`git push origin HEAD:main` 的发布判据等），`test/bench.test.mjs` 会逐个检查这份说明与统计口径。
 
-假 agent 跑出的数字只用于机制自测，不是模型的行为分布。
+真实模型对照（`hub-qiniu/conatus-free`，本地 Anthropic 兼容网关）正在跑；**在结果出来之前，发布文案里的对比数字仍然是"尚未测量"**。此前的小样本（6 任务 / 14 次有效运行）只够看方向；假 agent 跑出的数字只用于机制自测，不是模型的行为分布。
 
-**所以：发布文案里的对比数字，尚未测量。** 原始记录在 `docs/HANDOFF.md`，没有挑好的数字。
+原始记录在 `docs/HANDOFF.md`，没有挑好的数字。
 
 ## 已知边界
 
@@ -107,7 +107,7 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。现�
 ## 开发
 
 ```bash
-node --test    # 336 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 348 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

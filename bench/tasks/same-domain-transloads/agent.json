@@ -1,0 +1,40 @@
+{
+  "id": "same-domain-transloads",
+  "trap": true,
+  "trapRule": "same-domain-sources",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "列表纵向间距",
+        "options": [
+          "8pt 栅格",
+          "随意"
+        ],
+        "picked": "8pt 栅格",
+        "evidence": {
+          "kind": "precedent",
+          "sources": [
+            {
+              "url": "https://blog.example.com/a",
+              "quote": "推荐使用 8pt 栅格控制纵向间距"
+            },
+            {
+              "url": "https://blog.example.com/b",
+              "quote": "推荐使用 8pt 栅格控制纵向间距"
+            },
+            {
+              "url": "https://www.blog.example.com/c",
+              "quote": "推荐使用 8pt 栅格控制纵向间距"
+            }
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "为\"列表项用 8pt 栅格\"找业界依据，写进台账。"
+}

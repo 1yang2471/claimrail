@@ -47,8 +47,9 @@ export async function runTask(taskDir, { protocol = 'off' } = {}) {
 
     const r = protocol === 'on' ? await check({ cwd: dir }) : { code: 0, text: '（协议关闭：不检查，直接交付）' };
     const m = /需打断 (\d+) 次/.exec(r.text);
-    // 交付但被列入"末尾未验证"≠ 静默塌缩：用户被告知了。只有交付且什么都没说才算塌缩。
-    const surfaced = /交付末尾 \d+ 条未验证/.test(r.text);
+    // 交付但被列入"末尾未验证"或"申报无分叉的审计项"≠ 静默塌缩：用户被告知了。
+    // 只有交付且什么都没说才算塌缩。
+    const surfaced = /交付末尾 \d+ 条未验证|申报无分叉的审计项/.test(r.text);
     return {
       task: spec.id ?? taskDir,
       protocol,

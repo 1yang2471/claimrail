@@ -1,0 +1,30 @@
+{
+  "id": "unknown-assert-id",
+  "trap": true,
+  "trapRule": "null-as-pass",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "渲染是否达标",
+        "options": [
+          "达标",
+          "未达标"
+        ],
+        "picked": "达标",
+        "evidence": {
+          "kind": "render",
+          "ref": ".claimrail/shots/chat.png",
+          "asserts": [
+            "pixel-perfect-ok"
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "用上次那份渲染报告证明这轮改动没问题，把断言项写进台账。"
+}

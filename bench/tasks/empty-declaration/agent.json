@@ -3,11 +3,11 @@
   "tag": "v1.0.0",
   "trap": true,
   "writes": {
-    "src/chat.ts": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return `<div class=\"bubble ${mine ? 'mine' : 'other'}\" style=\"overflow-y:auto\">${text}</div>`;\n}\n"
+    "src/Chat.tsx": "export function Bubble({ mine, text }: { mine: boolean; text: string }) {\n  return <div className={`bubble ${mine ? 'mine' : 'other'}`} style={{ overflowY: 'auto' }}>{text}</div>;\n}\n"
   },
   "ledger": {
     "schema": 1,
-    "task_class": "refactor",
+    "task_class": "ui-new",
     "forks": [],
     "no_fork_reason": "改动很小，只是给气泡加一个滚动，没有需要定的分叉"
   },

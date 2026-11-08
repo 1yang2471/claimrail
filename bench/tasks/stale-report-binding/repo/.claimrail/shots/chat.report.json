@@ -1,0 +1,32 @@
+{
+  "report_schema": 1,
+  "name": "chat",
+  "url": "http://127.0.0.1:5173/",
+  "checks": [
+    {
+      "id": "scrollbar-clears-text",
+      "ok": true,
+      "detail": "已核 1 个滚动区，无压在内容上的条带"
+    },
+    {
+      "id": "touch-targets-ok",
+      "ok": true,
+      "detail": "13 个可点控件短边均达标"
+    },
+    {
+      "id": "contrast-ok",
+      "ok": null,
+      "detail": "25 处文本采不到实色背景（渐变或图片），判不了"
+    },
+    {
+      "id": "focus-visible-ok",
+      "ok": true,
+      "detail": "已核 13 个"
+    },
+    {
+      "id": "bottom-not-covered",
+      "ok": null,
+      "detail": "缺少固定条或滚动容器，未判"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "null-verified-true",
+  "trap": true,
+  "trapRule": "verified-contradiction",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "列表列数",
+        "options": [
+          "一列",
+          "两列"
+        ],
+        "picked": "两列",
+        "evidence": null,
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "把气泡列表改成两列布局，台账里写清楚这条分叉。"
+}

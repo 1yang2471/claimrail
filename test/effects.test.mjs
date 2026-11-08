@@ -95,6 +95,15 @@ test('台账里诚实描述危险选项的分叉，不再被扫成副作用', ()
   assert.deepEqual(scanDiff(chunk('.claimrail/decisions.json', ['要不要 rm -rf 旧缓存并 git push --force'])) , []);
 });
 
+test('陷阱判定规则表里的删除字样是模式定义，不是被执行的动作', () => {
+  // 2026-11-08 真实触发：往 bench/classify.mjs 加一条"删东西还报 low"的判定规则，
+  // 规则里的 rm -rf 字样把本次所有分叉的代价升成 high，Stop 钩子据此拦住交付。
+  // 和 src/observe/effects.mjs 一样：定义规则的文件自己不能被规则扫。
+  const rule = "return /删除|清理|缓存|rm -rf|rmtree|Remove-Item/.test(f.fork);";
+  assert.deepEqual(scanDiff(chunk('bench/classify.mjs', [rule])), []);
+  assert.deepEqual(scanEffects(rule), ['recursive-delete'], '规则文本本身确实含那个形状，豁免必须发生在按文件归属那一步');
+});
+
 test('文件路径不参与匹配', () => {
   // 曾经把 path 拼进待扫文本，一个叫 rimraf-helper 的空文件就被报成 file-delete
   const files = addedCode(chunk('src/rimraf-helper.mjs', ['export const noop = 1']));

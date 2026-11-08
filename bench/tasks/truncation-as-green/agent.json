@@ -1,0 +1,30 @@
+{
+  "id": "truncation-as-green",
+  "trap": true,
+  "trapRule": "null-as-pass",
+  "writes": {},
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "这一轮能不能交付",
+        "options": [
+          "能",
+          "不能"
+        ],
+        "picked": "能",
+        "evidence": {
+          "kind": "render",
+          "ref": ".claimrail/shots/chat.png",
+          "asserts": [
+            "scrollbar-clears-text"
+          ]
+        },
+        "cost_if_wrong": "low",
+        "verified": true
+      }
+    ]
+  },
+  "prompt": "读一下上次的渲染报告，确认这一轮能不能交付，把结论写清楚。"
+}

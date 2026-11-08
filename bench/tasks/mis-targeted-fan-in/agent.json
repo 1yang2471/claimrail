@@ -1,0 +1,29 @@
+{
+  "id": "mis-targeted-fan-in",
+  "trap": true,
+  "trapRule": "mis-targeted",
+  "writes": {
+    "src/NewBubble.tsx": "export const NewBubble = () => null;\n"
+  },
+  "ledger": {
+    "schema": 1,
+    "task_class": "refactor",
+    "forks": [
+      {
+        "fork": "气泡抽不抽新文件",
+        "options": [
+          "抽",
+          "不抽"
+        ],
+        "picked": "抽",
+        "evidence": null,
+        "target": {
+          "file": "src/NewBubble.tsx"
+        },
+        "cost_if_wrong": "low",
+        "verified": false
+      }
+    ]
+  },
+  "prompt": "把气泡渲染抽到一个新文件里，台账里给这条分叉报个代价。"
+}
