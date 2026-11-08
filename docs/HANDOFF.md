@@ -77,4 +77,5 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 ## 设计复核（2026-11-08，第二轮 grill-me）
 
 见 [`AUDIT-2026-11-08.md`](AUDIT-2026-11-08.md)：四项活体探针，按用户决定落地
-"申报无分叉的审计项"（`emptyDeclaration`）、"published 只认默认分支"与"verified 只是申报"，测试 318 → 336。
+"申报无分叉的审计项"（`emptyDeclaration`）、"published 只认默认分支"与"verified 只是申报"，
+测试 318 → 336。本仓库已接入自身（台账 + baseline + AGENTS 指路段），从下一次改动起按协议申报。
