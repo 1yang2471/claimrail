@@ -343,3 +343,45 @@ test('红项把绿项挤在后面也能一眼看出第一条问题', () => {
   const page = { scrollContainers: [container()], texts: [rightBubble()] };
   assert.equal(runChecks(page).find((r) => !r.ok).id, 'scrollbar-clears-text');
 });
+
+// 审查抓到的假绿：截断判断只在 texts / interactive 上做了，scrollContainers 与 fixedRects
+// 被静默丢掉——固定元素超过 40 个在真实页面上很常见（每个 sticky 表头都算），
+// 第 41 个之后固定条压内容永远查不到，而报告写的是"已核 40 个固定元素"。
+test('滚动容器/固定条被截断时也要改判"不作数"', () => {
+  const containers = Array.from({ length: 60 }, (_, i) => ({
+    selector: `#c${i}`,
+    rect: { x: 0, y: 0, w: 100, h: 100 },
+    scrollableY: true,
+    reservedX: 0,
+    scrollbarStyle: 'auto',
+    gutter: '',
+  }));
+  const s = scrollbarClearsText({ scrollContainers: containers, texts: [], raw: { scrollContainers: 61 } });
+  assert.equal(s.ok, null, `滚动区被截断却报了 ${s.ok}：${s.detail}`);
+  assert.match(s.detail, /截断/);
+
+  const bars = Array.from({ length: 40 }, (_, i) => ({ selector: `#f${i}`, rect: { x: 0, y: 990, w: 300, h: 10 } }));
+  const b = bottomNotCovered({
+    scrollContainers: [{ selector: '#sc', rect: { x: 0, y: 0, w: 300, h: 1000 }, scrollableY: true }],
+    fixedRects: bars,
+    raw: { fixedRects: 41 },
+  });
+  assert.equal(b.ok, null, `固定条被截断却报了 ${b.ok}：${b.detail}`);
+  assert.match(b.detail, /截断/);
+});
+
+// 透明文字（sr-only、图标字体）没有对比度可言：把 rgba(0,0,0,0) 合成到底色上得到 1.00，
+// 报"对比度不足"是纯假红——真站上这类元素能一次性造一排红。
+test('透明文字不算"对比度不足"，也不冒充"已核"', () => {
+  const only = contrastOk({ texts: [{ selector: '.sr-only', color: 'rgba(0, 0, 0, 0)', background: 'rgb(255, 255, 255)', fontSize: 16 }] });
+  assert.equal(only.ok, null, `透明文字被判成 ${only.ok}：${only.detail}`);
+
+  const mixed = contrastOk({
+    texts: [
+      { selector: '.a', color: '#111111', background: '#ffffff', fontSize: 16 },
+      { selector: '.sr-only', color: 'rgba(0, 0, 0, 0)', background: '#ffffff', fontSize: 16 },
+    ],
+  });
+  assert.equal(mixed.ok, true, mixed.detail);
+  assert.match(mixed.detail, /已核 1 处/, mixed.detail);
+});

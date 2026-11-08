@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { launchBrowser, openPage } from '../src/observe/driver.mjs';
 import { renderPage } from '../src/observe/web.mjs';
+import { playwrightBroken } from './helpers.mjs';
 
 // 真 Chromium 层的色值换算切片。单独一个文件是因为 browser.test.mjs 已经贴着
 // pre-commit 的大小上限；拆文件而不是抬阈值。
@@ -123,4 +124,10 @@ test('色值换算契约：老语法精确、现代色空间走浏览器、认�
     assert.ok(Math.abs(got.alpha.a - 0.5) < 0.01, JSON.stringify(got.alpha));
     assert.ok(got.mixed && got.mixed.rgb[0] > 150 && got.mixed.rgb[2] > 150, JSON.stringify(got.mixed));
   });
+});
+
+// 装了 playwright 却 import 不进来 = 坏安装，不是"这台机器没装"。
+// 这种情况下整层静默跳过、整套测试全绿——那是假绿，必须响。
+test('浏览器层不许因为坏安装而整层静默跳过', (t) => {
+  if (playwrightBroken) t.fail('node_modules 里装着 playwright，却 import 不进来：这是坏安装，整层跳过会变成假绿');
 });

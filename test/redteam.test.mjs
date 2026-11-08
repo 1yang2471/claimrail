@@ -58,7 +58,9 @@ test('伪造二：引用本次刚写的代码冒充既有做法 → 拦', async 
     await g(dir, ['add', 'src/Chat.tsx']);
     await ledger(dir, [
       fork({
-        target: { file: 'src/Chat.tsx', symbol: 'scrollbarGutter' },
+        // 符号必须真的在这个文件里：测量对象不成立时 fanIn 会取不到（→ high），
+        // 这条用例要的是"低代价 + 证据不成立"那条路径，别用不存在的符号把前提改掉
+        target: { file: 'src/Chat.tsx', symbol: 'scrollbar-gutter' },
         evidence: { kind: 'repo', ref: 'src/Chat.tsx:1', asserts: ['scrollbar-gutter'] },
         verified: true,
       }),
@@ -238,7 +240,8 @@ test('绕道洞二：纯 rename（相对起点只有一行 rename，无内容行
     assert.match(raw, /rename from docs\/notes-copy\.mjs/, raw.slice(0, 400));
     assert.equal(raw.includes('+rm -rf'), false, 'diff 里居然带了内容行，这条用例测不到纯 rename');
 
-    await ledger(dir, [fork({ target: { file: 'src/notes-copy.mjs', symbol: 'nothing' } })]);
+    // 同上：target 要能成立，否则覆盖原因会变成"引用数取不到"，测不到副作用那一条
+    await ledger(dir, [fork({ target: { file: 'src/notes-copy.mjs' } })]);
     const r = await check({ cwd: dir });
     assert.match(r.text, /recursive-delete/, r.text);
   } finally {

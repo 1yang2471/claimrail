@@ -1,6 +1,6 @@
 import { publishedFrom } from './published.mjs';
 import { scanDiff } from './effects.mjs';
-import { tagPointsAtHead, headOnRemote, grepCount, diffSince, changedLines, worktreeScanText } from './git.mjs';
+import { tagPointsAtHead, headOnRemote, grepCount, fileRefs, targetResolves, diffSince, changedLines, worktreeScanText } from './git.mjs';
 
 // Observation：cost.grade 唯一的输入。三个值都必须从仓库里读出来，
 // 这一层是整套协议里唯一接触真实世界的地方。读不出来就交 null，
@@ -28,9 +28,14 @@ export async function observe(target, { cwd, diffText = null, changed = null, ba
 
   // 没给测量对象就不硬猜：fanIn 取不到 → 按 high 处理 → 会来问人。
   // 审美类分叉正好落在这里，而它们本来就该被问。
+  // 给了测量对象也要先证明它成立：target 是模型填的，指向不存在的路径/符号时
+  // "0 处引用"是假零，而 fanIn 正是便宜/贵的输入之一。
   let fanIn = null;
-  if (target?.symbol) fanIn = await grepCount(target.symbol, target.file, cwd);
-  else if (target?.file) fanIn = await grepCount(target.file, target.file, cwd, { fixed: true });
+  if (target?.symbol || target?.file) {
+    if (!(await targetResolves(target, cwd))) fanIn = null;
+    else if (target.symbol) fanIn = await grepCount(target.symbol, target.file, cwd);
+    else fanIn = await fileRefs(target.file, cwd);
+  }
 
   return { fanIn, published, irreversible };
 }

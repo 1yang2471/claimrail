@@ -95,6 +95,11 @@ function overlayStrip(container) {
 export function scrollbarClearsText(page) {
   if (!nonEmpty(page.scrollContainers)) return skip('scrollbar-clears-text', '页面里没有纵向滚动容器可查');
   if (truncated(page, 'texts')) return skip('scrollbar-clears-text', `文本采集被截断（${page.raw.texts} > ${page.texts.length}），判不了`);
+  // 容器本身被截断同样要作数不清：第 61 个容器里的覆盖式条带永远查不到，
+  // 而报告会写成"已核 60 个滚动区，无压在内容上的条带"。四类采集一个都不能漏。
+  if (truncated(page, 'scrollContainers')) {
+    return skip('scrollbar-clears-text', `滚动容器采集被截断（${page.raw.scrollContainers} > ${page.scrollContainers.length}），判不了`);
+  }
 
   const hit = [];
   for (const container of page.scrollContainers) {
@@ -135,6 +140,12 @@ export function contrastOk(page) {
   let measured = 0;
   let unmeasurable = 0;
   for (const t of page.texts ?? []) {
+    // 透明文字（sr-only、图标字体）没有对比度可言：合成到底色上得到 1.00，
+    // 报"不足 4.5:1"是纯假红。它不算合格，也不算判过。
+    if (parseRgba(t.color)?.a === 0) {
+      unmeasurable += 1;
+      continue;
+    }
     const ratio = contrastRatio(t.color, t.background);
     if (ratio === null) {
       // 背景来自渐变/图片，或色值写法不认识：这一处没判过，既不算绿也不算红
@@ -186,6 +197,11 @@ export function bottomNotCovered(page) {
     .map((f) => ({ selector: f.selector, inside: f.inside, rect: box(f?.rect ?? f) }))
     .filter((f) => f.rect.w > 0 && f.rect.h > 0);
   if (!bars.length || !containers.length) return skip('bottom-not-covered', '缺少固定条或滚动容器，未判');
+  // 固定元素超过 40 个很常见（每个 sticky 表头都算）。丢掉的那些里有没有压内容的，
+  // 这一轮就是不知道——不许写成"已核 40 个固定元素"。
+  if (truncated(page, 'fixedRects')) {
+    return skip('bottom-not-covered', `固定元素采集被截断（${page.raw.fixedRects} > ${page.fixedRects.length}），判不了`);
+  }
 
   const hit = [];
   for (const c of containers) {

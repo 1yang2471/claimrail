@@ -6,24 +6,36 @@ import { join } from 'node:path';
 import { renderPage } from '../observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from '../observe/driver.mjs';
 
-export async function web({ url, state, viewport = '390x700,1280x800', out = join('.claimrail', 'shots'), name, cwd = process.cwd() } = {}) {
+// launch / open 可注入：不然这个命令一行都测不到，只能靠真浏览器手跑——
+// 退出码在这种地方最容易说谎（"五项全未判"曾经返回 0，CI 会当成检查通过）。
+export async function web({
+  url,
+  state,
+  viewport = '390x700,1280x800',
+  out = join('.claimrail', 'shots'),
+  name,
+  cwd = process.cwd(),
+  launch = launchBrowser,
+  open = openPage,
+} = {}) {
   if (!url) return { code: 1, text: '用法：claimrail web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .claimrail/shots]' };
 
   let browser;
   try {
-    browser = await launchBrowser();
+    browser = await launch();
   } catch (err) {
     return { code: 1, text: `浏览器没起来：${err.message}` };
   }
 
   const blocks = [];
   let red = false;
+  let judged = 0;
 
   try {
     for (const vp of parseViewports(viewport)) {
       let session;
       try {
-        session = await openPage(browser, { url, state, viewport: vp });
+        session = await open(browser, { url, state, viewport: vp });
       } catch (err) {
         blocks.push(`${vp}：页面没打开 —— ${err.message}`);
         red = true;
@@ -45,6 +57,7 @@ export async function web({ url, state, viewport = '390x700,1280x800', out = joi
         const green = report.checks.filter((c) => c.ok === true).map((c) => c.id);
         const undecided = report.checks.filter((c) => c.ok === null).map((c) => c.id);
         if (report.checks.some((c) => c.ok === false)) red = true;
+        judged += green.length;
 
         blocks.push(
           [
@@ -69,7 +82,16 @@ export async function web({ url, state, viewport = '390x700,1280x800', out = joi
       }
     }
 
-    return { code: red ? 1 : 0, text: `${url}\n\n${blocks.join('\n\n')}` };
+    // 退出码不许说谎：五项全未判时返回 0，CI 会当成"检查通过"。这份报告本来就不能
+    // 当证据（evidence 要求至少一项严格 true），所以退出码必须是 1。
+    const code = red || judged === 0 ? 1 : 0;
+    const tail =
+      judged === 0 && !red
+        ? '退出码 1：没有任何一项真的判过——这份报告不能当证据（未判 ≠ 合格）'
+        : red
+          ? '退出码 1：有检查项判红'
+          : '';
+    return { code, text: [`${url}`, ...blocks, tail].filter(Boolean).join('\n\n') };
   } finally {
     await browser.close().catch(() => {});
   }

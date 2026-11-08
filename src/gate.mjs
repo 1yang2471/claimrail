@@ -66,9 +66,13 @@ export function decide(enriched, { humanPresent = true, noForkReason = null } = 
     action = maxAction(action, humanPresent ? 'block' : 'halt');
   };
 
-  for (const f of enriched) {
+  // 打断数按 enriched 的下标去重，不按分叉文本：两条一字不差的分叉也是两件事
+  // （PRD 用户故事 9 拿这个数当中位数指标，按文本去重会低估负担）。
+  const interruptIdx = new Set();
+  for (const [i, f] of enriched.entries()) {
     if (!f.evidenceOk && f.cost === 'high') {
       questions.push(f);
+      interruptIdx.add(i);
       ask();
     } else if (!f.evidenceOk) {
       unverified.push(f);
@@ -84,11 +88,12 @@ export function decide(enriched, { humanPresent = true, noForkReason = null } = 
     }
     if (f.optionsCost[f.picked] !== cheap) {
       violations.push({ ...f, rule: '无证据却选了改起来更贵的候选', cheap });
+      interruptIdx.add(i);
       ask();
     }
   }
 
-  const interrupts = new Set([...questions, ...violations].map((f) => f.fork)).size;
+  const interrupts = interruptIdx.size;
 
   return {
     action,

@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname as dirOf, join } from 'node:path';
 
-import { check, init } from './cli.mjs';
+import { check, init } from '../src/cli.mjs';
 
 const g = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 

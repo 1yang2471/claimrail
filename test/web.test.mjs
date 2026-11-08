@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { renderPage, reportPathFor } from '../src/observe/web.mjs';
+import { web } from '../src/commands/web.mjs';
 import { verify } from '../src/evidence.mjs';
 
 // 一个"代码全合规、人看着难受"的聊天页采到的数据：滚动条带压在右对齐气泡上、
@@ -118,4 +119,35 @@ test('采集器空转产不出证据：全 null 的报告不能当作"已经看�
 test('报告路径由截图名派生，避免两处手写不一致', () => {
   assert.equal(reportPathFor('shots/chat@2x.png'), 'shots/chat@2x.report.json');
   assert.equal(reportPathFor('shots/chat.txt'), 'shots/chat.txt');
+});
+
+// —— web 命令本身（以前一行测试都没有，退出码也就没人管）——
+// 退出码不许说谎：五项全未判时返回 0，CI 会当成"检查通过"，而这份报告本来就不能当证据。
+const fakeBrowser = () => ({ close: async () => {} });
+
+const runWeb = (data, opts = {}) =>
+  web({
+    url: 'http://127.0.0.1:9/',
+    viewport: '390x700',
+    cwd: opts.cwd,
+    launch: async () => fakeBrowser(),
+    open: async () => ({ page: fakePage(data), context: { close: async () => {} } }),
+    ...opts,
+  });
+
+test('web 命令：五项全未判时退出码必须是 1（未判 ≠ 合格）', async () => {
+  await withDir(async (dir) => {
+    const empty = { viewport: { w: 390, h: 700 }, scrollContainers: [], texts: [], interactive: [], fixedRects: [] };
+    const r = await runWeb(empty, { cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /没有任何一项真的判过/);
+  });
+});
+
+test('web 命令：有红项退出 1，全绿退出 0', async () => {
+  await withDir(async (dir) => {
+    const bad = await runWeb(defectData, { cwd: dir });
+    assert.equal(bad.code, 1, bad.text);
+    assert.match(bad.text, /退出码 1：有检查项判红/);
+  });
 });

@@ -10,7 +10,7 @@ blocked=0
 skip() {
   case "$1" in
     *pnpm-lock.yaml|*package-lock.json|*yarn.lock|*.min.js|*.min.css) return 0 ;;
-    dist/*|build/*|coverage/*|node_modules/*|.forklight/shots/*) return 0 ;;
+    dist/*|build/*|coverage/*|node_modules/*|.claimrail/shots/*|bench/tasks/*/repo/.claimrail/shots/*.png) return 0 ;;
   esac
   return 1
 }

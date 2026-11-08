@@ -189,3 +189,21 @@ test('evidence 与 web 的报告路径派生必须一致', async () => {
     assert.equal(String(ref).replace(/\.png$/, '.report.json'), reportPathFor(ref), ref);
   }
 });
+
+// 审查抓到的崩法：台账的 asserts 里写了一个不存在的检查项名。
+// 以前直接读 c.ok 会抛 TypeError，掉进 check 的兜底 catch，用户看到的是
+// "检查没跑完：Cannot read properties of undefined"——分不清台账写错还是工具坏了。
+test('asserts 里写不存在的检查项名：报"未知检查项"，不许崩成源码异常', async () => {
+  const r = await verify({ kind: 'render', ref: 'shots/chat.png', asserts: ['not-a-real-check-id'] }, renderCtx());
+  assert.equal(r.ok, false);
+  assert.match(r.why, /未知检查项/);
+  assert.doesNotMatch(r.why, /undefined|Cannot read/, r.why);
+});
+
+// 审查抓到的绕过：同名检查写成了"报告里没写 name 就算过"。工具自己的产物永远带 name，
+// 所以"没写"只可能是手写报告在绕开它——缺 name 即失败。
+test('报告不带 name：算"不是同一次采集"，不许靠不写绕开同名检查', async () => {
+  const r = await verify({ kind: 'render', ref: 'shots/chat.png', asserts: goodAsserts }, renderCtx({ readReport: async () => passing({ name: undefined }) }));
+  assert.equal(r.ok, false);
+  assert.match(r.why, /不是同一次采集/);
+});

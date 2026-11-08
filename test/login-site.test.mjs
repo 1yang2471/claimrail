@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { launchBrowser, openPage } from '../src/observe/driver.mjs';
 import { renderPage } from '../src/observe/web.mjs';
+import { playwrightBroken } from './helpers.mjs';
 
 // 第三方真实登录门的闭环。之前只验证过"cookie/localStorage 注入进去了"和"本地起的
 // 登录门能过"；换成真实第三方站点才知道 state 到底顶不顶用。
@@ -69,4 +70,10 @@ test('真网络（FK_NET=1 才跑）：第三方登录门——匿名被挡，--
     await browser.close();
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// 装了 playwright 却 import 不进来 = 坏安装，不是"这台机器没装"。
+// 这种情况下整层静默跳过、整套测试全绿——那是假绿，必须响。
+test('浏览器层不许因为坏安装而整层静默跳过', (t) => {
+  if (playwrightBroken) t.fail('node_modules 里装着 playwright，却 import 不进来：这是坏安装，整层跳过会变成假绿');
 });

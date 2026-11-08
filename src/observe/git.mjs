@@ -25,9 +25,20 @@ const toPosix = (p) => String(p).split(sep).join('/');
 
 // 这个目录到底在不在 git 里。用来把"降级模式"与"实测出的高代价"分开：
 // 两者在报告里长得一样（都是 high），但一个该去 `git init`，一个该去拆改动。
-export async function isGitRepo(cwd) {
+//
+// 三种结果必须分清，不能都叫"不在仓库里"：
+//   repo    —— 真在仓库里
+//   none    —— 这个目录确实不是仓库（该去 git init）
+//   unknown —— git 本身用不了（坏 GIT_DIR、safe.directory、没装 git）：把人指去
+//              `git init` 一个本来就是仓库的目录，比不说还坏
+// 两条 stderr 实测可分辨：
+//   none    → fatal: not a git repository (or any of the parent directories): .git
+//   unknown → fatal: not a git repository: '<路径>'   ← 没有括号那句
+export async function gitState(cwd) {
   const r = await gitRaw(['rev-parse', '--is-inside-work-tree'], cwd);
-  return r.code === 0 && r.stdout.trim() === 'true';
+  if (r.code === 0) return r.stdout.trim() === 'true' ? 'repo' : 'unknown';
+  const text = `${r.stderr}${r.stdout}`.toLowerCase();
+  return /not a git repository \(or any of the parent directories\)/.test(text) ? 'none' : 'unknown';
 }
 
 export async function tagPointsAtHead(cwd) {
@@ -192,6 +203,48 @@ export async function grepCount(term, excludeFile, cwd, { fixed = false } = {}) 
   if (kind === 'none') return 0;
   if (kind === 'unknown') return null;
   return sumCounts(r.stdout, excludeFile);
+}
+
+// 文件级 fan-in 必须认相对写法。调用方写的是 `import { helper } from './helper.mjs'`，
+// 而 target 给的是仓库相对路径 `src/helper.mjs`——拿后者做精确匹配，实测被三处 import
+// 的文件会算成"0 处引用"，于是代价判 low、不覆写、不打断。
+// 三种写法一起数：仓库相对路径、`./名字`、以及单独的名字（同一条 git grep 里多给 -e，
+// 一行命中多次只算一次）。
+export async function fileRefs(file, cwd) {
+  const posix = toPosix(file);
+  const base = posix.split('/').pop();
+  const r = await gitRaw([
+    'grep', '-w', '-c', '-F',
+    '-e', posix,
+    '-e', `./${base}`,
+    '-e', base,
+    '--', '.', `:(exclude)${posix}`,
+  ], cwd);
+  const kind = mapGrepExit(r.code, r.stdout);
+  if (kind === 'none') return 0;
+  if (kind === 'unknown') return null;
+  return sumCounts(r.stdout, posix);
+}
+
+// 测量对象本身必须先成立。target 是模型填的，指向不存在的东西时"0 处引用"是假零——
+// 而 fanIn 正是便宜/贵的输入之一。返回 false 表示"这个测量对象不成立"，
+// 调用方按 null（→ high）处理，绝不按 0。
+export async function targetResolves(target, cwd) {
+  const file = target?.file;
+  if (!file) return true; // 只给 symbol 的情况交给 grep 自己判
+  const posix = toPosix(file);
+  const tracked = await gitRaw(['ls-files', '--error-unmatch', '--', posix], cwd);
+  if (tracked.code !== 0) {
+    // 未跟踪不等于不存在：刚建的文件本来就没进索引
+    try {
+      statSync(join(cwd, file));
+    } catch {
+      return false;
+    }
+  }
+  if (!target?.symbol) return true;
+  const hit = await gitRaw(['grep', '-w', '-c', '-e', target.symbol, '--', posix], cwd);
+  return hit.code === 0; // 文件里根本没这个符号 → 测量对象不成立
 }
 
 // 仓库大到某个程度就放弃全量扫描：返回 null 让调用方按"未判"处理，

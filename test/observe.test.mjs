@@ -1,7 +1,7 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
-import { cp, mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -132,6 +132,41 @@ test('文件数超过旧上限时仍然给出时间戳，而不是 null', async 
     const newest = await newestTrackedMtime(dir);
     assert.equal(typeof newest, 'number', `超过 5000 文件就返回了 ${newest}，大仓库的 render 证据会全失效`);
     assert.ok(newest >= future.getTime(), `最新时间戳没被算进去：${newest} < ${future.getTime()}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 审查抓到的可绕过：测量对象是模型自己填的（target 来自台账），而 fanIn 是便宜/贵的
+// 唯一输入之一。指向一个不存在的路径，grep 出来必然是 0 → 代价判 low → 不覆写、不打断。
+test('测量对象不存在时不许给出"0 处引用"这个假零', async () => {
+  const ghost = await observe({ file: 'src/does-not-exist.mjs' }, { cwd: repo, diffText: '' });
+  assert.equal(ghost.fanIn, null, `不存在的文件被算成 ${ghost.fanIn} 处引用`);
+  assert.equal(grade(ghost), 'high');
+
+  const typo = await observe({ file: 'src/cost.mjs', symbol: 'NOT_A_REAL_SYMBOL' }, { cwd: repo, diffText: '' });
+  assert.equal(typo.fanIn, null, `文件里没有的符号被算成 ${typo.fanIn} 处引用`);
+});
+
+// 文件级 fan-in 必须认相对写法：调用方写的是 `./helper.mjs`，而 target 给的是仓库
+// 相对路径 `src/helper.mjs`。拿后者做精确匹配，被三处 import 的文件会算成 0 处引用。
+test('文件级 fan-in 要认相对写法：./helper.mjs 也算引用', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-refs-'));
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    await mkdir(join(dir, 'src'), { recursive: true });
+    await writeFile(join(dir, 'src', 'helper.mjs'), 'export const helper = 1;\n', 'utf8');
+    for (const n of ['a', 'b', 'c']) {
+      await writeFile(join(dir, 'src', `${n}.mjs`), `import { helper } from './helper.mjs';\nconsole.log(helper);\n`, 'utf8');
+    }
+    g(['add', '-A']);
+    g(['commit', '-qm', 'init']);
+
+    const obs = await observe({ file: 'src/helper.mjs' }, { cwd: dir, diffText: '' });
+    assert.equal(obs.fanIn, 3, `./helper.mjs 的三处引用没被算进来：${obs.fanIn}`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

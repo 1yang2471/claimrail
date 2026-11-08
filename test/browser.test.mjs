@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { launchBrowser, openPage } from '../src/observe/driver.mjs';
+import { playwrightBroken } from './helpers.mjs';
 import { renderPage } from '../src/observe/web.mjs';
 import { verify } from '../src/evidence.mjs';
 
@@ -362,4 +363,10 @@ test('受保护页面：无登录态被踢到登录页，--state 才拿到真实
     srv.close();
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// 装了 playwright 却 import 不进来 = 坏安装，不是"这台机器没装"。
+// 这种情况下整层静默跳过、整套测试全绿——那是假绿，必须响。
+test('浏览器层不许因为坏安装而整层静默跳过', (t) => {
+  if (playwrightBroken) t.fail('node_modules 里装着 playwright，却 import 不进来：这是坏安装，整层跳过会变成假绿');
 });

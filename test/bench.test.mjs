@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { run } from '../src/bench.mjs';
+import { run } from '../bench/runner.mjs';
 import { trapTaken } from '../bench/classify.mjs';
 
 // 这一层是发布文案唯一允许引用的数字来源（PRD Testing Decisions 第 2 层）。

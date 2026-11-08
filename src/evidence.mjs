@@ -231,7 +231,9 @@ export async function verify(evidence, ctx) {
     const report = ctx.readReport ? await ctx.readReport(String(ref).replace(/\.png$/, '.report.json')) : null;
     if (!report || !Array.isArray(report.checks)) return { ok: false, why: '有截图但没有度量报告' };
     if (report.report_schema !== 1) return { ok: false, why: `度量报告版本不对（report_schema=${report.report_schema}）` };
-    if (report.name !== undefined && report.name !== basename(ref)) {
+    // name 必须有且必须对得上：缺 name 就当没写——工具自己的产物永远带 name，
+    // 所以"没写"只可能是手写报告在绕开这道检查。
+    if (report.name !== basename(ref)) {
       return { ok: false, why: `报告 name "${report.name}" 与截图 "${basename(ref)}" 不是同一次采集` };
     }
 
@@ -242,7 +244,11 @@ export async function verify(evidence, ctx) {
     if (missing.length) return { ok: false, why: `报告缺了 ${missing.length} 项检查：${missing.join('、')}` };
 
     for (const id of asserts) {
+      // 台账里写了个不存在的检查项名：这是申报错误，不是"检查没跑完"。
+      // 以前这里直接读 c.ok，TypeError 会掉进 check 的兜底 catch，用户看到的是一句
+      // 源码级异常，分不清"台账写错了"和"工具坏了"。
       const c = report.checks.find((x) => x.id === id);
+      if (!c) return { ok: false, why: `未知检查项「${id}」：报告里没有这一项（可用：${RENDER_CHECK_IDS.join('、')}）` };
       if (c.ok === false) return { ok: false, why: `${id} 判红：${c.detail}` };
       // null 是"未采到/未判"，不许冒充"没问题"
       if (c.ok !== true) return { ok: false, why: `${id} 不作数：${c.detail}` };

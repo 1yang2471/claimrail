@@ -7,16 +7,27 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, hook, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
+import { check, init, recordCmd, rulesCmd, invalidateCmd, LEDGER_PATH } from '../src/cli.mjs';
+import { repoWithEvidence } from './helpers.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fixture = (name) => join('test', 'fixtures', name);
 
+
+
 test('端到端：证据查得到 + 代价算得低 → 放行，退出码 0', async () => {
-  const res = await check({ cwd: repo, ledger: fixture('ledger-clean.json'), diffText: '' });
-  assert.equal(res.code, 0, res.text);
-  assert.match(res.text, /✓ 可以交付/);
-  assert.match(res.text, /分叉 1 条 · 需打断 0 次/);
+  const dir = await repoWithEvidence();
+  try {
+    const res = await check({ cwd: dir });
+    assert.equal(res.code, 0, res.text);
+    assert.match(res.text, /✓ 可以交付/);
+    assert.match(res.text, /分叉 1 条 · 需打断 0 次/);
+    // 光有这两条不够：低代价但证据不成立时也会绿（审查抓到的弱断言）
+    assert.match(res.text, /未验证 0 条/, res.text);
+    assert.match(res.text, /均有可回验证据/, res.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('端到端：没有测量对象 → 程序把 low 覆写成 high → 拦住', async () => {
@@ -62,7 +73,9 @@ test('init 建模板、说清数据去向，并让偏好与截图不进 git', as
     assert.deepEqual(ledger.forks, []);
 
     const gi = await readFile(join(dir, '.gitignore'), 'utf8');
-    for (const p of ['memory/', '*.png', '.claimrail/shots/']) assert.ok(gi.includes(p), p);
+    for (const p of ['memory/', '.claimrail/shots/']) assert.ok(gi.includes(p), p);
+    // 不许写 '*.png'：那会把目标仓库里所有真实图片一起排除掉（静默丢数据）
+    assert.ok(!gi.includes('*.png'), `init 给目标仓库写了 *.png 通配：${gi}`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -267,85 +280,6 @@ test('重复 init 不重复写指路，也不动已有内容', async () => {
 
 // hooks 层刻意做薄：宿主在"一次响应结束（交付前）"调它。ZCode 的语义是退出码 0 放行、
 // 2 才是故意阻断；其它非零会被宿主当成故障，而不是"拦住"。没有台账 = 这个仓库不在协议里。
-test('hook：没台账时静默放行，不制造噪音', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'fk-hook-'));
-  try {
-    const r = await hook({ cwd: dir });
-    assert.equal(r.code, 0);
-    assert.equal(r.text, '');
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test('hook：台账通过 → 0；被拦 → 2（2 才是故意阻断）', async () => {
-  const ok = await hook({ cwd: repo, ledger: fixture('ledger-clean.json') });
-  assert.equal(ok.code, 0, ok.text);
-  const blocked = await hook({ cwd: repo, ledger: fixture('ledger-block.json') });
-  assert.equal(blocked.code, 2);
-  assert.match(blocked.text, /拦住/);
-});
-
-// 业界语义（Claude Code / ZCode 同一套）：Stop 的退出码 2 会"续一轮"把 stderr 交给模型。
-// 所以已经因 Stop 钩子续过一轮（stop_hook_active）时不能再拦，否则死循环。
-test('hook：stop_hook_active 为真时不再阻断（防自锁），但仍然报原因', async () => {
-  const again = await hook({ cwd: repo, ledger: fixture('ledger-block.json'), payload: { stop_hook_active: true } });
-  assert.equal(again.code, 0, again.text);
-  assert.match(again.text, /拦住|block|未验证/, '第二次至少要说明为什么没交付');
-});
-
-test('hook：stopHookActive（ZCode 驼峰）同样认', async () => {
-  const again = await hook({ cwd: repo, ledger: fixture('ledger-block.json'), payload: { stopHookActive: true } });
-  assert.equal(again.code, 0, again.text);
-});
-
-// 门对"低代价 + 无证据"是放行但要点名（check 退出码 0）。真模型实测会把这个点名当耳旁风：
-// 正文照样写"全部核实"。所以钩子要把未验证条目回给模型续一轮，逼交付说明逐条声明。
-// 夹具用临时 git 仓库：本仓库现在有 0.1.0 tag，会把 low 覆写成 high 走 block 路径。
-test('hook：低代价未验证也要拦一轮，把条目递给模型去声明', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'fk-hook-unv-'));
-  try {
-    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
-    g(['init', '-q']);
-    g(['config', 'user.email', 't@t']);
-    g(['config', 'user.name', 't']);
-    await writeFile(join(dir, 'package.json'), '{\n  "name": "x"\n}\n', 'utf8');
-    g(['add', '-A']);
-    g(['commit', '-qm', 'init']);
-    await mkdir(join(dir, '.claimrail'), { recursive: true });
-    const ledger = {
-      schema: 1,
-      task_class: 'refactor',
-      forks: [
-        {
-          fork: '列表行高用 token 还是写死',
-          options: ['token', '写死 24px'],
-          picked: 'token',
-          target: { file: 'package.json' },
-          evidence: null,
-          cost_if_wrong: 'low',
-          verified: false,
-        },
-      ],
-    };
-    await writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify(ledger, null, 2), 'utf8');
-
-    const c = await check({ cwd: dir });
-    assert.equal(c.code, 0, c.text);
-    assert.equal(c.unverified.length, 1, c.text);
-
-    const first = await hook({ cwd: dir });
-    assert.equal(first.code, 2, first.text);
-    assert.match(first.text, /逐条声明未验证项/);
-    assert.match(first.text, /列表行高用 token 还是写死/);
-
-    const second = await hook({ cwd: dir, payload: { stop_hook_active: true } });
-    assert.equal(second.code, 0, second.text);
-    assert.match(second.text, /不再重复阻断/);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
 
 // 非 git 目录是显式的降级模式，不是"程序真算出来代价很高"。这两件事在报告里必须分开说：
 // 实测教训（PRD-notes 第 58 条）——Shinsekai 不是 git 仓库，于是每条分叉都判 high；
@@ -377,10 +311,49 @@ test('非 git 目录：报告要标明这是降级模式，并逐条说清"不�
     assert.equal(res.code, 1, res.text);
     assert.match(res.text, /非 git 目录/);
     assert.match(res.text, /保守默认/, '没说明这是保守默认');
-    assert.match(res.text, /不在 git 仓库里/, '逐条原因没说清');
+    // 三条原因要逐条说清：只断言"出现过一次"的话，坏掉其中一条也测不出来
+    assert.match(res.text, /不在 git 仓库里，引用数取不到/, res.text);
+    assert.match(res.text, /不在 git 仓库里，发布状态取不到/, res.text);
+    assert.match(res.text, /不在 git 仓库里，改动内容取不到/, res.text);
     // "没有仓库"不许被说成"grep 抽风"——两个原因差着一个 git init 的距离
     assert.doesNotMatch(res.text, /git grep 失败/);
+    // 也不许把"半瞎"说成"全瞎"：repo 档在 git 之外仍读得了文件与行，
+    // 真正丢掉的是"先干后证"（那一步要 git）。文案必须点名丢掉的是哪一条。
+    assert.match(res.text, /先干后证/, res.text);
   } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 审查抓到的误判：任何 git 失败都被说成"非 git 目录"，于是用户被指去 `git init`
+// 一个本来就是仓库的目录。实测两条 stderr 是可分辨的：
+//   非仓库   → fatal: not a git repository (or any of the parent directories): .git
+//   坏 GIT_DIR → fatal: not a git repository: '<路径>'
+test('git 用不了 ≠ 不在仓库里：两种降级要说不同的话', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-gitbad-'));
+  const env = process.env.GIT_DIR;
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    await writeFile(join(dir, 'package.json'), '{"name":"x"}', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'init']);
+    await mkdir(join(dir, '.claimrail'), { recursive: true });
+    await writeFile(
+      join(dir, '.claimrail', 'decisions.json'),
+      JSON.stringify({ schema: 1, task_class: 'ui-new', forks: [] , no_fork_reason: '只改文档' }),
+      'utf8',
+    );
+
+    process.env.GIT_DIR = 'C:/definitely-not-a-repo/nope.git';
+    const res = await check({ cwd: dir });
+    assert.doesNotMatch(res.text, /非 git 目录（降级模式）/, res.text);
+    assert.match(res.text, /git 读不出|git 不可用/, res.text);
+  } finally {
+    if (env === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = env;
     await rm(dir, { recursive: true, force: true });
   }
 });

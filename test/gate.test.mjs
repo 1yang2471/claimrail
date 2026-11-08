@@ -101,6 +101,12 @@ test('模型在台账里自填的 options_cost 一律不采信（被约束的一
   assert.equal(d.metrics.rule4NotEnabled, 1, '程序没算出来，就报未启用');
 });
 
+test('两条一字不差的分叉也算两次打断（按文本去重会低估负担）', () => {
+  const d = run([fork(), fork()], { observations: [HIGH, HIGH], verifications: [NONE, NONE] });
+  assert.equal(d.questions.length, 2);
+  assert.equal(d.metrics.interrupts, 2);
+});
+
 test('同一条分叉既缺证据又选了贵做法，只算一次打断', () => {
   const d = run([fork()], { observations: [HIGH], verifications: [NONE], optionsCosts: [COSTS_EXPENSIVE_PICKED] });
   assert.equal(d.questions.length, 1);

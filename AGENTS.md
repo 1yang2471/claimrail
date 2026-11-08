@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（282 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（309 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -32,6 +32,14 @@
 | 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`；背景自己半透明则未知（真站实测：`rgba(0,0,0,.05)` 被当纯黑，76/103 假红） |
 | 色值换算必须问浏览器本人 | `driver.mjs` 的 `window.__fk.rgbaOf`：老语法（`rgb()`/`rgba()`/`transparent`）走精确解析，现代色空间（`oklch()`/`lab()`/`color()`/`color-mix()`）在 canvas 上画一个像素再读回来。为什么不全走像素：8 位回读会把半透明量化到 1/255，实测同一处比值会漂 0.047（`rgba(10,20,30,.5)`：3.483 → 3.529）。为什么不能只读字符串：Chrome 把 `oklch()` 原样回显（`fillStyle` 与注册 `<color>` 属性都试过），只有像素是权威。真站实测：`iana.org/help/example-domains` 49 处文本里 40 处文字色是 `oklch()`，改前只判 9 处、改后判满 49 处并抓出 31 处真实缺陷（最低 2.45:1，改前正被"未判"盖住）。`test/color.test.mjs` 三条；变异：去掉像素回退 → 红 2，去掉 `CSS.supports` 守卫 → 红 1（无效值会凭空报出 `rgb(0,0,0)`） |
 | 认不出的色值整处不判，不许拿祖先的颜色冒充 | `web.mjs` 的 `bgOf`：某一层 `backgroundColor` 解析不出来就整处 `null`（旧实现 `continue` 掉那一层，于是把祖先的底色当成了这一层的底色）。`test/color.test.mjs`；变异：`if (!c)` 改成 `if (c === undefined)` → 红 |
+| 交付正文里的全称断言要跟门里的未验证项对撞 | `src/overclaim.mjs` + `src/commands/check.mjs` 的 `hook`：宿主 Stop 事件带 `last_assistant_message`（依据：产品自带 `resources/glm/zcode.cjs` 构造 payload 的那段）。正文宣称"全部核实"而门里有未验证项 → 拦一轮并摊开矛盾；正文已逐条声明 → 放行；读不到正文 → 明说读不到，按"没提"处理，不冒充看过。**否认句不算声明**："本次交付没有任何未验证的事项"里也有"未验证"三字，纯关键词判断会被它骗过去。`test/overclaim.test.mjs`；变异：去掉否定守卫 → 红，去掉"声明优先" → 红 |
+| 测量对象必须先证明成立 | `src/observe/index.mjs` 的 `targetResolves` + `src/observe/git.mjs` 的 `fileRefs`：target 是模型填的，指向不存在的路径/符号时"0 处引用"是假零，而 fanIn 正是便宜/贵的输入之一 → 判 null（按 high）。文件级 fan-in 要认 `./helper.mjs` 这种相对写法（拿仓库相对路径精确匹配会把三处 import 算成 0）。`test/observe.test.mjs`；变异：去掉检查 → 红，退回只按路径匹配 → 红 |
+| 四类采集都要认截断 | `src/observe/geometry.mjs` 的 `truncated()`：以前只判 texts 与 interactive，滚动容器与固定元素被截断时仍报"已核 60 个滚动区"——页面上固定元素超过 40 个很常见，被丢掉的那条压内容就永远查不到。现在四类一个都不漏。`test/geometry.test.mjs`；变异：去掉任一条守卫 → 红 |
+| 透明文字没有对比度可言 | `geometry.mjs` 的 `contrastOk`：`rgba(0,0,0,0)` 合成到底色上得到 1.00，报"不足 4.5:1"是纯假红（sr-only、图标字体常见）。它不算合格，也不冒充"已核"。`test/geometry.test.mjs`；变异：去掉守卫 → 红 |
+| 非 git 目录是显式降级模式，不是实测 | `src/observe/git.mjs` 的 `gitState` 分三种：repo / none（确实不是仓库）/ unknown（git 本身用不了：坏 GIT_DIR、safe.directory）。三者文案必须不同——把"仓库读不出来"说成"这里不是仓库"会把人指去 `git init` 一个本来就是仓库的目录。降级时要说清丢的是什么：repo 档仍读得了文件与行，丢的是"先干后证"（引用的行是不是本次刚写的）。`test/cli.test.mjs`；变异：不区分 none/unknown → 红 |
+| 退出码不许说谎 | `src/commands/web.mjs`：五项全未判时退出码是 1（这份报告本来就不能当证据），不是 0；`claimrail check` 退出码 0 只在"确实有绿项"时成立。`test/web.test.mjs` |
+| 报告必须带 name | `src/evidence.mjs` 的 render 档：报告不带 `name` 就当"不是同一次采集"——工具自己的产物永远带 name，"没写"只可能是手写报告在绕开这道检查。`test/evidence.test.mjs`；变异：name 变回可选 → 红 |
+| init 不许替目标仓库决定忽略什么 | `src/cli.mjs` 的 `init`：只写 `memory/` 与 `.claimrail/shots/`，不再写 `*.png` 通配——那会把用户仓库里所有真实图片一起静默排除在提交之外。`test/cli.test.mjs`；变异：写回 *.png → 红 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |
 | 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（真站实测：三个 index.html 收敛同名，前一份证据被后一份覆盖） |
 
@@ -47,18 +55,10 @@
 | 交付前钩子只许拦一次 | `src/cli.mjs` 的 `hook()`：Stop 事件读 stdin 的 `stop_hook_active` / `stopHookActive`，**续过一轮后不再阻断**（否则永远拦 = 死循环）；无台账的仓库静默放行。**放行判定必须排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮（把条目递给模型去声明"这条没能验证，原因是 X"）——真模型实测会在末尾点名照挂的情况下写"全部核实"。`test/cli.test.mjs` 五条；变异：去掉 `continuedBefore` 守卫 → 红 3；去掉未验证分支 → 红 1。真机接线：用户级 `~/.zcode/cli/config.json` 的 Stop 钩子，第一次回答被拦后模型续一轮、改成"卡在分叉，请定 A/B" |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的 `field.unknown` 与 `evidence.field.unknown`：只认白名单键。`confidence`/`rationale`/`options_cost` 都进不去 |
 
-## 已知的检出边界（别把"未判"当"没问题"）
+## 已知的检出边界
 
-- `contrast-ok` 曾在磨砂卡片 + 渐变背景上覆盖率极低（真站 7/111），当时只能判"不了"。**v2 已接像素采样**（`src/observe/pixel.mjs` + `png.mjs`，零依赖解 PNG）：
-  截图落地后读文字矩形内、字形之外的留白，多点一致才认作背景；点与点不一致（跨渐变）或全落在字形上（比值 <1.05）一律退回未判，不造红也不造绿。
-  仍判不了的两类：渐变在采样点之间剧烈变化、以及整块被图片背景覆盖的文本。报告里的 `pixelBackgrounds` 会写明补了几处、几处退回未判。
-- 现代色值写法曾经整类漏判（**已修 2026-11-08**）：真站 `iana.org/help/example-domains` 一页 49 处文本里 40 处文字色是 `oklch()`，`parseRgba` 不认识 → 整处不判；更坏的是报告里那句话写的是"采不到实色背景"，照着它去查背景的人永远查不到问题。现在色值统一由浏览器换算（画一个像素读回来）。浏览器自己也认不出的值（`CSS.supports('color', …)` 为假）仍然整处"未判"，不猜。
-- 非 git 目录里三个代价输入全部取不到 → 一切按 high。claimrail 在 git 之外基本失明，这是边界不是特性。
-- 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。Shinsekai 真 Vite SPA 已实测：双视口各有触摸目标红（13/12 处），scrollbar/focus 绿，对比度/底部遮挡未判；首次依赖预构建时宽屏 `networkidle` 20 秒超时，预热后重跑成功。绿、红、未判必须分开报告。
-- 引文核实只保证**可见正文里有这串字**，不保证那个页面在推荐这个做法。实测 24 个 URL 里有两处命中的是例外条款：W3C 用色页的 "an author cannot use color alone to achieve 3:1 contrast…"、SC 2.5.8 的 "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements…"。语气程序判不了，台账里的 `url + quote` 就是留给 reviewer 抽查上下文的——这是这一档唯一的人防线，别把它当程序保证。
-- "≥3 独立域名推荐同一做法"在数字本身不收敛的主张上不该成立：触摸目标尺寸实测是 24 CSS px（WCAG 2.2 AA）/ 44pt（Apple）/ 48dp（Material）/ 1cm×1cm（NN/g，物理尺寸）。这种分叉该申报的是"各家数字不一致，我选 X 因为 Y"，硬凑"业界都这么做"会被回访戳穿。
-- 反爬站回访直接 403（实测 stackoverflow 的问答页）。不伪造浏览器 UA 去绕——这类来源就是不可核实，换静态文档站。补测又见 Medium 系（medium.com、uxdesign.cc）对无浏览器指纹的回访一律 403，`adamsilver.io` 用 undici 直连 fetch failed：**口碑好的 UX 文章有一批永远够不着**，凑不齐 3 域时先检查是不是撞了这类站，而不是急着说"业界不收敛"。
-- 分叉型主张（"A 还是 B"）的证据可以引**任一候选方向**的句子，但必须写清支持的是哪个候选；NN/g 谈数据表格的 "unlike with a card-based UI…" 不是支持卡片的票。口味类 4 主张 × 4 域名补测虽有 2/4 通过字串回验，自动筛选混入标题/FAQ 和语义不符的引文，**不等于 2 条主张有三域同向推荐**；强制 precedent 的口味类有效性尚未证实。
+别把"未判"当"没问题"。完整清单见 [`docs/BOUNDARIES.md`](docs/BOUNDARIES.md)（最要紧的两条：
+非 git 目录是**显式降级模式**，报告开头会写明；引文命中 ≠ 页面在推荐这个做法）。
 
 ## 改这些代码时的硬规矩
 

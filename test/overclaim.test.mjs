@@ -110,3 +110,48 @@ test('读不到正文时按"没提"处理，但明说读不到，不冒充看过
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 审查抓到的假绿：一句否认同时短路两道防线。
+// "本次交付没有任何未验证的事项，所有来源均已核实" 里既有"未验证"三字（骗过声明识别），
+// 又有全称断言；而声明分支排在前面时直接放行 → 退出 0。
+test('否认句不许冒充"已声明"，两条防线也不许被一句话同时短路', async () => {
+  assert.equal(declaresUnverified('本次交付没有任何未验证的事项'), false);
+  assert.equal(declaresUnverified('没有未核实的内容'), false);
+  // 老老实实说自己没能验证的句子仍然算声明
+  assert.equal(declaresUnverified('这条我没能验证，原因是拿不到设计规范'), true);
+
+  const dir = await repoWithUnverified();
+  try {
+    const r = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: '本次交付没有任何未验证的事项，所有来源均已核实。' },
+    });
+    assert.equal(r.code, 2, r.text);
+    assert.match(r.text, /不能同时成立/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 声明优先，但"否认"不算声明。
+// 这两条一起钉住，顺序就动不了：先看宣称 → 诚实的"其余都核实过"会被白拦；
+// 先看声明 → 一句否认就能把两道防线一起短路。
+test('诚实的声明优先放行；否认不算声明', async () => {
+  const dir = await repoWithUnverified();
+  try {
+    const honest = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: '「列表行高用 token 还是写死」这条我没能验证（拿不到设计规范）；其余来源全部核实。' },
+    });
+    assert.equal(honest.code, 0, honest.text);
+
+    const denial = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: '本次交付没有任何未验证的事项，所有来源均已核实。' },
+    });
+    assert.equal(denial.code, 2, denial.text);
+    assert.match(denial.text, /不能同时成立/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
