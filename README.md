@@ -90,7 +90,9 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` now holds **20 tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
 
-A real-model comparison (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) is running; **until it finishes, the release comparison number is still "not measured"**. The earlier 6-task / 14-run sample is directional only. Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
+The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) ran all 20 tasks on the off arm with a 6-step budget, and **the data is invalid**: 7 runs were voided by 429 rate limits, and of the 13 valid runs only 1 ended naturally and delivered — the other 12 hit the step cap. A collapse rate needs delivery as its precondition, so these 13 runs cannot produce a trustworthy number. Rate-limit retry and incremental result writing are now in place; a 10-step, 6-task two-arm pilot is being re-run.
+
+**Until a valid comparison completes, the release comparison number is still "not measured".** The earlier 6-task / 14-run sample is directional only. Numbers produced by the fake agent are mechanism self-tests, not a model's behaviour distribution.
 
 **So: the comparison numbers in any release copy are not yet measured.** Raw records live in `docs/HANDOFF.md`; nothing has been cherry-picked.
 
