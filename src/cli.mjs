@@ -10,11 +10,12 @@ import { grade } from './cost.mjs';
 import { verifyAll } from './evidence.mjs';
 import { enrich, decide, render } from './gate.mjs';
 import { observe, whyUnknown } from './observe/index.mjs';
-import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince } from './observe/git.mjs';
+import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, isGitRepo } from './observe/git.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
 import { web } from './commands/web.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from './paths.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
+import { overclaims, declaresUnverified, readDelivery } from './overclaim.mjs';
 
 export { web, parse, help, unknownCmd, LEDGER_PATH };
 
@@ -175,7 +176,16 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
     const diff = diffText ?? (await diffSince(cwd, base));
     const overrides = [];
-    if (!base && diffText === null) {
+    // 非 git 目录：三个代价输入一个都取不到 → 每条分叉都判 high。必须一次说清，
+    // 否则"降级默认"在报告里跟"实测出的高代价"长得一模一样。
+    const gitRepo = await isGitRepo(cwd);
+    if (!gitRepo) {
+      overrides.push(
+        '⚠ 非 git 目录（降级模式）：fanIn / published / irreversible 三项都取不到，所有分叉按 high 处理——这是保守默认，不是实测结果；repo 类证据在 git 之外也无法回验',
+      );
+    }
+    // 这一句只在真仓库里成立：没有仓库时说"没跑过 init"会把人指错方向
+    if (gitRepo && !base && diffText === null) {
       overrides.push('⚠ 没有 baseline（没跑过 claimrail init，或仓库当时没有提交）：本次只比较 HEAD 之后的改动，已提交的内容扫不到');
     }
 
@@ -185,7 +195,7 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       observations.push(obs);
       // 申报 low 而程序算出 high：覆写，并把原因摊开——这一步不留痕迹就等于没拦
       if (fork.cost_if_wrong === 'low' && grade(obs) === 'high') {
-        const missing = whyUnknown(obs);
+        const missing = whyUnknown(obs, { gitRepo });
         const hit = [...obs.published ?? [], ...obs.irreversible ?? []];
         const reason = missing.length ? missing.join('；') : `已发布或有副作用：${hit.join('、')}`;
         overrides.push(`${fork.fork}：申报 low → 程序 high（${reason}）`);
@@ -272,12 +282,28 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   // "3 个来源全部当场核实"。所以钩子把未验证条目结构化地回给模型改口。仍然是只拦一次。
   // 注意顺序：stop_hook_active 的放行判断必须在未验证声明之前，否则续过一轮还会被拦。
   if (continuedBefore) return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
+  // 交付正文拿得到就直接按它判：宣称"全都核实过"与门里的未验证项不能同时成立；
+  // 已经逐条声明过的就不再拦一轮。拿不到正文时老实说拿不到，不猜。
+  const delivery = readDelivery(p);
   if (r.code === 0 && r.unverified?.length) {
+    if (delivery && declaresUnverified(delivery)) return { code: 0, text: '' };
+    const claims = overclaims(delivery ?? '');
+    if (claims.length) {
+      return {
+        code: 2,
+        text: [
+          r.text,
+          `交付正文里写着「${claims[0]}」，但门里有 ${r.unverified.length} 条未验证项——这两句不能同时成立：`,
+          ...r.unverified.map((u) => `  • ${u.fork}｜已选 ${u.picked}｜${u.why}`),
+          '要么去把证据拿到，要么把正文改成"这条我没能验证，原因是 X"。不要只改措辞。',
+        ].join('\n'),
+      };
+    }
     return {
       code: 2,
       text: [
         r.text,
-        '交付说明必须逐条声明未验证项（你的交付说明里一条都没提）：',
+        `交付说明必须逐条声明未验证项（${delivery ? '你的交付说明里一条都没提' : '没能读到交付正文，按"没提"处理'}）：`,
         ...r.unverified.map((u) => `  • ${u.fork}｜已选 ${u.picked}｜${u.why}`),
         '在正文里写清"哪条没能验证、原因是什么"，然后结束本轮。',
       ].join('\n'),

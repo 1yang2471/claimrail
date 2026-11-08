@@ -35,11 +35,19 @@ export async function observe(target, { cwd, diffText = null, changed = null, ba
   return { fanIn, published, irreversible };
 }
 
-export function whyUnknown(observation) {
+// 取不到值的原因必须分清：一个是"没给测量对象"，一个是"这里根本没有 git"。
+// 旧写法把后者也说成"git grep 失败"，照着这句去查 grep 的人永远查不到问题。
+export function whyUnknown(observation, { gitRepo = true } = {}) {
   const obs = observation ?? {};
   const missing = [];
-  if (typeof obs.fanIn !== 'number') missing.push('引用数取不到：未提供测量对象，或 git grep 失败');
-  if (!Array.isArray(obs.published)) missing.push('发布状态取不到：不在 git 仓库里，或分支状态读不出来');
-  if (!Array.isArray(obs.irreversible)) missing.push('改动内容取不到：无法扫描副作用');
+  if (typeof obs.fanIn !== 'number') {
+    missing.push(gitRepo ? '引用数取不到：未提供测量对象，或 git grep 失败' : '不在 git 仓库里，引用数取不到');
+  }
+  if (!Array.isArray(obs.published)) {
+    missing.push(gitRepo ? '发布状态取不到：不在 git 仓库里，或分支状态读不出来' : '不在 git 仓库里，发布状态取不到');
+  }
+  if (!Array.isArray(obs.irreversible)) {
+    missing.push(gitRepo ? '改动内容取不到：无法扫描副作用' : '不在 git 仓库里，改动内容取不到');
+  }
   return missing;
 }

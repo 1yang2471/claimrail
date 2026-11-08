@@ -26,7 +26,7 @@ export const CHECK_IDS = [
 
 // 返回 { rgb:[r,g,b], a } 而不是丢掉了 alpha：
 // 半透明的前景或背景都必须先合成再算比值，否则 rgba(0,0,0,.05) 会被当成纯黑。
-function parseRgba(input) {
+export function parseRgba(input) {
   if (typeof input !== 'string') return null;
   const s = input.trim().toLowerCase();
   if (s.includes('%')) return null; // 百分号色值不硬算，宁可不作数
@@ -146,8 +146,11 @@ export function contrastOk(page) {
     const large = size >= LARGE_PX || (size >= LARGE_BOLD_PX && Boolean(t.bold));
     if (ratio < (large ? CONTRAST_LARGE : CONTRAST_NORMAL)) bad.push({ ...t, ratio });
   }
-  if (measured === 0) return skip('contrast-ok', `${unmeasurable} 处文本采不到实色背景（渐变或图片），判不了`);
-  const note = unmeasurable ? `，另有 ${unmeasurable} 处采不到实色背景未判` : '';
+  if (measured === 0) return skip('contrast-ok', `${unmeasurable} 处文本的底色或色值采不到/不可信，判不了`);
+  // 这句话只能说清"原因在颜色这一侧"：底色采不到（渐变/图片）、采到的底色不可信
+  // （采样点不一致、落在字形上）、色值写法认不出来，都落在这里。旧话术一律叫
+  // "采不到实色背景"，照着它去查背景的人会在"明明采到了"的地方扑空。
+  const note = unmeasurable ? `，另有 ${unmeasurable} 处未判（底色或色值采不到/不可信，不算合格）` : '';
   if (!bad.length) return pass('contrast-ok', `已核 ${measured} 处${note}`);
   const worst = bad.reduce((a, b) => (b.ratio < a.ratio ? b : a));
   return fail('contrast-ok', `${bad.length}/${measured} 处正文对比度不足 4.5:1，最低 ${worst.ratio.toFixed(2)}（${worst.selector}）${note}`);

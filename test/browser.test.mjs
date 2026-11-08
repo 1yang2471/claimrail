@@ -266,15 +266,46 @@ test('磨砂+渐变页：像素采样把覆盖率从少数拉到全部，并抓�
       const onDetail = withPixel.checks.find((c) => c.id === 'contrast-ok').detail;
 
       // 关掉像素：有文本判不了（这正是不开 v2 时的假绿来源）
-      assert.match(offDetail, /采不到实色背景未判/, `关像素时应当有未判项，实得：${offDetail}`);
+      assert.match(offDetail, /另有 \d+ 处未判（底色或色值采不到/, `关像素时应当有未判项，实得：${offDetail}`);
       // 开像素：全部判上，且补的处数等于刚才未判的处数
       assert.equal(withPixel.pixelBackgrounds.inkSuspected, 0);
       assert.ok(withPixel.pixelBackgrounds.filled >= 3, `补的处数太少：${JSON.stringify(withPixel.pixelBackgrounds)}`);
-      assert.doesNotMatch(onDetail, /采不到实色背景/, `开像素后仍有未判：${onDetail}`);
+      assert.doesNotMatch(onDetail, /处未判（底色/, `开像素后仍有未判：${onDetail}`);
       // 补上之后必须抓到真实的浅字，而不是"全部合格"
       assert.match(onDetail, /对比度不足 4\.5:1/, `浅灰字没被抓到：${onDetail}`);
     });
   } finally {
+    srv.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 真实站点上 networkidle 可能永远不到：实测 saucedemo.com 挂着两个永不完成的遥测
+// fetch（events.backtrace.io），一页完全正常的页面因此整页跑不起来——工具对这类站点
+// 等于全盲。所以"等网络静默"只能尽力而为：文档落地了就继续采集。
+test('真浏览器：有请求永不结束时也要出报告，不许整页跑不起来', async (t) => {
+  if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
+  const { createServer } = await import('node:http');
+  const srv = createServer((req, res) => {
+    if (req.url.startsWith('/beacon')) return; // 永不响应：模拟挂住的遥测
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(
+      '<!doctype html><body><main><h1>正文落地了</h1>' +
+        '<p style="color:#111">挂住的 beacon 不该拖垮整页</p></main>' +
+        '<script>fetch("/beacon");</script></body>',
+    );
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const dir = await mkdtemp(join(tmpdir(), 'cr-idle-'));
+  try {
+    await withBrowser(async (browser) => {
+      const session = await openPage(browser, { url: `http://127.0.0.1:${srv.address().port}/`, viewport: '400x200', timeoutMs: 1500 });
+      const report = await renderPage(session.page, { outDir: dir, name: 'idle' });
+      await session.context.close();
+      assert.ok(report.counts.texts >= 2, `正文没采到：${JSON.stringify(report.counts)}`);
+    });
+  } finally {
+    srv.closeAllConnections?.();
     srv.close();
     await rm(dir, { recursive: true, force: true });
   }

@@ -346,3 +346,41 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 非 git 目录是显式的降级模式，不是"程序真算出来代价很高"。这两件事在报告里必须分开说：
+// 实测教训（PRD-notes 第 58 条）——Shinsekai 不是 git 仓库，于是每条分叉都判 high；
+// 不写明的话，读报告的人会以为工具真的测出了高代价，实际是三个输入一个都取不到。
+test('非 git 目录：报告要标明这是降级模式，并逐条说清"不在 git 里"', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-nogit-'));
+  try {
+    await mkdir(join(dir, '.claimrail'), { recursive: true });
+    await writeFile(
+      join(dir, '.claimrail', 'decisions.json'),
+      JSON.stringify({
+        schema: 1,
+        task_class: 'ui-new',
+        forks: [
+          {
+            fork: '导航结构：顶部还是侧边',
+            options: ['顶部', '侧边'],
+            picked: '顶部',
+            evidence: null,
+            cost_if_wrong: 'low',
+            verified: false,
+          },
+        ],
+      }),
+      'utf8',
+    );
+
+    const res = await check({ cwd: dir });
+    assert.equal(res.code, 1, res.text);
+    assert.match(res.text, /非 git 目录/);
+    assert.match(res.text, /保守默认/, '没说明这是保守默认');
+    assert.match(res.text, /不在 git 仓库里/, '逐条原因没说清');
+    // "没有仓库"不许被说成"grep 抽风"——两个原因差着一个 git init 的距离
+    assert.doesNotMatch(res.text, /git grep 失败/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

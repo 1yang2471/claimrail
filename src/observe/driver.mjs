@@ -140,7 +140,15 @@ export async function openPage(browser, { url, state, viewport = '1280x800', tim
   try {
     await context.addInitScript(installHelpers);
     const page = await context.newPage();
-    await page.goto(url, { waitUntil: 'networkidle', timeout: timeoutMs });
+    // 真实站点上"等页面静默"两条路都会失败：实测 saucedemo.com 挂着永不完成的遥测
+    // fetch（events.backtrace.io），networkidle 永远不到；它的登录页连 load 都等不到
+    // （有资源一直不返回）。这两种情况下工具曾经整页跑不起来 = 对该站点全盲。
+    // 所以只有"文档解析完"是可信信号，样式/图片与 SPA 渲染都尽力等一会儿，等不到就按
+    // 当前 DOM 采集，不抛错。超时预算按 timeoutMs 缩放，免得慢站把整轮拖太久。
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    const settle = Math.min(timeoutMs, 5000);
+    await page.waitForLoadState('load', { timeout: settle }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: settle }).catch(() => {});
     // 探针以回调交出：调用方必须先采未聚焦基线、再走 Tab。顺序反了（曾经就是这样）
     // 会让基线带着焦点，焦点检查于是永远判绿。
     return { page, context, viewport: `${width}x${height}`, focusProbe: () => tabSamples(page, tabMax) };

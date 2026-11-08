@@ -23,6 +23,13 @@ export async function gitRaw(args, cwd) {
 const splitZ = (text) => text.split('\0').filter(Boolean);
 const toPosix = (p) => String(p).split(sep).join('/');
 
+// 这个目录到底在不在 git 里。用来把"降级模式"与"实测出的高代价"分开：
+// 两者在报告里长得一样（都是 high），但一个该去 `git init`，一个该去拆改动。
+export async function isGitRepo(cwd) {
+  const r = await gitRaw(['rev-parse', '--is-inside-work-tree'], cwd);
+  return r.code === 0 && r.stdout.trim() === 'true';
+}
+
 export async function tagPointsAtHead(cwd) {
   const r = await gitRaw(['tag', '--points-at', 'HEAD'], cwd);
   if (r.code !== 0) return null;

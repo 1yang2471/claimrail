@@ -10,7 +10,7 @@
 //     用多个点的一致性来确认"这确实是背景"。
 //   - 结果要能被判定层当作"已判"参与统计，同时保留来源标记（pixel / css），
 //     让人知道这一条是程序读像素读出来的，不是读样式读出来的。
-import { contrastRatio } from './geometry.mjs';
+import { contrastRatio, parseRgba } from './geometry.mjs';
 
 // 从矩形里挑背景采样点：四角内缩 + 中心线上下。全部落在文字自身像素之外。
 // 行高通常大于字高，所以上下留白比左右更可靠；宽度不足时退回只取上下。
@@ -47,9 +47,19 @@ export function pixelAt(img, p) {
 
 const dist = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
 
+// 采样点离多数色簇多远，就说明"这里不是同一块底色"了。
+// 实测分界：缓变渐变里的偏差只有几十（跨 140px 变 8 阶 ≈ 12/通道 = 距离 36），
+// 而 10px 棋盘上采样点会在 58 与 255 之间跳（距离 591）。120 落在两者中间偏保守一侧。
+const FOREIGN = 120;
+
 // 一处文本的背景色：采样点里取出现最多的颜色，且要求足够多的点一致。
 // 不一致说明采样点压到了文字笔画或跨在渐变上——返回 null，由调用方记"未判"。
-export function backgroundAt(img, rect, { tolerance = 24, minAgree = 3 } = {}) {
+//
+// textColor 用来把"落在字形上的点"与"旁边换了另一块底色"分开：前者是采样噪声（认），
+// 后者说明多数色簇只代表它自己那一半边，报出去就是假绿。
+// 实测（2026-11-08，10px 棋盘）：4 深 2 白 → 旧实现取深色报 6.80 合格，
+// 而同一处文字压在白格上的比值只有 1.67。
+export function backgroundAt(img, rect, { tolerance = 24, minAgree = 3, textColor = null, foreign = FOREIGN } = {}) {
   const pts = samplePoints(rect).map((p) => pixelAt(img, p)).filter(Boolean);
   if (pts.length < minAgree) return null;
 
@@ -63,6 +73,15 @@ export function backgroundAt(img, rect, { tolerance = 24, minAgree = 3 } = {}) {
     }
   }
   if (bestCount < minAgree) return null;
+
+  const ink = textColor ? parseRgba(textColor)?.rgb ?? null : null;
+  const stray = pts.some((o) => {
+    if (dist(o, best) <= foreign) return false; // 渐变里的偏差，认
+    if (ink && dist(o, ink) <= tolerance) return false; // 落在文字笔画上，不算底色
+    return true;
+  });
+  if (stray) return null;
+
   const group = pts.filter((o) => dist(o, best) <= tolerance);
   const mean = [0, 1, 2].map((k) => Math.round(group.reduce((s, o) => s + o[k], 0) / group.length));
   return `rgb(${mean[0]}, ${mean[1]}, ${mean[2]})`;
@@ -80,7 +99,7 @@ export function applyPixelBackgrounds(data, img, opts = {}) {
   let inkSuspected = 0;
   const texts = (data.texts ?? []).map((t) => {
     if (t.background) return t;
-    const bg = backgroundAt(img, t.rect, opts);
+    const bg = backgroundAt(img, t.rect, { ...opts, textColor: t.color });
     if (!bg) return t;
     const ratio = contrastRatio(t.color, bg);
     if (ratio === null || ratio < INK_RATIO) {

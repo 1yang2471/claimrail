@@ -272,7 +272,7 @@ test('采不到实色背景（渐变/图片）就未判，绝不许产生红', (
   // 采样 backgroundColor 得到透明，旧实现兜底成白色 → 83 处 1.00 假红
   const allUnknown = { texts: [{ selector: '.pill', color: '#ffffff', background: null }] };
   assert.equal(contrastOk(allUnknown).ok, null);
-  assert.match(contrastOk(allUnknown).detail, /渐变或图片/);
+  assert.match(contrastOk(allUnknown).detail, /底色或色值采不到/);
 
   const mixed = {
     texts: [
@@ -281,7 +281,7 @@ test('采不到实色背景（渐变/图片）就未判，绝不许产生红', (
       { selector: '.pill', color: '#ffffff', background: null },
     ],
   };
-  assert.match(contrastOk(mixed).detail, /已核 2 处，另有 1 处采不到实色背景未判/);
+  assert.match(contrastOk(mixed).detail, /已核 2 处，另有 1 处未判（底色或色值采不到/);
 
   const oneBad = {
     texts: [

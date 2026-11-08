@@ -136,3 +136,25 @@ test('像素背景读出来的颜色能直接参与对比度判定', () => {
   const ratio = contrastRatio(r.texts[0].color, r.texts[0].background);
   assert.ok(ratio !== null && ratio < 4.5, `浅灰压白应当判不足 4.5:1，实得 ${ratio}`);
 });
+
+// 实测到的假绿（2026-11-08，10px 棋盘背景）：6 个采样点里 4 深 2 白，旧实现取"深"当底色
+// → 报 6.80 合格；而同一处文字压在白格上的比值只有 1.67。报的是它采到的那半边，不是整块。
+test('高频棋盘背景：多数色簇代表不了整块底色 → 退回未判，不许报合格', () => {
+  const img = decodePng(makePng(160, 40, (x, y) => ((((x / 10) | 0) + ((y / 10) | 0)) % 2 ? [255, 255, 255] : [58, 58, 58])));
+  const data = {
+    texts: [{ selector: '.checker', rect: { x: 0, y: 0, w: 120, h: 30 }, color: 'rgb(200, 200, 200)', background: null }],
+  };
+  const r = applyPixelBackgrounds(data, img);
+  assert.equal(r.texts[0].background, null, `把棋盘的一格当成了整块底色：${r.texts[0].background}`);
+  assert.equal(r.filled, 0);
+});
+
+// 反面对照：真页面上常见的缓变渐变必须还能判——否则这道守卫是拿覆盖率换来的。
+test('缓变渐变仍要能判：点与点有差，但不是"旁边换了一块颜色"', () => {
+  const img = decodePng(makePng(140, 30, (x) => [230 + Math.round((x * 8) / 140), 236 + Math.round((x * 8) / 140), 242]));
+  const data = {
+    texts: [{ selector: '.grad', rect: { x: 5, y: 5, w: 120, h: 20 }, color: 'rgb(60, 60, 60)', background: null }],
+  };
+  const r = applyPixelBackgrounds(data, img);
+  assert.equal(r.filled, 1, `缓变渐变被判未判了：${JSON.stringify(r.texts[0])}`);
+});
