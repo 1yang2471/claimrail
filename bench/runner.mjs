@@ -20,7 +20,7 @@ const median = (xs) => {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 };
 
-export async function runTask(taskDir, { protocol = 'off' } = {}) {
+async function runTask(taskDir, { protocol = 'off' } = {}) {
   const spec = JSON.parse(await readFile(join(taskDir, 'agent.json'), 'utf8'));
   const dir = await mkdtemp(join(tmpdir(), 'fk-bench-'));
   try {

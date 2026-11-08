@@ -19,8 +19,6 @@ const SURFACES = {
   'api-design': /(^|\/)(api|routes?|controllers?)\/|(^|\/)(openapi|swagger)[^/]*\.(ya?ml|json)$|\.(proto|graphql|gql)$/i,
 };
 
-export const AUDIT_CLASSES = Object.keys(SURFACES);
-
 // files 来自 changedLines：已改行的文件、未跟踪的新文件、rename/copy 的落地路径。
 // 去重后再过滤，顺序保持调用方给的顺序（人读起来像 diff 的顺序）。
 export function surfaceFiles(taskClass, files = []) {

@@ -17,7 +17,7 @@ export const TASK_CLASSES = [
   'rename',
 ];
 
-export const EVIDENCE_KINDS = ['repo', 'memory', 'render', 'precedent', 'web'];
+const EVIDENCE_KINDS = ['repo', 'memory', 'render', 'precedent', 'web'];
 
 // 允许空格与中文路径——"聊天 页面.tsx"这类文件真实存在，正则拒了它等于逼模型
 // 写一条假 ref 来凑数，那比误拦更糟。但禁止以 ./ 或 ../ 开头：render 的 ref 会被

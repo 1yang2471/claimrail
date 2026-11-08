@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 
 let cached;
 
-export async function loadPlaywright() {
+async function loadPlaywright() {
   if (cached) return cached;
   try {
     cached = await import('playwright');
@@ -25,7 +25,7 @@ export async function loadPlaywright() {
 // sel 必须带兄弟序号：同 class 的兄弟气泡（聊天页一屏全是 .bubble）如果算出同一个
 // 字符串，focusSamples 的 Map 会互相覆盖——第一个探到、第二个跟着被判"焦点可见"，
 // 那是纯假绿；tabSamples 也会因为重名提前 break，少探一整片。
-export function installHelpers() {
+function installHelpers() {
   const sel = (el) => {
     if (el.id) return `#${el.id}`;
     const cls = typeof el.className === 'string' && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : '';
@@ -107,7 +107,7 @@ export function installHelpers() {
 
 // 真实键盘 Tab 走一圈：这是 :focus-visible 唯一会被触发的路径。
 // 回到已走过的元素就停——再走下去只是在原地打转。
-export async function tabSamples(page, maxTabs = 40) {
+async function tabSamples(page, maxTabs = 40) {
   const seen = [];
   for (let i = 0; i < maxTabs; i++) {
     await page.keyboard.press('Tab');

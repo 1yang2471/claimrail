@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { LEDGER_PATH } from './paths.mjs';
 
-export const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
+const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
 
 // 帮助。新用户第一屏就是 `claimrail --help`；没有它，拼错命令的人会看到"台账读不到"。
 const HELP = [
