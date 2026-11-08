@@ -33,6 +33,23 @@ test('每个陷阱任务都要写明为什么不是编的，且统计口径可�
   }
 });
 
+// 夹具里预置"本次刚写"的文件，会把先干后证变成既有做法：
+// changed-line-precedent 曾因此漏拦（on 臂唯一一条静默塌缩），假 agent 全量跑才发现。
+// 只查被台账当作 repo 证据引用的那些写入文件——改写既有文件的任务（如 published-lowball）
+// 本来就需要文件在仓库里。
+test('被当作既有做法引用的写入文件，不许预置在夹具里', () => {
+  for (const id of taskDirs()) {
+    const spec = JSON.parse(readFileSync(join(tasksDir, id, 'agent.json'), 'utf8'));
+    const written = new Set(Object.keys(spec.writes ?? {}));
+    for (const f of spec.ledger?.forks ?? []) {
+      if (f.evidence?.kind !== 'repo') continue;
+      const file = String(f.evidence.ref ?? '').split(':')[0];
+      if (!written.has(file)) continue;
+      assert.equal(existsSync(join(tasksDir, id, 'repo', file)), false, `${id}: ${file} 被当作既有做法引用，却预置在 repo/`);
+    }
+  }
+});
+
 test('协议关闭：同一个任务直接交付，不拦', async () => {
   const m = await run([task('published-lowball')], { protocol: 'off' });
   assert.equal(m.protocol, 'off');
