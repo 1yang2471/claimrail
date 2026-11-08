@@ -45,6 +45,63 @@
       "verified": true
     },
     {
+      "fork": "沿用旧台账怎么判",
+      "options": [
+        "记为已知洞",
+        "target 覆盖就拦",
+        "内容指纹（hook 快照）"
+      ],
+      "picked": "内容指纹（hook 快照）",
+      "evidence": null,
+      "target": {
+        "file": "src/delivery.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": false
+    },
+    {
+      "fork": "违规记录放本地还是进 git",
+      "options": [
+        "本地不进 git",
+        "进 git 可 review",
+        "进 git 只记汇总"
+      ],
+      "picked": "本地不进 git",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/PRD.md:76",
+        "asserts": [
+          "默认不进 git"
+        ]
+      },
+      "target": {
+        "file": "src/delivery.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "未申报拦一次还是硬阻断",
+      "options": [
+        "只拦一次",
+        "硬阻断直到写",
+        "拦一次 + 落记录"
+      ],
+      "picked": "拦一次 + 落记录",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/PRD.md:55",
+        "asserts": [
+          "打断的次数有上限"
+        ]
+      },
+      "target": {
+        "file": "src/commands/hook.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
       "fork": "pilot 里 on 臂「没写台账」的运行怎么统计",
       "options": [
         "算作工具有效（on 臂零塌缩）",

@@ -16,7 +16,8 @@ import { web } from './commands/web.mjs';
 import { LEDGER_PATH, BASELINE_PATH, TEMPLATE_HASH_PATH } from './paths.mjs';
 import { TEMPLATE_TEXT, templateHash } from './template.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
-import { check, hook, readIncoming, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
+import { check, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
+import { hook, readIncoming } from './commands/hook.mjs';
 
 export { web, parse, help, unknownCmd, LEDGER_PATH, check, hook };
 export { readJson, writeBaseline, readBaseline } from './commands/check.mjs';
