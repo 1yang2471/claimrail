@@ -16,6 +16,7 @@ import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince,
 import { readLog } from '../store.mjs';
 import { surfaceFiles } from '../audit.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from '../paths.mjs';
+import { undeclaredBlock } from '../undeclared.mjs';
 import { overclaims, declaresUnverified, readDelivery } from '../overclaim.mjs';
 
 export { readJson, writeBaseline, readBaseline };  // check / hook 本身就是 export
@@ -39,7 +40,8 @@ async function readBaseline(cwd) {
 
 async function readJson(path) {
   try {
-    return { ok: true, value: JSON.parse(await readFile(path, 'utf8')) };
+    const text = await readFile(path, 'utf8');
+    return { ok: true, value: JSON.parse(text), text };
   } catch (err) {
     return { ok: false, error: err.message };
   }
@@ -125,6 +127,34 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     const touched = changedNow
       ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])]
       : [];
+
+    // 未申报：工作区真有改动，台账却还是 init 模板。这是 pilot 里 5/6 的形状——
+    // 门以前只校验"已申报"的东西，不写台账就静默放行（2026-11-08 第一性复核）。
+    const undeclared = await undeclaredBlock({ cwd, ledgerText: raw.text, ledger: raw.value, changed: touched });
+    if (undeclared) {
+      return {
+        code: 1,
+        undeclared,
+        data: {
+          schema: 1,
+          action: 'block',
+          task_class: raw.value.task_class,
+          total: 0,
+          metrics: { interrupts: 0, unverified: 0, violations: 0, rule4NotEnabled: 0 },
+          degraded: null,
+          no_fork_reason: raw.value.no_fork_reason ?? null,
+          emptyDeclaration: null,
+          undeclared,
+          overrides: [],
+          questions: [],
+          unverified: [],
+          violations: [],
+          notEnabled: [],
+        },
+        text: undeclared.text,
+      };
+    }
+
     const auditFiles = raw.value.forks.length === 0 ? surfaceFiles(raw.value.task_class, touched) : [];
     const emptyDeclaration = auditFiles.length
       ? {

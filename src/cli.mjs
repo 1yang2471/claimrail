@@ -5,7 +5,7 @@ import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { validateLedger, SCHEMA_VERSION } from './schema.mjs';
+import { validateLedger } from './schema.mjs';
 import { grade } from './cost.mjs';
 import { verifyAll } from './evidence.mjs';
 import { enrich, decide, render } from './gate.mjs';
@@ -13,7 +13,8 @@ import { observe, whyUnknown } from './observe/index.mjs';
 import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState } from './observe/git.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
 import { web } from './commands/web.mjs';
-import { LEDGER_PATH, BASELINE_PATH } from './paths.mjs';
+import { LEDGER_PATH, BASELINE_PATH, TEMPLATE_HASH_PATH } from './paths.mjs';
+import { TEMPLATE_TEXT, templateHash } from './template.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
 import { check, hook, readIncoming, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
 
@@ -25,14 +26,6 @@ const NOTICE = `数据去向：
   .claimrail/decisions.json  进 git（它是给你 review 的东西）
   memory/                    不进 git（个人偏好，只在你机器上）
   截图（.claimrail/shots/）      不进 git（真实产品画面）`;
-
-const TEMPLATE = {
-  schema: SCHEMA_VERSION,
-  task_class: 'ui-new',
-  forks: [],
-  no_fork_reason: '把本行改成"为什么这次没有分叉"，或者填 forks',
-};
-
 
 // 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
 // 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
@@ -64,13 +57,16 @@ export async function init({ cwd = process.cwd() } = {}) {
   await mkdir(join(cwd, '.claimrail'), { recursive: true });
   const file = join(cwd, LEDGER_PATH);
   const created = !existsSync(file);
-  if (created) await writeFile(file, `${JSON.stringify(TEMPLATE, null, 2)}\n`, 'utf8');
+  if (created) await writeFile(file, TEMPLATE_TEXT, 'utf8');
+  // 模板指纹：check 用它判"台账是不是一字未动"。存下来而不是每次现算，
+  // 是为了模板跨版本变化时，旧仓库仍按 init 当时的模板判。
+  await writeFile(join(cwd, TEMPLATE_HASH_PATH), `${templateHash()}\n`, 'utf8');
 
   const gi = join(cwd, '.gitignore');
   const lines = existsSync(gi) ? (await readFile(gi, 'utf8')).split('\n') : [];
   // 只写自己产物所在的目录。曾经还写过 '*.png'：那会把目标仓库里所有真实图片
   // 一起排除在提交之外（静默丢数据），而 init 的本意只是别让截图进库。
-  const add = ['memory/', '.claimrail/shots/'].filter((p) => !lines.includes(p));
+  const add = ['memory/', '.claimrail/shots/', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
   // baseline 只在没有的时候写：重复 init 不许把起点往前推，那等于把已提交的改动洗白

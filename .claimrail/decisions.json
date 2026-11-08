@@ -3,6 +3,48 @@
   "task_class": "docs-new",
   "forks": [
     {
+      "fork": "未申报的判定用哪把尺",
+      "options": [
+        "模板哈希",
+        "target 覆盖",
+        "每次台账必须变"
+      ],
+      "picked": "模板哈希",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/PRD.md:26",
+        "asserts": [
+          "没被申报的分叉"
+        ]
+      },
+      "target": {
+        "file": "src/undeclared.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "未申报规则住在 check 还是 hook",
+      "options": [
+        "check 统一拦",
+        "只在 hook 拦",
+        "警告 + hook 转阻断"
+      ],
+      "picked": "check 统一拦",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/PRD.md:74",
+        "asserts": [
+          "用退出码说话"
+        ]
+      },
+      "target": {
+        "file": "src/undeclared.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
       "fork": "pilot 里 on 臂「没写台账」的运行怎么统计",
       "options": [
         "算作工具有效（on 臂零塌缩）",
