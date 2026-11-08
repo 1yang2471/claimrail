@@ -60,7 +60,7 @@
       "verified": false
     },
     {
-      "fork": "违规记录放本地还是进 git",
+      "fork": "hook 的本地状态（快照 + 违规记录）放本地还是进 git",
       "options": [
         "本地不进 git",
         "进 git 可 review",
@@ -75,7 +75,7 @@
         ]
       },
       "target": {
-        "file": "src/delivery.mjs"
+        "file": ".gitignore"
       },
       "cost_if_wrong": "low",
       "verified": true

@@ -3,6 +3,9 @@ node_modules/
 memory/
 *.png
 .claimrail/shots/
+# Stop 钩子的本地状态：快照与违规记录不进 git（与截图同类）
+.claimrail/last-delivery.json
+.claimrail/violations.jsonl
 # bench 夹具里的截图是测试数据，不是真实产品画面：允许入库
 !bench/tasks/*/repo/.claimrail/
 !bench/tasks/*/repo/.claimrail/shots/
