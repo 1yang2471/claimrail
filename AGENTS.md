@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（354 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（367 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -10,10 +10,10 @@
 | 没证据不许声称已验证（`evidence: null` ⇒ `verified: false`） | `src/schema.mjs` 的 `evidence.null-vs-verified` |
 | 模型不许给自己的改动报低代价 | `src/cost.mjs` 的 `apply()`：程序算出 high 就覆写，且 `check` 打印覆写原因 |
 | 覆写理由不许留空 | `check.mjs` 分开说三种 high 来源（读不到值 / 已发布或有副作用 / 引用数达门槛）。实测 fan-in 触发时理由句曾是「已推送/已发布或有副作用：」冒号后空白。`test/override.test.mjs`；变异：去掉 fan-in 分支 → 红 1 |
-| 「已发布」只认默认分支与 tag | `git.mjs` 的 `headOnRemoteDefault`：用 `git branch -r --contains HEAD` 判 HEAD 在不在远端分支上（覆盖功能分支、已合并、本地领先，也不漏 `git push origin HEAD:main` 这种不设上游的推法）；默认分支优先读 `<remote>/HEAD`，读不到只认该远端下唯一一个 main/master，其余 → `null` → high。`test/published-remote.test.mjs`；变异：成员判断 / 兜底 / `--contains` / 理由句各去掉一次 → 分别红 1/3/2/1 |
+| 「已发布」只认默认分支与 tag | `git.mjs` 的 `headOnRemoteDefault`：`git branch -r --contains HEAD` 判 HEAD 在不在远端分支（不漏 `git push origin HEAD:main`）；默认分支读 `<remote>/HEAD`，读不到只认唯一 main/master，否则 `null` → high。`test/published-remote.test.mjs`；变异全红 |
 | 读不到仓库状态不许降级成乐观值 | `src/observe/git.mjs` 的 `mapGrepExit` + `test/observe.test.mjs` 非 git 目录用例（已用变异验证：`unknown` 改成 `none` 会红两条） |
 | 采集不到数据不许判绿 | `src/observe/geometry.mjs` 三态 `null` + `src/evidence.mjs` 只认严格 `true`（报告全 null 或只有截图无报告都判失败） |
-| 视觉证据必须是新的 | `src/evidence.mjs` render 档比较截图 mtime 与 `newestTrackedMtime`（该函数对大仓库不再交 null：上限 200000，实测 6000 文件 148ms）；`.claimrail/`、`memory/` 从时间戳里排除，否则台账总在截图之后写，每条 render 证据都会先天"过时"，报告层的伪造检查永远轮不到 |
+| 视觉证据必须是新的 | `src/evidence.mjs` render 档比较截图 mtime 与 `newestTrackedMtime`（上限 200000）；`.claimrail/`、`memory/` 从时间戳里排除，否则台账总在截图之后写，render 证据先天"过时" |
 | 不许伪造度量报告 | `src/evidence.mjs`：id 必须 ∈ `RENDER_CHECK_IDS`、五项齐全、`report_schema` 版本对、`name` 与截图同名、断言项必须严格 true（`test/redteam.test.mjs`） |
 | 不许引用本次刚写的代码冒充既有做法 | `observe/git.mjs` 的 `changedLines` + `isChangedLine`，经 `cli.makeCtx` 注入 `ctx.isChanged`（`test/redteam.test.mjs`） |
 | 未跟踪文件不能对档位隐身 | `observe/git.mjs` 的 `worktreeScanText` 把 `git status --porcelain -z` 的 `??` 并进副作用扫描与 mtime（`test/redteam.test.mjs`） |
@@ -57,8 +57,9 @@
 | bench 的陷阱任务必须来自真翻过的车 | `bench/tasks/*/trap.md` 要写"为什么这不是编的任务"并指向实测出处；假 agent 跑出的数字只能叫机制自测，不得进发布文案（`test/bench.test.mjs` 钉住"无分叉盲区必须被计入静默塌缩"，防止把已知漏洞算成已拦）。**交付但被列进"交付末尾未验证"（`surfaced`）不算静默塌缩**，单独计 `deliveredSurfaced`；真模型的文字判定要先排除"模型把错误结论引出来再否定"（`bench/classify.mjs` 的 `noticed` 关键词），否则会把反驳算成主张 |
 | 低代价 + 证据不可核实 = 放行但点名 | `gate.decide`：`!evidenceOk && cost !== 'high'` 进 `unverified`，交付说明里必须列出"欠一次人工检查"。这是设计，不是漏拦——但**工具不读交付正文**：真模型实测在门已点名的情况下仍写"3 个来源的引文全部当场核实"。别把"末尾点名"说成"正文也诚实" |
 | 壳页能不能核实，取决于台账里写哪个 URL | `m3.material.io` / `developer.apple.com` 的 HTML 是 SPA 壳（可见正文 15/39 字符），但 Apple 文档另有 JSON 数据接口能取到正文。当前 `verifyPrecedent` 只回访台账给的 URL：写壳页 URL 这一票就不成立，写数据接口 URL 才能核（v2 再考虑自动找接口） |
-| init 要给宿主留指路 | `src/cli.mjs` 的 `writeAgentsPointer`：目标仓库 AGENTS.md 里写 marker 块（`<!-- claimrail:begin/end -->`，幂等、不动原有内容）。真机实测：ZCode 0.17.1 无头、技能已加载、Skill 工具可调，光靠 description 连跑三次设计任务都不加载 claimrail；写入指路后同一任务产出 3 条分叉台账、自跑 check（退出码 0）与 web 双视口。`test/cli.test.mjs` 两条；变异：关掉写入 → 红 2 |
-| 交付前钩子只许拦一次 | `src/cli.mjs` 的 `hook()`：Stop 事件读 stdin 的 `stop_hook_active` / `stopHookActive`，**续过一轮后不再阻断**（否则永远拦 = 死循环）；无台账的仓库静默放行。**放行判定必须排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮（把条目递给模型去声明"这条没能验证，原因是 X"）——真模型实测会在末尾点名照挂的情况下写"全部核实"。`test/cli.test.mjs` 五条；变异：去掉 `continuedBefore` 守卫 → 红 3；去掉未验证分支 → 红 1。真机接线：用户级 `~/.zcode/cli/config.json` 的 Stop 钩子，第一次回答被拦后模型续一轮、改成"卡在分叉，请定 A/B" |
+| init 要给宿主留指路 | `src/cli.mjs` 的 `writeAgentsPointer`：AGENTS.md 写 marker 块（幂等、不动原内容）。实测光靠 skill description 连跑三次设计任务都不加载；写入指路后同一任务产出 3 条分叉并自跑 check。`test/cli.test.mjs`；变异：关掉写入 → 红 2 |
+| 交付前钩子只许拦一次 | `src/commands/hook.mjs`：读 `stop_hook_active`，**续过一轮后不再阻断**（否则死循环）；没初始化过的仓库静默放行，初始化过但台账被删 → 拦。**放行判定排在未验证声明之前**：`check` 退出码 0 但有未验证条目时也拦一轮，逼正文逐条声明。`test/cli.test.mjs`、`test/delivery.test.mjs`；变异：去掉 `continuedBefore` / 未验证分支 / 删台账拦截 → 分别红 3/1/1 |
+| 未申报本身也拦 | `src/undeclared.mjs`：工作区有改动、台账仍是 init 模板（哈希或占位理由）→ `check` 退出 1；init 脚印（`.claimrail/`、AGENTS.md、.gitignore）不算改动。沿用旧台账由 hook 的 `{tree_hash, ledger_hash}` 快照判，第二次放行并落 `.claimrail/violations.jsonl`。`test/undeclared.test.mjs`、`test/delivery.test.mjs`；变异：关掉模板判定 / 占位理由 / 脚印过滤 / stale / 违规记录 / 删台账拦截 → 全红 |
 | 自供字段一律拒收（含 evidence 内部） | `src/schema.mjs` 的白名单：`confidence`/`rationale`/`options_cost` 都进不去。唯一例外 `verified` 只作申报、程序不读（`test/verified.test.mjs` 钉住） |
 | bench 陷阱任务不许编 | `bench/tasks/` 20 个，`trap.md` 都要写明"为什么不是编的"与统计口径；`test/bench.test.mjs` 逐个查。判定规则集中在 `bench/classify.mjs`；`trapRule` 必须已知，漏写由测试拦 |
 

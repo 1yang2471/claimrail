@@ -19,7 +19,7 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 | "The screenshot proves it's fine" | Screenshot must be newer than the last code change; `null` (undecided) items in the report never count as passing |
 | "I followed the existing pattern" | Re-reads the cited `file:line`; lines added/modified in this session don't count as an existing pattern |
 | "I remember you rejected X" | `log#n` must exist and match; a misaligned line number is a hard error |
-| "There are no forks in this task" | Not blocked — this is the one known hole. The program records `no_fork_reason`; when `forks: []` and the diff touches files of that task class, `check` prints an audit item and `check --json` exposes `emptyDeclaration` (touched files and total). It cannot tell whether a fork existed — it only makes the escape countable |
+| "There are no forks in this task" | If the ledger is still the `init` template and the diff is non-empty, `check` exits 1: nothing ships until the agent writes a declaration. A written `forks: []` plus `no_fork_reason` counts as a declaration; when the diff touches files of that task class, `check` prints an audit item and `check --json` exposes `emptyDeclaration`. The program cannot tell whether a fork existed — it only makes the escape countable |
 
 ## Usage
 
@@ -34,7 +34,7 @@ Then use `claimrail`; from a repo checkout, `node src/cli.mjs` works the same:
 
 ```bash
 claimrail init              # ledger template + AGENTS.md pointer + baseline
-claimrail check             # pre-delivery check; exit code 0 lets it through
+claimrail check             # pre-delivery check; exit 0 lets it through; an untouched ledger template blocks
 claimrail web --url http://127.0.0.1:5173/   # two viewports, five geometry checks (needs playwright)
 claimrail record --key ui.spacing --what "no overlay scrollbars" --why "covers right-aligned bubbles"
 claimrail rules             # current rules + raw rejections + provenance
@@ -108,7 +108,7 @@ The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible 
 ## Development
 
 ```bash
-node --test    # 354 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 367 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

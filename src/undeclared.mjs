@@ -12,7 +12,7 @@ import { templateHash, isTemplateReason } from './template.mjs';
 // 这三类是 init 的脚印；真正的工作改动不会落在这里。
 export const isProtocolPath = (p) => p === 'AGENTS.md' || p === '.gitignore' || p.startsWith('.claimrail/');
 
-export async function readTemplateHash(cwd) {
+async function readTemplateHash(cwd) {
   try {
     const s = (await readFile(join(cwd, TEMPLATE_HASH_PATH), 'utf8')).trim();
     if (/^[0-9a-f]{64}$/.test(s)) return s;

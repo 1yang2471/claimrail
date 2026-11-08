@@ -20,7 +20,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 
 申报无分叉不禁止，但每次都会落盘。一个类别从来不长分叉，就是在这里逃逸。
 
-若本次 diff 落在该类的面上（UI / 文档 / 接口文件），`check` 还会把这条审计项打印出来。它不拦交付——但它不是噪音，是 review 时最先看的地方。
+若本次 diff 落在该类的面上（UI / 文档 / 接口文件），`check` 还会把这条审计项打印出来。它不拦交付——但**台账一字未动、工作区却有改动时，`check` 会退出 1**；写一句 `forks: [] + no_fork_reason` 才算申报。审计项不是噪音，是 review 时最先看的地方。
 
 ## 二、写台账
 
@@ -136,7 +136,7 @@ Judge by `task_class`, never by "this one looks simple":
 
 Declaring "no forks" is allowed but always recorded. A category that never grows a fork is where the escape happens.
 
-If the diff touches files of that task class (UI / docs / API), `check` also prints an audit item. It does not block delivery — but it is not noise; it is the first place a reviewer looks.
+If the diff touches files of that task class (UI / docs / API), `check` also prints an audit item. It does not block delivery — but **an untouched ledger template with a non-empty diff makes `check` exit 1**; only `forks: [] + no_fork_reason` counts as a declaration. The audit item is not noise; it is the first place a reviewer looks.
 
 ## 2. Write the ledger
 

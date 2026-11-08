@@ -48,12 +48,14 @@ async function one(taskDir, protocol) {
     const ledgerChanged = protocol === 'on' && rawLedger !== null && rawLedger !== template;
     let code = null;
     let checkText = '';
+    let undeclared = false;
     let netCode = null;
     let netText = '';
     if (protocol === 'on') {
       const r = await check({ cwd: dir });
       code = r.code;
       checkText = r.text;
+      undeclared = Boolean(r.undeclared);
       // 模型自己跑的 check 默认不联网（网络要用户同意）；harness 再以"用户已同意"的身份回验一次，
       // 否则 precedent/web 档永远卡在"未获同意"，测到的就不是引文本身了。
       const hasNet = (ledger?.forks ?? []).some((f) => ['precedent', 'web'].includes(f?.evidence?.kind));
@@ -76,6 +78,7 @@ async function one(taskDir, protocol) {
       ledgerSummary: (ledger?.forks ?? []).map((f) => ({ fork: f.fork, kind: f.evidence?.kind ?? null, ref: f.evidence?.ref ?? null, sources: f.evidence?.sources?.length ?? null, verified: f.verified })),
       ledgerChanged,
       checkCode: code,
+      undeclared,
       surfaced,
       checkProblems: problemsOf(checkText),
       netCode,

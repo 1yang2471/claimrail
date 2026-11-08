@@ -1,8 +1,7 @@
 // 交付前的门：check（校验台账）。hook（宿主接线）已拆到 ./hook.mjs——
 // 两者是两个关注点，而且放在一起会把本文件推过提交钩子的 20KB 上限。
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { validateLedger } from '../schema.mjs';

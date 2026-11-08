@@ -19,7 +19,7 @@ claimrail 在交付前把门关上：AI 必须先写一份决策台账（哪些�
 | "截图证明没问题" | 截图必须晚于最后一次代码改动；报告里的未判项（`null`）不作数 |
 | "参考了仓库里的做法" | 重读 `file:line`；本次新增/修改的行不算既有做法 |
 | "我记得你否决过 X" | `log#n` 必须存在且内容对得上；行号错位直接报错 |
-| "本任务没有分叉" | 门不拦——这是唯一已知的洞。程序会记下 `no_fork_reason`；当 `forks: []` 而本次 diff 落在该类文件面上时，`check` 打印审计项、`check --json` 给出 `emptyDeclaration`（改动文件与总数）。它判不了"有没有分叉"，只让逃逸可统计 |
+| "本任务没有分叉" | 台账仍是 `init` 模板而本次 diff 非空时，`check` 退出 1：不写申报就交付不出去。写了 `forks: []` + `no_fork_reason` 算已申报；若本次 diff 落在该类文件面上，`check` 打印审计项、`--json` 给 `emptyDeclaration`。程序判不了"有没有分叉"，只让逃逸可统计 |
 
 ## 用法
 
@@ -34,7 +34,7 @@ cd claimrail && npm install && npm link   # npm link 让 claimrail 命令进 PAT
 
 ```bash
 claimrail init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
-claimrail check             # 交付前校验；退出码 0 才放行（CI / npx 同理）
+claimrail check             # 交付前校验；退出码 0 才放行；台账仍是模板会拦（CI / npx 同理）
 claimrail web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
 claimrail record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
 claimrail rules             # 现行规则 + 原始否决 + 来源
@@ -107,7 +107,7 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。`benc
 ## 开发
 
 ```bash
-node --test    # 354 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 367 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

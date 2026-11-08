@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 
 import { SCHEMA_VERSION } from './schema.mjs';
 
-export const TEMPLATE = {
+const TEMPLATE = {
   schema: SCHEMA_VERSION,
   task_class: 'ui-new',
   forks: [],
