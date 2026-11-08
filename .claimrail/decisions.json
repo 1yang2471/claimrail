@@ -10,12 +10,19 @@
         "修 + 补测试"
       ],
       "picked": "修 + 补测试",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/delivery.test.mjs:154-177",
+        "asserts": [
+          "快照写不进去",
+          "违规记录写不进去"
+        ]
+      },
       "target": {
         "file": "src/commands/hook.mjs"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     },
     {
       "fork": "未申报的判定用哪把尺",
@@ -67,12 +74,19 @@
         "内容指纹（hook 快照）"
       ],
       "picked": "内容指纹（hook 快照）",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/delivery.test.mjs:58-93",
+        "asserts": [
+          "台账自上次放行后未变",
+          "reason, 'stale'"
+        ]
+      },
       "target": {
         "file": "src/delivery.mjs"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     },
     {
       "fork": "hook 的本地状态（快照 + 违规记录）放本地还是进 git",
@@ -123,12 +137,19 @@
         "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效"
       ],
       "picked": "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/bench.test.mjs:176-198",
+        "asserts": [
+          "三分类",
+          "没写台账"
+        ]
+      },
       "target": {
         "file": "docs/AUDIT-2026-11-08.md"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     },
     {
       "fork": "发布文案里的对比数字这一轮是否更新",
@@ -222,12 +243,19 @@
         "要求模型用 npx"
       ],
       "picked": "从 bench 模块位置推导",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/bench.test.mjs:114-122",
+        "asserts": [
+          "从模块位置推导",
+          "existsSync"
+        ]
+      },
       "target": {
         "file": "bench/agent.mjs"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     },
     {
       "fork": "陷阱判定规则要不要为每个新任务新增",
@@ -279,12 +307,19 @@
         "换模型"
       ],
       "picked": "重试 + 指数退避",
-      "evidence": null,
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/bench.test.mjs:148-174",
+        "asserts": [
+          "指数退避",
+          "退避间隔必须翻倍"
+        ]
+      },
       "target": {
         "file": "bench/agent.mjs"
       },
       "cost_if_wrong": "low",
-      "verified": false
+      "verified": true
     }
   ]
 }
