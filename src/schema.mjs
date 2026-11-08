@@ -128,6 +128,9 @@ function checkFork(fork, i, taskClass) {
     at('cost.two-grade', 'cost_if_wrong 只能 low 或 high');
   }
 
+  // verified 是唯一被接受的自供字段，但它只是申报：程序不读它，判定只看 evidence
+  // 的回验结果（test/verified.test.mjs 钉住这条不变量）。这里唯一的约束是
+  // "无证据不得声称已验证"——拦的是自相矛盾的台账，不是采信 self-report。
   if (typeof fork.verified !== 'boolean') at('verified.bool', 'verified 必须是布尔');
 
   const { evidence } = fork;

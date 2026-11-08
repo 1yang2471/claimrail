@@ -50,6 +50,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 - 每个字段一行，不许内联代码。台账要进 git 给人 review。
 - `cost_if_wrong` 你只能往高报。程序会算，你报低了会被覆写并打印出来——那次覆写就是你要重新想一遍的地方。
 - `evidence: null` 时 `verified` 必须是 `false`。"我还没来得及查"是合法状态，"我没查但我说查了"不是。
+- `verified` 只是写给人和 reviewer 看的申报，`check` 不采信它——证据照样逐条回验。别把它当免检开关。
 - 不确定的分叉要写出来，哪怕你打算照默认做。**没申报的分叉是这套机制唯一抓不到的东西。**
 
 ## 三、证据分五档
@@ -165,6 +166,7 @@ Rules, not suggestions:
 - One field per line, no inline code. The ledger goes into git for humans to review.
 - `cost_if_wrong` can only be raised by you. The program computes its own grade; if yours is lower it gets overwritten and printed — that overwrite is the place to think again.
 - When `evidence` is `null`, `verified` must be `false`. "I haven't checked yet" is a legal state; "I didn't check but said I did" is not.
+- `verified` is a declaration for humans and reviewers only; `check` does not trust it — evidence is still re-verified item by item. Do not treat it as a bypass.
 - Write down the forks you're unsure about, even if you plan to take the default. **An undeclared fork is the only thing this mechanism cannot catch.**
 
 ## 3. Five evidence tiers
