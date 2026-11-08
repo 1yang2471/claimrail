@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "task_class": "refactor",
+  "forks": [],
+  "no_fork_reason": "接入协议本身：只加台账、baseline 与 AGENTS 指路段，没有实现分叉；从下一次改动起按协议申报"
+}

@@ -80,3 +80,8 @@
 约束力必须挂在外部可计算的量上，不能挂在模型的自我评价上：每一行都是"改坏了会有东西报错"。
 加检查时沿用同一标准——**把错放回去，检查必须变红**。三处踩过的滚动条事实见
 [`docs/HANDOFF.md`](docs/HANDOFF.md) 的「别退回去的实测事实」，别在 AGENTS 里再抄一份。
+
+<!-- claimrail:begin -->
+## claimrail
+动界面/文档/接口前读 `skill/SKILL.md`，写 `.claimrail/decisions.json`；交付前跑 `node src/cli.mjs check`。
+<!-- claimrail:end -->
