@@ -43,7 +43,16 @@ export const retryable = (status) => status === 429 || (status >= 500 && status 
 export async function callModel(
   messages,
   system,
-  { fetchImpl = globalThis.fetch, api = API, key = KEY, model = MODEL, retries = RETRIES, retryMs = RETRY_MS } = {},
+  {
+    fetchImpl = globalThis.fetch,
+    api = API,
+    key = KEY,
+    model = MODEL,
+    retries = RETRIES,
+    retryMs = RETRY_MS,
+    // 注入 sleep：退避间隔必须可断言，又不靠测量墙钟（CI 负载会让计时断言飘）。
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  } = {},
 ) {
   for (let attempt = 0; ; attempt += 1) {
     const res = await fetchImpl(`${api}/v1/messages`, {
@@ -59,7 +68,7 @@ export async function callModel(
     }
     const wait = retryMs * 2 ** attempt;
     process.stderr.write(`  ${res.status} 限流，${Math.round(wait / 1000)}s 后重试（${attempt + 1}/${retries}）\n`);
-    await new Promise((resolve) => setTimeout(resolve, wait));
+    await sleep(wait);
   }
 }
 
