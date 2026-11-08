@@ -23,7 +23,14 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 
 ## Usage
 
-Once installed, use the `claimrail` command (from a repo checkout, `node src/cli.mjs` works the same):
+Not on npm yet (`npm view claimrail` returns 404). Install from source:
+
+```bash
+git clone https://github.com/1yang2471/claimrail.git
+cd claimrail && npm install && npm link   # npm link puts the claimrail command on PATH
+```
+
+Then use `claimrail`; from a repo checkout, `node src/cli.mjs` works the same:
 
 ```bash
 claimrail init              # ledger template + AGENTS.md pointer + baseline

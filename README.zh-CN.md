@@ -23,7 +23,14 @@ claimrail 在交付前把门关上：AI 必须先写一份决策台账（哪些�
 
 ## 用法
 
-安装后用 `claimrail` 命令；仓库内开发用 `node src/cli.mjs`：
+当前未发布到 npm（`npm view claimrail` 返回 404）。从源码安装：
+
+```bash
+git clone https://github.com/1yang2471/claimrail.git
+cd claimrail && npm install && npm link   # npm link 让 claimrail 命令进 PATH
+```
+
+装好后用 `claimrail`；在仓库内开发直接用 `node src/cli.mjs`：
 
 ```bash
 claimrail init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
