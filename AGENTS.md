@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（318 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（325 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -40,7 +40,8 @@
 | 退出码不许说谎 | `src/commands/web.mjs`：五项全未判时退出码是 1（这份报告本来就不能当证据），不是 0；`claimrail check` 退出码 0 只在"确实有绿项"时成立。`test/web.test.mjs` |
 | 报告必须绑住它测的那张图 | `src/observe/web.mjs` 写 `shot_sha256`；`src/evidence.mjs` 回验时重算截图哈希（`ctx.shotHash`）比对。只靠文件名 + mtime 不够：换一张图或换一份同名报告都能混过去。缺 `shot_sha256` 一律失败（手写报告不能靠"不写"绕开）。`test/evidence.test.mjs`、`test/web.test.mjs`；变异：去掉缺字段守卫 / 去掉哈希比对 / 报告不写哈希 → 各红一次 |
 | 报告要说清"没覆盖到哪里" | `src/observe/web.mjs` 的 `limitations`：四类采集截断、未判底色、采样疑似压字、像素采样关闭/失败、焦点没探或只探了一部分。`web` 命令把它打到屏幕上——只写进 report.json 等于没写。`test/web.test.mjs`；变异：去掉一条 → 红 |
-| 判定要能结构化交出去 | `src/commands/check.mjs` 返回 `data`（schema=1：action / metrics / degraded / overrides / questions / unverified / violations / notEnabled）；`--json` 在入口打印它，文本是同一份决策的视图。`test/args.test.mjs`、`test/hook.test.mjs`；变异：删解析 / 删 data / 删入口分支 → 各红 |
+| 判定要能结构化交出去 | `src/commands/check.mjs` 返回 `data`（schema=1：action / metrics / degraded / overrides / questions / unverified / violations / notEnabled / no_fork_reason / emptyDeclaration）；`--json` 在入口打印它，文本是同一份决策的视图。`test/args.test.mjs`、`test/hook.test.mjs`；变异：删解析 / 删 data / 删入口分支 → 各红 |
+| 申报无分叉要留审计线索 | `src/audit.mjs` + `src/commands/check.mjs`：`forks: []` 且本次 diff 落在该类文件面上时，`check` 打印审计项、`--json` 给出 `emptyDeclaration`（touched / touchedTotal / reason）；不参与 action 与退出码。refactor 故意没有面——它的面是任意代码，命中等于没区分度。`test/audit.test.mjs`；变异：关掉计算 → 红 4、去掉面过滤 → 红 6、去掉上屏 → 红 4、去掉 `no_fork_reason` → 红 1 |
 | 报告必须带 name | `src/evidence.mjs` 的 render 档：报告不带 `name` 就当"不是同一次采集"——工具自己的产物永远带 name，"没写"只可能是手写报告在绕开这道检查。`test/evidence.test.mjs`；变异：name 变回可选 → 红 |
 | init 不许替目标仓库决定忽略什么 | `src/cli.mjs` 的 `init`：只写 `memory/` 与 `.claimrail/shots/`，不再写 `*.png` 通配——那会把用户仓库里所有真实图片一起静默排除在提交之外。`test/cli.test.mjs`；变异：写回 *.png → 红 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |

@@ -14,6 +14,7 @@ import { enrich, decide, render } from '../gate.mjs';
 import { observe, whyUnknown } from '../observe/index.mjs';
 import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState } from '../observe/git.mjs';
 import { readLog } from '../store.mjs';
+import { surfaceFiles } from '../audit.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from '../paths.mjs';
 import { overclaims, declaresUnverified, readDelivery } from '../overclaim.mjs';
 
@@ -118,6 +119,20 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     ctx.lastChangeMs = (await newestTrackedMtime(cwd)) ?? undefined;
     const diff = diffText ?? (await diffSince(cwd, base));
     const overrides = [];
+
+    // 申报无分叉时的审计线索：台账说没有分叉，而改动落在该类的面上。
+    // 只进输出与 --json，不参与 action/退出码——见 src/audit.mjs 顶部的说明。
+    const touched = changedNow
+      ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])]
+      : [];
+    const auditFiles = raw.value.forks.length === 0 ? surfaceFiles(raw.value.task_class, touched) : [];
+    const emptyDeclaration = auditFiles.length
+      ? {
+          reason: raw.value.no_fork_reason ?? null,
+          touched: auditFiles.slice(0, 5),
+          touchedTotal: auditFiles.length,
+        }
+      : null;
     // 非 git 目录：三个代价输入一个都取不到 → 每条分叉都判 high。必须一次说清，
     // 否则"降级默认"在报告里跟"实测出的高代价"长得一模一样。
     // 也别把"半瞎"说成"全瞎"：repo 档在 git 之外仍读得了文件与行号，真正丢掉的是
@@ -198,6 +213,9 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       total: d.total,
       metrics: d.metrics,
       degraded: git === 'repo' ? null : git === 'none' ? 'no-git' : 'git-unknown',
+      // 审计面要能用脚本消费："为什么申报无分叉"以前只在文本视图里
+      no_fork_reason: raw.value.no_fork_reason ?? null,
+      emptyDeclaration,
       overrides,
       questions: d.questions.map(item),
       unverified: d.unverified.map(item),
@@ -214,6 +232,17 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
         `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
         ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),
         render(d),
+        ...(emptyDeclaration
+          ? [
+              `【申报无分叉的审计项 · 本次改动落在 ${raw.value.task_class} 的面上】`,
+              `  改动文件 ${emptyDeclaration.touchedTotal} 个：${emptyDeclaration.touched.join('、')}${
+                emptyDeclaration.touchedTotal > emptyDeclaration.touched.length
+                  ? `（另有 ${emptyDeclaration.touchedTotal - emptyDeclaration.touched.length} 个）`
+                  : ''
+              }`,
+              '  不拦交付：程序判不了"有没有分叉"，只把"申报无分叉却动了这类文件"记下来供抽查',
+            ]
+          : []),
         d.action === 'proceed' ? '✓ 可以交付' : `✗ 交付被拦住（${d.action}）`,
       ].join('\n'),
     };

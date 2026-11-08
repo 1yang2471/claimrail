@@ -19,7 +19,7 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 | "The screenshot proves it's fine" | Screenshot must be newer than the last code change; `null` (undecided) items in the report never count as passing |
 | "I followed the existing pattern" | Re-reads the cited `file:line`; lines added/modified in this session don't count as an existing pattern |
 | "I remember you rejected X" | `log#n` must exist and match; a misaligned line number is a hard error |
-| "There are no forks in this task" | Invisible to the gate. This is the one known hole — auditable via `no_fork_reason`, not pretended to be caught |
+| "There are no forks in this task" | Not blocked — this is the one known hole. The program records `no_fork_reason`; when `forks: []` and the diff touches files of that task class, `check` prints an audit item and `check --json` exposes `emptyDeclaration` (touched files and total). It cannot tell whether a fork existed — it only makes the escape countable |
 
 ## Usage
 
@@ -101,7 +101,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 318 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 325 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).
