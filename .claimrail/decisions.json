@@ -3,6 +3,21 @@
   "task_class": "docs-new",
   "forks": [
     {
+      "fork": "代码审查的两处问题怎么处理",
+      "options": [
+        "只记录",
+        "直接修",
+        "修 + 补测试"
+      ],
+      "picked": "修 + 补测试",
+      "evidence": null,
+      "target": {
+        "file": "src/commands/hook.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": false
+    },
+    {
       "fork": "未申报的判定用哪把尺",
       "options": [
         "模板哈希",

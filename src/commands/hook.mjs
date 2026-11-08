@@ -40,13 +40,25 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const continuedBefore = p?.stop_hook_active === true || p?.stopHookActive === true;
   const at = new Date().toISOString();
+  // 本地状态写不进去（只读仓库、路径被占）不许把交付打成宿主故障：
+  // 快照/违规记录是尽力而为的审计线索，不是交付的前置条件。
+  const saveSnapshot = async (entry) => {
+    try {
+      await writeSnapshot(dir, entry);
+    } catch {}
+  };
+  const logViolation = async (entry) => {
+    try {
+      await recordViolation(dir, entry);
+    } catch {}
+  };
 
   // 台账被删：初始化过（有 baseline 或模板指纹）就不是"不在协议里"，而是绕开。
   if (!existsSync(join(dir, ledger))) {
     const initialized = existsSync(join(dir, BASELINE_PATH)) || existsSync(join(dir, TEMPLATE_HASH_PATH));
     if (!initialized) return { code: 0, text: '' };
     if (continuedBefore) {
-      await recordViolation(dir, { at, reason: 'ledger-deleted' });
+      await logViolation({ at, reason: 'ledger-deleted' });
       return { code: 0, text: '台账被删了；本轮已续过一次，不再重复阻断。' };
     }
     return { code: 2, text: '台账被删了：恢复 .claimrail/decisions.json，或重新跑 claimrail init。' };
@@ -58,7 +70,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   if (r.code !== 0) {
     if (continuedBefore) {
       if (r.undeclared) {
-        await recordViolation(dir, {
+        await logViolation({
           at,
           reason: 'undeclared',
           task_class: r.data?.task_class ?? null,
@@ -85,8 +97,8 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const snap = await readSnapshot(dir);
   if (snap && tHash !== snap.treeHash && lHash === snap.ledgerHash) {
     if (continuedBefore) {
-      await recordViolation(dir, { at, reason: 'stale', changed: touched.slice(0, 5), changedTotal: touched.length });
-      await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+      await logViolation({ at, reason: 'stale', changed: touched.slice(0, 5), changedTotal: touched.length });
+      await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
       return { code: 0, text: '工作区有改动，但台账自上次放行后未变；本轮已续过一次，不再重复阻断。' };
     }
     return {
@@ -104,7 +116,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
 
   // 3. 只拦一次：续过一轮就放行，但把仍未通过的检查原因留在输出里。
   if (continuedBefore) {
-    await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+    await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
     return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
   }
 
@@ -116,7 +128,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
     if (!delivery) {
       // 宿主没给正文：判不了"有没有逐条声明"。拦下去会在不提供正文的宿主上打成死循环
       // （stop_hook_active 也未必给）。按"未判"处理：未验证条目仍留在 check 输出里。
-      await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+      await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
       return { code: 0, text: `${r.text}\n（宿主没给交付正文，跳过"正文逐条声明"检查；未验证条目见上）` };
     }
     const claims = overclaims(delivery);
@@ -133,7 +145,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
       };
     }
     if (declared) {
-      await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+      await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
       return { code: 0, text: '' };
     }
     return {
@@ -147,6 +159,6 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
     };
   }
 
-  await writeSnapshot(dir, { at, treeHash: tHash, ledgerHash: lHash });
+  await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
   return { code: 0, text: '' };
 }

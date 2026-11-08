@@ -110,7 +110,7 @@ A second 6-task pilot ran with that gate (`docs/bench-pilot-2026-11-09.json`, 12
 ## Development
 
 ```bash
-node --test    # 367 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 370 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

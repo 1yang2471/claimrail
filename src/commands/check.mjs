@@ -126,7 +126,13 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
 
     // 未申报：工作区真有改动，台账却还是 init 模板。这是 pilot 里 5/6 的形状——
     // 门以前只校验"已申报"的东西，不写台账就静默放行（2026-11-08 第一性复核）。
-    const undeclared = await undeclaredBlock({ cwd, ledgerText: raw.text, ledger: raw.value, changed: touched });
+    const undeclared = await undeclaredBlock({
+      cwd,
+      ledgerText: raw.text,
+      ledger: raw.value,
+      changed: touched,
+      ledgerPath: ledger,
+    });
     if (undeclared) {
       return {
         code: 1,

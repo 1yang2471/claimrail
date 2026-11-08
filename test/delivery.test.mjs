@@ -3,7 +3,7 @@
 // 只拦一次：第二次仍没申报就放行，但落一条 violations 记录，让"放行"也可统计。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -146,6 +146,31 @@ test('台账仍是模板：hook 复用 check 的未申报拦截', async () => {
     const blocked = await hook({ cwd: dir });
     assert.equal(blocked.code, 2, blocked.text);
     assert.match(blocked.text, /未申报 · 台账仍是 init 模板/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 本地状态是审计线索，不是交付的前置条件：写不进去也不许把交付打成宿主故障。
+test('快照写不进去（路径被占）：放行，不抛错', async () => {
+  const dir = await repoWithLedger();
+  try {
+    await mkdir(join(dir, '.claimrail', 'last-delivery.json'));
+    const r = await hook({ cwd: dir });
+    assert.equal(r.code, 0, r.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('违规记录写不进去：仍然放行', async () => {
+  const dir = await repoWithLedger();
+  try {
+    assert.equal((await hook({ cwd: dir })).code, 0);
+    await writeFile(join(dir, 'src-two.ts'), 'export const b = 2;\n', 'utf8');
+    await mkdir(join(dir, '.claimrail', 'violations.jsonl'));
+    const r = await hook({ cwd: dir, payload: { stop_hook_active: true } });
+    assert.equal(r.code, 0, r.text);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

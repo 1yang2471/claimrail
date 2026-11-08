@@ -22,7 +22,7 @@ async function readTemplateHash(cwd) {
   return templateHash();
 }
 
-export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [] }) {
+export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [], ledgerPath = '.claimrail/decisions.json' }) {
   const workTouched = changed.filter((f) => !isProtocolPath(f));
   if (!workTouched.length) return null;
 
@@ -40,7 +40,7 @@ export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [] })
       `工作区有改动（${workTouched.length} 个文件）：${shown.join('、')}${
         workTouched.length > shown.length ? `（另有 ${workTouched.length - shown.length} 个）` : ''
       }`,
-      '写 .claimrail/decisions.json：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。',
+      `写 ${ledgerPath}：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。`,
       '不要求你想清楚每个分叉，只要求把"这次有没有分叉"写下来。',
     ].join('\n'),
   };

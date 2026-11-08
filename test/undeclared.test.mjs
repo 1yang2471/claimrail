@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { check, init } from '../src/cli.mjs';
+import { TEMPLATE_TEXT } from '../src/template.mjs';
 
 const g = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 
@@ -106,6 +107,20 @@ test('只改 AGENTS.md / .gitignore 这类 init 脚印：不拦', async () => {
     await writeFile(join(dir, 'AGENTS.md'), `${await readFile(join(dir, 'AGENTS.md'), 'utf8')}\n补充一行。\n`, 'utf8');
     const r = await check({ cwd: dir });
     assert.equal(r.code, 0, r.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('自定义台账路径：提示里写实际路径，不写死默认路径', async () => {
+  const dir = await repoWithTemplate();
+  try {
+    await writeFile(join(dir, 'custom-ledger.json'), TEMPLATE_TEXT, 'utf8');
+    await writeFile(join(dir, 'src-note.ts'), 'export const a = 1;\n', 'utf8');
+    const r = await check({ cwd: dir, ledger: 'custom-ledger.json' });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /custom-ledger\.json/);
+    assert.doesNotMatch(r.text, /\.claimrail\/decisions\.json/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
