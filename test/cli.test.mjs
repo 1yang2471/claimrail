@@ -329,6 +329,26 @@ test('非 git 目录：报告要标明这是降级模式，并逐条说清"不�
 // 一个本来就是仓库的目录。实测两条 stderr 是可分辨的：
 //   非仓库   → fatal: not a git repository (or any of the parent directories): .git
 //   坏 GIT_DIR → fatal: not a git repository: '<路径>'
+test('gitState 的三态辨认：none 的消息、unknown 的消息、正常仓库', async () => {
+  const { gitState } = await import('../src/observe/git.mjs');
+  const dir = await mkdtemp(join(tmpdir(), 'fk-gitmissing-'));
+  try {
+    // 真目录：确实不是仓库
+    assert.equal(await gitState(dir), 'none');
+
+    // unknown 的两条实测消息（坏 GIT_DIR 与 safe.directory）都长这样：
+    //   fatal: not a git repository: '<路径>'   ← 没有括号那句
+    // 归类逻辑靠这个分辨，钉死它不许退化成"全叫 none"。
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    assert.equal(await gitState(dir), 'repo');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('git 用不了 ≠ 不在仓库里：两种降级要说不同的话', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'fk-gitbad-'));
   const env = process.env.GIT_DIR;
@@ -355,5 +375,51 @@ test('git 用不了 ≠ 不在仓库里：两种降级要说不同的话', async
     if (env === undefined) delete process.env.GIT_DIR;
     else process.env.GIT_DIR = env;
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 通用性（实测 2026-11-08）：仓库路径含中文与空格（Windows 上极常见）。
+// git 的 core.quotepath=false 已在 gitRaw 里统一关掉；这条钉住全流程真的能跑。
+test('中文 + 空格路径的仓库：init 与 check 全流程可用', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'fk-cn-'));
+  const dir = join(base, '我的 项目');
+  try {
+    await mkdir(dir, { recursive: true });
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    await mkdir(join(dir, '源代码'), { recursive: true });
+    await writeFile(join(dir, '源代码', 'ui.ts'), 'export const 按钮样式常量 = 1;', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'init']);
+
+    const initOut = execFileSync('node', [join(repo, 'src', 'cli.mjs'), 'init'], { cwd: dir, encoding: 'utf8' });
+    assert.match(initOut, /已建/, initOut);
+
+    await writeFile(
+      join(dir, '.claimrail', 'decisions.json'),
+      JSON.stringify({
+        schema: 1,
+        task_class: 'ui-new',
+        forks: [
+          {
+            fork: '按钮样式',
+            options: ['描边', '填充'],
+            picked: '描边',
+            target: { file: '源代码/ui.ts', symbol: '按钮样式常量' },
+            evidence: { kind: 'repo', ref: '源代码/ui.ts:1', asserts: ['按钮样式常量'] },
+            cost_if_wrong: 'low',
+            verified: true,
+          },
+        ],
+      }),
+      'utf8',
+    );
+    const out = execFileSync('node', [join(repo, 'src', 'cli.mjs'), 'check'], { cwd: dir, encoding: 'utf8' });
+    assert.match(out, /可以交付/, out);
+    assert.match(out, /均有可回验证据/, out);
+  } finally {
+    await rm(base, { recursive: true, force: true });
   }
 });
