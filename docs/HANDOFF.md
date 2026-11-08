@@ -8,7 +8,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 
 ## 现状
 
-- 16 个模块 / 2260+ 行 src / `node --test` 279 项（278 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
+- 21 个模块 / 2650+ 行 src / `node --test` 282 项（281 通过 + 1 skip，真网络烟测默认关）/ 6 条对外命令：`init check web record rules invalidate`（另有宿主接线用的 `hook`）
 - 提交基线 `de2cb59`；之后本轮三条：precedent 实测修正 / 口味类补测降级 / 真 SPA + `--state` 实测（`git log --oneline -4` 可查）。已装 Playwright + Chromium（optional peerDependency，本机 devDependency）
 - 测试分四层：纯逻辑（gate/cost/evidence/geometry/focus/memory/schema）、真 git 仓库端到端（redteam）、真 Chromium（browser）、CLI 闭环（cli/store）
 
@@ -48,6 +48,7 @@ claimrail 不让 AI 变有品味，它让 AI 在没依据的时候**不再伪装
 ## 已知未修
 
 - ~~对比度在磨砂+渐变设计上覆盖率极低（真站 7/111），要判得靠截图像素采样~~ —— **v2 已做（2026-11-08）**：`src/observe/png.mjs`（零依赖 PNG 解码，只支持 8 位非隔行）+ `src/observe/pixel.mjs`（文字矩形内、字形之外的留白多点采样，一致才认）。真浏览器实测：渐变页浅灰字 CSS 判不了 → 像素判出 1.62:1 红；`pixel: false` 时退回未判。**磨砂卡片 + 渐变页的覆盖率实测（2026-11-08）**：10 处文本，关像素只判 2 处（另 8 处"采不到实色背景未判"，报告是绿的），开像素判满 10 处并抓出 2 处真实缺陷（最低 2.41:1）。这条已固化成 `test/browser.test.mjs` 的覆盖率用例；变异：拆掉补背景 → 红 2。仍判不了的：采样点跨渐变、整块图片背景。
+- ~~现代色值写法整类漏判~~ —— **已修（2026-11-08）**。基线（改前）：`iana.org/help/example-domains` 一页 49 处文本，报告是「已核 9 处，另有 40 处**采不到实色背景**未判」。逐条摊开看：那 40 处文字色写的是 `oklch()`，`parseRgba` 不认识 → 整处不判，而报告把它归因成背景问题——照着这句话去查背景的人永远查不到。改法：`driver.mjs` 的 `window.__fk.rgbaOf`，老语法（`rgb()`/`rgba()`/`transparent`）精确解析，其余在 canvas 上画一个像素读回来；`web.mjs` 的文字色改走同一条路。**为什么像素是唯一权威**（三次探针实测）：`ctx.fillStyle = 'oklch(…)'; ctx.fillStyle` 原样回显，注册成 `@property` 语法 `<color>` 的自定义属性也原样回显，只有 `getImageData` 拿得到 sRGB。**为什么老语法不走像素**：8 位回读把半透明量化到 1/255，实测同一处对比度能漂 0.047（`rgba(10,20,30,.5)`：3.483 → 3.529）。改后复验同一 URL：**判满 49/49**（像素补背景 0 处，CSS 已够）、抓出 **31 处真实缺陷**、最低 **2.45:1**（改前被"未判"盖住的最坏一处；截图人眼复核：页脚导航的浅灰链接压在浅灰底上，确实够浅）。同页另有两处 `#2e7dca` on 白 = 4.28，属于擦线真缺陷。测试：`test/color.test.mjs` 三条（判得上、认不出要整处不判、换算契约）；变异：去掉像素回退 → 红 2，`if (!c)` 改成 `if (c === undefined)` → 红 1，去掉 `CSS.supports` 守卫 → 红 1（无效值会被报成 `rgb(0,0,0)`）。
 - 非 git 目录三个输入全 null → 一切判 high，工具近乎失明；要么发布时写明边界，要么设计显式非 git 降级模式（新需求，需用户拍板）。
 - ~~`newestTrackedMtime` 有 5000 文件上限，超限返回 null~~ —— **已修（2026-11-08）**：实测 6000 个文件全量 stat 只要 148ms，5000 的门槛保护的是不存在的性能问题，代价是任何正常 monorepo 的 render 证据全失效。上限抬到 200000（只挡"误把整个 home 当仓库"这类异常）。5200 文件仓库端到端验证：render 证据正常成立、check 退出 0。测试：`test/observe.test.mjs` 超大仓库用例；变异：上限改回 5000 → 红 1。
 - ~~`storageState` 已在真 Chromium + 本地 HTTP 页验证 cookie/localStorage 注入；真实需要登录的产品页尚未跑~~ —— **登录闭环已跑（2026-11-08）**：本地起了一个真的需要登录的站（未登录访问 `/dashboard` 302 到 `/login`，`/login` 永远可达）。无登录态：被踢到 `/login`，看不到受保护内容；带 `--state`：落到 `/dashboard`，采集到 3 处文本 / 1 个控件。已固化成 `test/browser.test.mjs` 用例；变异：`newContext` 去掉 `storageState` → 红 2。仍**未跑**的是第三方真实产品（需要你的凭据）。

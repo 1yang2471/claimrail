@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（279 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
+新 agent 进来先跑 `node --test`（282 个，约 30 秒），再读 `docs/PRD.md`。PRD 是需求源头，十四轮盘问的结论都在里面；它没写的范围，v1 不做。
 
 ## 规则表
 
@@ -30,6 +30,8 @@
 | 像素补的背景也要能退回未判 | `src/observe/pixel.mjs` 的 `applyPixelBackgrounds`：采样点颜色不一致（跨渐变）、或读到的"底色"与字色比值 <1.05（说明采到的是字形本身）一律不填，留 `null`。变异：去掉 1.05 守卫 → `test/pixel.test.mjs` 红；拆掉 `renderPage` 里的补背景调用 → `test/browser.test.mjs` 红 |
 | 采不到真值时不许兜底猜测 | `web.mjs` 的 `bgOf`：渐变/图片背景、最底层半透明一律 `null`（真站实测：兜底白色一次造 83 处假红） |
 | 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`；背景自己半透明则未知（真站实测：`rgba(0,0,0,.05)` 被当纯黑，76/103 假红） |
+| 色值换算必须问浏览器本人 | `driver.mjs` 的 `window.__fk.rgbaOf`：老语法（`rgb()`/`rgba()`/`transparent`）走精确解析，现代色空间（`oklch()`/`lab()`/`color()`/`color-mix()`）在 canvas 上画一个像素再读回来。为什么不全走像素：8 位回读会把半透明量化到 1/255，实测同一处比值会漂 0.047（`rgba(10,20,30,.5)`：3.483 → 3.529）。为什么不能只读字符串：Chrome 把 `oklch()` 原样回显（`fillStyle` 与注册 `<color>` 属性都试过），只有像素是权威。真站实测：`iana.org/help/example-domains` 49 处文本里 40 处文字色是 `oklch()`，改前只判 9 处、改后判满 49 处并抓出 31 处真实缺陷（最低 2.45:1，改前正被"未判"盖住）。`test/color.test.mjs` 三条；变异：去掉像素回退 → 红 2，去掉 `CSS.supports` 守卫 → 红 1（无效值会凭空报出 `rgb(0,0,0)`） |
+| 认不出的色值整处不判，不许拿祖先的颜色冒充 | `web.mjs` 的 `bgOf`：某一层 `backgroundColor` 解析不出来就整处 `null`（旧实现 `continue` 掉那一层，于是把祖先的底色当成了这一层的底色）。`test/color.test.mjs`；变异：`if (!c)` 改成 `if (c === undefined)` → 红 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `geometry.touchTargetsOk` 排除（真站实测：16 处假红） |
 | 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（真站实测：三个 index.html 收敛同名，前一份证据被后一份覆盖） |
 
@@ -50,6 +52,7 @@
 - `contrast-ok` 曾在磨砂卡片 + 渐变背景上覆盖率极低（真站 7/111），当时只能判"不了"。**v2 已接像素采样**（`src/observe/pixel.mjs` + `png.mjs`，零依赖解 PNG）：
   截图落地后读文字矩形内、字形之外的留白，多点一致才认作背景；点与点不一致（跨渐变）或全落在字形上（比值 <1.05）一律退回未判，不造红也不造绿。
   仍判不了的两类：渐变在采样点之间剧烈变化、以及整块被图片背景覆盖的文本。报告里的 `pixelBackgrounds` 会写明补了几处、几处退回未判。
+- 现代色值写法曾经整类漏判（**已修 2026-11-08**）：真站 `iana.org/help/example-domains` 一页 49 处文本里 40 处文字色是 `oklch()`，`parseRgba` 不认识 → 整处不判；更坏的是报告里那句话写的是"采不到实色背景"，照着它去查背景的人永远查不到问题。现在色值统一由浏览器换算（画一个像素读回来）。浏览器自己也认不出的值（`CSS.supports('color', …)` 为假）仍然整处"未判"，不猜。
 - 非 git 目录里三个代价输入全部取不到 → 一切按 high。claimrail 在 git 之外基本失明，这是边界不是特性。
 - 没有 dev server / 登录态时，SPA 只会得到"五项全未判"，且报告不可引用（0 项绿）。工具不会替你把服务起起来。Shinsekai 真 Vite SPA 已实测：双视口各有触摸目标红（13/12 处），scrollbar/focus 绿，对比度/底部遮挡未判；首次依赖预构建时宽屏 `networkidle` 20 秒超时，预热后重跑成功。绿、红、未判必须分开报告。
 - 引文核实只保证**可见正文里有这串字**，不保证那个页面在推荐这个做法。实测 24 个 URL 里有两处命中的是例外条款：W3C 用色页的 "an author cannot use color alone to achieve 3:1 contrast…"、SC 2.5.8 的 "links within paragraphs of text do not need to meet the 24 by 24 css pixels requirements…"。语气程序判不了，台账里的 `url + quote` 就是留给 reviewer 抽查上下文的——这是这一档唯一的人防线，别把它当程序保证。
@@ -59,7 +62,7 @@
 
 ## 改这些代码时的硬规矩
 
-1. **红队层与浏览器层必须跟着跑**：`node --test test/redteam.test.mjs test/browser.test.mjs`。前者测的是产品存在的理由（模型能否不实做却拿到"已验证"），后者测的是两百多个纯逻辑测试一行都没执行过的 DOM 采集代码。
+1. **红队层与浏览器层必须跟着跑**：`node --test test/redteam.test.mjs test/browser.test.mjs test/color.test.mjs`。前者测的是产品存在的理由（模型能否不实做却拿到"已验证"），中间那个测的是两百多个纯逻辑测试一行都没执行过的 DOM 采集代码，最后一个测的是色值换算（真 Chromium）。
 2. **加一道拦之后要做变异验证**：把那处守卫改坏，测试必须变红；改回来必须绿。从来没报过错的守卫等于没加。已验证：`mapGrepExit` 的 `unknown`、`ls-files -z`（承重是 `-z`，`core.quotepath=false` 只是冗余）、未跟踪并入扫描、log 行号自校验、先干后证、header fail-closed、自供字段拒收、逐候选真算、焦点签名归一化。
 3. **别在带未提交改动的文件上用 `git checkout --` / `git clean`**：这一条是踩过代价的——用 `git checkout` 复原一个被 sed 改过的文件时，把同一文件里未提交的正经改动一起打回了上个提交，靠重写才恢复。要复原就先 `cp` 出来再 `cp` 回去。
 4. **变异要先确认它真的生效**：有一次 sed 的匹配串没命中，测试"照样绿"被误当成守卫有效。先 grep 出那一行、改完看 diff、再跑，才叫验证。

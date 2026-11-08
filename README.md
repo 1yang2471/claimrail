@@ -89,6 +89,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 
 - Non-git directories: all three cost inputs are unavailable → everything grades `high`; the tool is nearly blind there.
 - Contrast on frosted/gradient backgrounds used to be unjudgeable (7/111 texts on a real site). It is now sampled from screenshot pixels (v2) — but a text whose sample points straddle a gradient or land on the glyphs themselves is still reported as undecided, not as passing.
+- Modern CSS colour syntaxes used to be skipped wholesale: on `iana.org/help/example-domains`, 40 of 49 text runs are coloured with `oklch()`, and the report blamed "no solid background sampled" — pointing at the background when the foreground was what went unread. Colours are now resolved by the browser itself (one pixel painted and read back), so `oklch()`, `lab()`, `color()` and `color-mix()` are judged too: that page now measures 49/49 and turns up 31 real defects, the worst at 2.45:1. Anything the browser itself rejects is still reported as undecided.
 - SPA shells expose no readable text: `m3.material.io` returns 200 with 62KB of HTML and 15 visible characters. Most design-system sites are like this, so the `precedent` tier can't reach them.
 - A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
 - The logged-in flow is verified against a local login-gated site (anonymous → redirected to `/login`; with `--state` → real content collected). A third-party production page has not been run — that needs your credentials.
@@ -97,7 +98,7 @@ Numbers produced by the fake agent are mechanism self-tests, not a model's behav
 ## Development
 
 ```bash
-node --test    # 279 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 282 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

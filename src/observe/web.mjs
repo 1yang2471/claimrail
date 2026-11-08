@@ -30,19 +30,19 @@ export function collectInPage() {
   // 于是 103 处文本里 76 处报对比度不足，最低 1.53——全是假红。
   // 另外两条纪律：碰到 background-image/渐变就返回 null（图片无法采样），
   // 最底层仍半透明也返回 null（真实背景未知，不许兜底成白色）。
+  // 第三堂课的教训（2026-11-08，iana.org）：认不出的色值必须整处不判。
+  // 旧实现在这里 continue 掉认不出的那层，于是拿祖先的颜色当成了这一层的底色——
+  // 把"没看到"伪装成"看到了"。
   const bgOf = (el) => {
     const layers = [];
     for (let n = el; n; n = n.parentElement) {
       const cs = getComputedStyle(n);
       if (cs.backgroundImage && cs.backgroundImage !== 'none') return null;
-      const m = /rgba?\(([^)]+)\)/.exec(cs.backgroundColor);
-      if (!m) continue;
-      const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
-      if (p.length < 3 || p.slice(0, 3).some(Number.isNaN)) continue;
-      const a = p.length >= 4 ? p[3] : 1;
-      if (a === 0) continue;
-      layers.push({ rgb: p.slice(0, 3), a });
-      if (a === 1) break; // 已经不透明，下面再有什么都看不见
+      const c = fk.rgbaOf(cs.backgroundColor);
+      if (!c) return null;
+      if (c.a === 0) continue;
+      layers.push(c);
+      if (c.a === 1) break; // 已经不透明，下面再有什么都看不见
     }
     if (!layers.length) return null;
     const bottom = layers[layers.length - 1];
@@ -56,6 +56,10 @@ export function collectInPage() {
     return `rgb(${acc[0]}, ${acc[1]}, ${acc[2]})`;
   };
   const cap = (list, n) => (list.length > n ? list.slice(0, n) : list);
+
+  // 交给判定层的色值统一是老语法（唯一可能判不了的是 null = 认不出来）。
+  // 文字色以前是原样透传的，所以文字色写成 oklch() 时判定层的老语法解析器就整处漏判。
+  const legacyCss = (c) => (c ? (c.a < 1 ? `rgba(${c.rgb.join(', ')}, ${c.a})` : `rgb(${c.rgb.join(', ')})`) : null);
 
   const scrollContainers = [];
   const fixedRects = [];
@@ -107,7 +111,7 @@ export function collectInPage() {
         selector: sel(parent),
         container: owner,
         rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
-        color: s.color,
+        color: legacyCss(fk.rgbaOf(s.color)),
         background: bgOf(parent),
         fontSize: fs,
         bold: Number(s.fontWeight) >= 600,
