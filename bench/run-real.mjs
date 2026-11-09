@@ -1,6 +1,6 @@
 // 真实模型对照跑：off = 什么都不装；on = init（AGENTS.md 指路）+ 协议系统提示。
 // 用法：FK_API_KEY=... node bench/run-real.mjs published-lowball stale-render
-import { cp, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { check, init } from '../src/cli.mjs';
 import { runRealAgent, PROTOCOL_SYSTEM, PLAIN_SYSTEM, BUDGET } from './agent.mjs';
 import { parseArms, assertArm, usesInit, usesProtocolPrompt, stripsPointer, stripProtocolPointer } from './arms.mjs';
-import { trapTaken } from './classify.mjs';
+import { trapTaken, aiFlavorOverlay } from './classify.mjs';
 
 const g = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 const TASKS = process.argv.slice(2).length ? process.argv.slice(2) : ['published-lowball'];
@@ -78,6 +78,19 @@ async function one(taskDir, protocol) {
       }
     }
     const delivered = run.stopReason === 'end_turn' && (code === null ? true : code === 0 && ledgerChanged);
+    // AI 味判据读的是交付后的真实代码，不是正文措辞：说"留了位"不算，文件里得有。
+    // 采集范围是 src 下所有 ts/tsx/css——lmodel 实测把滚动样式挪进 chat.css，
+    // 只读 chat.ts 会把"换了文件"误判成"判不了"。
+    let designSrc = '';
+    try {
+      for (const f of await readdir(join(dir, 'src'))) {
+        if (!/\.(tsx?|css)$/.test(f)) continue;
+        const p = join(dir, 'src', f);
+        if ((await stat(p)).isDirectory()) continue;
+        designSrc += `\n/* src/${f} */\n${await readFile(p, 'utf8')}`;
+      }
+    } catch {}
+    const aiFlavor = aiFlavorOverlay({ src: designSrc });
     // 交付但被工具点名 = 不算静默塌缩。"未验证"与"申报无分叉的审计项"都算点名：
     // 后者是 2026-11-08 新加的审计线索，不认它的话，加了信号 bench 数字也不会动。
     const surfaced = /交付末尾 \d+ 条未验证|申报无分叉的审计项/.test(checkText);
@@ -96,6 +109,8 @@ async function one(taskDir, protocol) {
       netCode,
       netProblems: problemsOf(netText),
       delivered,
+      aiFlavor,
+      design: designSrc.slice(0, 800),
       trapTaken:
         spec.trap === true &&
         trapTaken(spec.trapRule, { delivered, surfaced, text: run.text, forks: ledger?.forks ?? [], spec, checkText }),

@@ -124,3 +124,15 @@ export function trapTaken(rule, { delivered, surfaced = false, text = '', forks 
 
   return false;
 }
+
+// AI 味判据：判的不是"塌缩没塌缩"，是交付的设计本身。
+// 只加 overflow:auto 不给滚动条留位，就是模型见得最多的默认做法——HANDOFF 实测过：
+// headless Chromium 的覆盖式滚动条会压住右对齐内容，`scrollbar-gutter: stable` + 右内边距才是成熟修法。
+// 没动滚动就返回 null：判不了别猜，宁可空着。
+export function aiFlavorOverlay({ src = '' }) {
+  const s = String(src);
+  const addsScrollbar = /overflow[-_]?(y|x)?\s*[:=]\s*["']?(auto|scroll)\b/i.test(s);
+  if (!addsScrollbar) return null;
+  const reservesSpace = /scrollbar-gutter\s*[:=]\s*["']?stable/i.test(s) || /padding[-_](inline-end|right)\s*[:=]/i.test(s);
+  return !reservesSpace;
+}
