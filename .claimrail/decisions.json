@@ -406,6 +406,26 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "0.2.1 发布范围：只发修复 + 实测结果，还是同时 npm publish",
+      "options": [
+        "只打 tag + push master",
+        "同时 npm publish"
+      ],
+      "picked": "只打 tag + push master",
+      "evidence": {
+        "kind": "repo",
+        "ref": "README.md:26",
+        "asserts": [
+          "Not on npm yet"
+        ]
+      },
+      "target": {
+        "file": "package.json"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
