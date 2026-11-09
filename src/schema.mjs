@@ -35,9 +35,14 @@ const REF_PATTERNS = {
 
 // 三档都必须写明声称要点：不给行号、不给出处、只有截图没有断言项，
 // 是三种最省事的编造方式——最后一种以前不要求，等于允许"我看过了"当证据。
-const ASSERTS_REQUIRED = ['repo', 'render', 'web'];
+// memory 同理：log#1 存在但没有要点，回验只能比对全文，"引用了一条记录"不是证据。
+const ASSERTS_REQUIRED = ['repo', 'memory', 'render', 'web'];
 
 const MAX_TEXT = 120; // 一屏清单要三秒读完；800 字符的单行"清单"没人读
+
+// 段中 `..` 同样要拦：`a/../../etc/x.png` 不以 ../ 开头，正则放行，join 后逃出仓库
+// （审查实测）。render/repo 的 ref 与 target.file 都拿它去 join cwd，必须整段拒绝。
+const hasParentSegment = (p) => String(p).split(/[\\/]/).includes('..');
 
 // 设计类任务：产出形态由人的偏好决定，"最常见"不等于"最好"。
 // 这几类不允许用单一网页转述收场（见 checkFork 里的 design-needs-precedent）。
@@ -117,6 +122,7 @@ function checkFork(fork, i, taskClass) {
         } else {
           const te = badText(t.file);
           if (te) at(`options[${n}].target.file`, te);
+          else if (hasParentSegment(t.file)) at(`options[${n}].target.file`, 'target 不许包含 ".." 路径段：越界即拒绝');
         }
       }
     }
@@ -153,6 +159,8 @@ function checkFork(fork, i, taskClass) {
     } else if (evidence.kind === 'precedent') {
       const errs = checkPrecedent(evidence);
       for (const [rule, msg] of errs) at(rule, msg);
+    } else if (hasParentSegment(evidence.ref ?? '')) {
+      at('evidence.ref', 'ref 不许包含 ".." 路径段：ref 会被 join 到仓库根上，越界即拒绝');
     } else if (!REF_PATTERNS[evidence.kind].test(String(evidence.ref ?? ''))) {
       at('evidence.ref', `${evidence.kind} 的 ref 格式不符：${evidence.ref ?? '(空)'}`);
     }
@@ -184,6 +192,7 @@ function checkFork(fork, i, taskClass) {
     } else {
       const err = badText(fork.target.file ?? '');
       if (err) at('target.file', `target.file ${err}`);
+      else if (hasParentSegment(fork.target.file)) at('target.file', 'target.file 不许包含 ".." 路径段：target 会被 join 到仓库根上，越界即拒绝');
       if ('symbol' in fork.target) {
         const e2 = badText(fork.target.symbol);
         if (e2) at('target.symbol', `target.symbol ${e2}`);

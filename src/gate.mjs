@@ -1,4 +1,4 @@
-import { apply, grade } from './cost.mjs';
+import { apply } from './cost.mjs';
 
 // 门。它自己不碰外部世界：代价由 cost 算好、证据由 evidence 回验好，
 // 这里只做一件事——把"要不要打断人"和"在哪一刻打断"决定下来，并渲染成一屏。

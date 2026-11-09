@@ -158,3 +158,29 @@ test('测量对象形状不对就拒——宁可拒了重报，不要静默算�
   assert.ok(validateLedger(ledger({ forks: [fork({ target: { symbol: 'X' } })] })).errors.some((e) => e.rule === 'target.file'));
   assert.ok(validateLedger(ledger({ forks: [fork({ target: { file: 'a.tsx', symbol: 'X\nY' } })] })).errors.some((e) => e.rule === 'target.symbol'));
 });
+
+// 审查抓到的错位：schema 只对 repo/render/web 要求 asserts，memory 放行；
+// verify 却要求 memory 也带要点 → 结构校验通过、整轮跑完才失败，用户不知道该补什么。
+test('memory 档同样必须带 asserts（schema 与 verify 同一把尺）', () => {
+  const r = validateLedger(ledger({ forks: [fork({ evidence: { kind: 'memory', ref: 'log#1' } })] }));
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.rule === 'evidence.asserts'), JSON.stringify(r.errors));
+});
+
+// 审查抓到的逃逸：`..` 只在段首被拦，`a/../../etc/x.png` 不以 ../ 开头，join 后逃出仓库。
+// ref 与 target 都会被 join 到仓库根上，段中 ".." 必须整段拒收。
+test('段中 ".." 路径段一律拒收（ref 与 target 同规）', () => {
+  const ev = validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'a/../../etc/x.png', asserts: ['contrast-ok'] } })] }));
+  assert.ok(ev.errors.some((e) => e.rule === 'evidence.ref'), JSON.stringify(ev.errors));
+
+  const tg = validateLedger(ledger({ forks: [fork({ target: { file: 'pkg/../../x.ts' } })] }));
+  assert.ok(tg.errors.some((e) => e.rule === 'target.file'), JSON.stringify(tg.errors));
+
+  const op = validateLedger(ledger({ forks: [fork({ options: [{ label: 'A', target: { file: '../outside.ts' } }, { label: 'B', target: { file: 'b.ts' } }] })] }));
+  assert.ok(op.errors.some((e) => e.rule === 'options[0].target.file'), JSON.stringify(op.errors));
+
+  // 开头的 ../ 与 ./ 仍由原有正则拦，这里顺带钉住不退化
+  assert.ok(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: '../outside.png', asserts: ['x'] } })] })).errors.some((e) => e.rule === 'evidence.ref'));
+  // 文件名里合法的 ..（如 "v1..2.png"）不误伤
+  assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/v1..2.png', asserts: ['x'] } })] })).ok, true);
+});

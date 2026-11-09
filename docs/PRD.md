@@ -124,14 +124,16 @@ claimrail 不重写那份清单，把它当上游引用。我们的差异在两�
       "fork": "一句话：规格没定的是什么",
       "options": ["候选A", "候选B"],
       "picked": "候选B",
-      "evidence": { "kind": "repo|memory|render|web", "ref": "Chat.tsx:88 | log#3 | chat@1280.png | https://…" },
+      "evidence": { "kind": "repo|memory|render|precedent|web", "ref": "Chat.tsx:88 | log#3 | chat@1280.png | https://…" },
       "cost_if_wrong": "high",       // 程序覆写，模型只能上调
-      "verified": true,              // evidence 为 null 时必须为 false
-      "options_cost": { "候选A": "low", "候选B": "high" }  // observe 供给，可缺省
+      "verified": true               // evidence 为 null 时必须为 false
     }
   ]
 }
 ```
+
+> `options_cost` 已从台账里删除（2026-11-08 审计）：候选代价必须由程序逐候选 observe 真算，
+> "由模型填、可缺省"就是被否决的免检通道。现在的形状见 `src/schema.mjs` 的字段白名单。
 
 `forks: []` 允许，但必须带 `task_class`，且每次空申报全部落盘可统计。空申报不设自动升级规则（v2 再根据数据决定）。
 
@@ -186,7 +188,7 @@ v1 的五个检查及其阈值（全部为可判定的硬事实，不含品味�
 | `bottom-not-covered` | 滚动容器最后一个内容项与固定/粘性元素矩形相交 | — |
 | `touch-targets-ok` | 可交互元素包围盒短边不足下限 | 44px |
 | `contrast-ok` | 正文对比度低于 WCAG 门槛（大字号走低档） | 4.5:1 / 3:1，24px 或 18.66px 加粗算大字 |
-| `focus-visible-ok` | 聚焦时 outline/shadow/border 无可测变化 | v1 一律 `null`，待驱动层真实键盘事件 |
+| `focus-visible-ok` | 聚焦时 outline/shadow/border 无可测变化 | 阈值不变；v1 设计时的"一律 null"已被真键盘 Tab 探针取代（见 driver.mjs） |
 
 经典滚动条（`offsetWidth - clientWidth > 0`）挤走布局宽度，不判红——只有覆盖式才会压内容，这与原始例子的成因一致。
 
@@ -211,7 +213,7 @@ v1 的五个检查及其阈值（全部为可判定的硬事实，不含品味�
 
 副作用扫描只作用于**新增行**，且排除 `test(s)/`、`fixtures/`、`docs/`、`*.test.*` 以及规则表自身所在文件。原因不是洁癖：规则表文本里必然含 `rm -rf`、`DROP TABLE`、`npm publish` 这些形状，扫全文等于任何一次改动都判定"有不可逆副作用"，门在第一天就彻底失灵。测试数据与文档里的命令不是动作。
 
-CLI 的实际表面：`claimrail init`（建 `.claimrail/decisions.json`、补 `.gitignore` 三条、在 AGENTS.md 里写一段带 marker 的指路段（幂等、不动原有内容）、打印一次数据去向）和 `claimrail check [ledger] [--cwd] [--ledger] [--unattended] [--allow-net]`。退出码 0 放行 / 1 拦住；结构不合规时不进入后续检查——先修申报，再谈代价。`check` 会把程序覆写的档位打出来（`申报 low → 程序 high（原因）`），这一步不留痕迹就等于没拦。
+CLI 的实际表面：`claimrail init`（建 `.claimrail/decisions.json`、补 `.gitignore` 四条、在 AGENTS.md 里写一段带 marker 的指路段（幂等、不动原有内容）、打印一次数据去向）和 `claimrail check [ledger] [--cwd] [--ledger] [--unattended] [--allow-net]`。退出码 0 放行 / 1 拦住；结构不合规时不进入后续检查——先修申报，再谈代价。`check` 会把程序覆写的档位打出来（`申报 low → 程序 high（原因）`），这一步不留痕迹就等于没拦。
 
 ### 第四条门规则（盘问之外补入，已确认保留）
 
@@ -221,7 +223,7 @@ CLI 的实际表面：`claimrail init`（建 `.claimrail/decisions.json`、补 `
 
 ### 记忆结构
 
-`memory/log.md` 只追加，是唯一真相。`rules.md` 是可删除可重建的缓存，同一条否决命中 ≥2 次才升格，每条带 `[来源: log#n]`。正向参照物（`anchors`）单独记。读取时 rules 全读，log 只读最近 20 条。
+`memory/log.jsonl` 只追加，是唯一真相。规则是可删除可重建的缓存（现算 + `memory/denied.json` 禁用名单），同一条否决命中 ≥2 次才升格，每条带 `[来源: log#n]`。正向参照物（`anchors`）单独记。读取时 rules 全读，log 全量读（行号是引用坐标，不能只读尾部）。
 
 ### 上游依赖
 

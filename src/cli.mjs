@@ -1,27 +1,20 @@
 #!/usr/bin/env node
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
-import { validateLedger } from './schema.mjs';
-import { grade } from './cost.mjs';
-import { verifyAll } from './evidence.mjs';
-import { enrich, decide, render } from './gate.mjs';
-import { observe, whyUnknown } from './observe/index.mjs';
-import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState } from './observe/git.mjs';
 import { record, recordAnchor, rulesList, rulesText, invalidateRule, readLog, readDenied } from './store.mjs';
+import { gitToplevel } from './observe/git.mjs';
 import { web } from './commands/web.mjs';
 import { LEDGER_PATH, BASELINE_PATH, TEMPLATE_HASH_PATH } from './paths.mjs';
 import { TEMPLATE_TEXT, templateHash } from './template.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
-import { check, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
+import { check, readBaseline, writeBaseline } from './commands/check.mjs';
 import { hook, readIncoming } from './commands/hook.mjs';
 import { AGENTS_BEGIN, AGENTS_END } from './agents.mjs';
 
-export { web, parse, help, unknownCmd, LEDGER_PATH, check, hook };
-export { readJson, writeBaseline, readBaseline } from './commands/check.mjs';
+export { parse, help, unknownCmd, LEDGER_PATH, check, hook };
 
 
 const NOTICE = `数据去向：
@@ -55,25 +48,29 @@ async function writeAgentsPointer(cwd) {
 }
 
 export async function init({ cwd = process.cwd() } = {}) {
-  await mkdir(join(cwd, '.claimrail'), { recursive: true });
-  const file = join(cwd, LEDGER_PATH);
+  // 协议是仓库级的：从子目录跑 init，台账/baseline/AGENTS 指路都落在仓库根。
+  // 落在子目录里的台账，check 与 hook（都以仓库根为基准）会当成"没初始化"。
+  const root = (await gitToplevel(cwd)) ?? cwd;
+  await mkdir(join(root, '.claimrail'), { recursive: true });
+  const file = join(root, LEDGER_PATH);
   const created = !existsSync(file);
   if (created) await writeFile(file, TEMPLATE_TEXT, 'utf8');
   // 模板指纹：check 用它判"台账是不是一字未动"。存下来而不是每次现算，
   // 是为了模板跨版本变化时，旧仓库仍按 init 当时的模板判。
-  await writeFile(join(cwd, TEMPLATE_HASH_PATH), `${templateHash()}\n`, 'utf8');
+  await writeFile(join(root, TEMPLATE_HASH_PATH), `${templateHash()}\n`, 'utf8');
 
-  const gi = join(cwd, '.gitignore');
+  const gi = join(root, '.gitignore');
   const lines = existsSync(gi) ? (await readFile(gi, 'utf8')).split('\n') : [];
   // 只写自己产物所在的目录。曾经还写过 '*.png'：那会把目标仓库里所有真实图片
   // 一起排除在提交之外（静默丢数据），而 init 的本意只是别让截图进库。
   const add = ['memory/', '.claimrail/shots/', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
-  // baseline 只在没有的时候写：重复 init 不许把起点往前推，那等于把已提交的改动洗白
-  const hasBase = existsSync(join(cwd, BASELINE_PATH));
-  const base = hasBase ? await readBaseline(cwd) : await writeBaseline(cwd);
-  const agents = await writeAgentsPointer(cwd);
+  // baseline 在"文件存在但解析不出 sha"（init 跑在没有提交的仓库里，只写了个空文件）时
+  // 也要补写：那个空文件以前永不修复，之后 commit 掉的改动会让模板台账 check 退出 0
+  // （实测复现）。有效 baseline 不动——重复 init 不许把起点往前推，那等于把改动洗白。
+  const base = (await readBaseline(root)) ?? (await writeBaseline(root));
+  const agents = await writeAgentsPointer(root);
 
   return {
     code: 0,
@@ -147,7 +144,19 @@ export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
 
 const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd, help, unknown: unknownCmd };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// 主模块判断必须比真实路径：Windows 上 pnpm 把包装成 junction、POSIX 上 npm bin 是 symlink，
+// Node 按 realpath 解析主模块而 argv[1] 保留链接路径——字符串相等永远不成立，CLI 静默 exit 0。
+// 对一个用退出码说话的门，这是最坏形状（审查实测：junction 下 check 无输出退出 0）。
+export function isMainEntry(argv1 = process.argv[1], moduleUrl = import.meta.url) {
+  if (!argv1) return false;
+  try {
+    return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
+}
+
+if (isMainEntry()) {
   const { cmd, flags } = parse(process.argv.slice(2));
   let res;
   try {

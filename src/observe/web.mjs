@@ -56,7 +56,6 @@ export function collectInPage() {
     }
     return `rgb(${acc[0]}, ${acc[1]}, ${acc[2]})`;
   };
-  const cap = (list, n) => (list.length > n ? list.slice(0, n) : list);
 
   // 交给判定层的色值统一是老语法（唯一可能判不了的是 null = 认不出来）。
   // 文字色以前是原样透传的，所以文字色写成 oklch() 时判定层的老语法解析器就整处漏判。
@@ -164,9 +163,12 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
   await mkdir(outDir, { recursive: true });
   const data = await page.evaluate(collectInPage);
   const png = join(outDir, `${name}.png`);
+  // 截图必须在焦点探测之前：Tab 会滚动页面（实测一次真站 0→911→1532），
+  // 探测之后拍，像素采样拿"滚动前"的坐标去读"滚动后"的截图，颜色对不上号
+  // ——假绿假红都可能，报告还标 backgroundFrom:'pixel'。
+  await page.screenshot({ path: png });
   const samples = focusProbe ? await focusProbe() : focusSamples;
   const interactive = samples ? applyFocusProbe(data.interactive, samples) : data.interactive;
-  await page.screenshot({ path: png });
 
   // 把截图本体读一次：既用来算"这一份报告测的是哪张图"的哈希，也用来做像素采样。
   // 哈希是落盘链的最后一环——以前只靠文件名与 mtime，换一张图或换一份报告都能混过去。

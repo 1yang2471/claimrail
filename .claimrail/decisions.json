@@ -1,542 +1,170 @@
 {
   "schema": 1,
-  "task_class": "docs-new",
+  "task_class": "refactor",
   "forks": [
     {
-      "fork": "代码审查的两处问题怎么处理",
+      "fork": "审查修复范围：只修 P0 还是 P0/P1/P2 全修",
       "options": [
-        "只记录",
-        "直接修",
-        "修 + 补测试"
+        "只修 P0",
+        "P0/P1/P2 全修"
       ],
-      "picked": "修 + 补测试",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/delivery.test.mjs:154-177",
-        "asserts": [
-          "快照写不进去",
-          "违规记录写不进去"
-        ]
-      },
+      "picked": "P0/P1/P2 全修",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false,
       "target": {
         "file": "src/commands/hook.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
+      }
     },
     {
-      "fork": "未申报的判定用哪把尺",
+      "fork": "fail-closed 范围：none（确实不是仓库）保持放行还是全拦",
       "options": [
-        "模板哈希",
-        "target 覆盖",
-        "每次台账必须变"
+        "全拦",
+        "none 照旧放行"
       ],
-      "picked": "模板哈希",
+      "picked": "none 照旧放行",
       "evidence": {
-        "kind": "repo",
-        "ref": "docs/PRD.md:26",
+        "kind": "memory",
+        "ref": "log#2",
         "asserts": [
-          "没被申报的分叉"
+          "none（确实不是仓库）照旧放行"
         ]
       },
+      "cost_if_wrong": "low",
+      "verified": true,
       "target": {
-        "file": "src/undeclared.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
+        "file": "src/commands/check.mjs"
+      }
     },
     {
-      "fork": "未申报规则住在 check 还是 hook",
+      "fork": "readIncoming 修法：只补括号还是连定时器一起修",
       "options": [
-        "check 统一拦",
-        "只在 hook 拦",
-        "警告 + hook 转阻断"
+        "只补括号",
+        "补括号+unref/clearTimeout"
       ],
-      "picked": "check 统一拦",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/PRD.md:74",
-        "asserts": [
-          "用退出码说话"
-        ]
-      },
-      "target": {
-        "file": "src/undeclared.mjs"
-      },
+      "picked": "补括号+unref/clearTimeout",
+      "evidence": null,
       "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "沿用旧台账怎么判",
-      "options": [
-        "记为已知洞",
-        "target 覆盖就拦",
-        "内容指纹（hook 快照）"
-      ],
-      "picked": "内容指纹（hook 快照）",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/delivery.test.mjs:58-93",
-        "asserts": [
-          "台账自上次放行后未变",
-          "reason, 'stale'"
-        ]
-      },
-      "target": {
-        "file": "src/delivery.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "hook 的本地状态（快照 + 违规记录）放本地还是进 git",
-      "options": [
-        "本地不进 git",
-        "进 git 可 review",
-        "进 git 只记汇总"
-      ],
-      "picked": "本地不进 git",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/PRD.md:76",
-        "asserts": [
-          "默认不进 git"
-        ]
-      },
-      "target": {
-        "file": ".gitignore"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "未申报拦一次还是硬阻断",
-      "options": [
-        "只拦一次",
-        "硬阻断直到写",
-        "拦一次 + 落记录"
-      ],
-      "picked": "拦一次 + 落记录",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/PRD.md:55",
-        "asserts": [
-          "打断的次数有上限"
-        ]
-      },
+      "verified": false,
       "target": {
         "file": "src/commands/hook.mjs"
+      }
+    },
+    {
+      "fork": "主模块判断：realpath 比对还是引 is-main 包",
+      "options": [
+        "realpathSync 比对",
+        "引第三方包"
+      ],
+      "picked": "realpathSync 比对",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#3",
+        "asserts": [
+          "realpathSync 比对"
+        ]
       },
       "cost_if_wrong": "low",
-      "verified": true
+      "verified": true,
+      "target": {
+        "file": "src/cli.mjs"
+      }
     },
     {
-      "fork": "pilot 里 on 臂「没写台账」的运行怎么统计",
+      "fork": "入口层用例：挤进超限的 cli.test 还是拆新文件",
       "options": [
-        "算作工具有效（on 臂零塌缩）",
-        "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效"
+        "留在 cli.test",
+        "拆 test/entry.test.mjs"
       ],
-      "picked": "三分类：没写台账 / 写了被拦 / 写了放行，前者不算工具有效",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/bench.test.mjs:176-198",
-        "asserts": [
-          "三分类",
-          "没写台账"
-        ]
-      },
+      "picked": "拆 test/entry.test.mjs",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false,
       "target": {
-        "file": "docs/AUDIT-2026-11-08.md"
+        "file": "test/entry.test.mjs"
+      }
+    },
+    {
+      "fork": "runCli 助手：execFileSync 还是 spawnSync",
+      "options": [
+        "execFileSync",
+        "spawnSync"
+      ],
+      "picked": "spawnSync",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false,
+      "target": {
+        "file": "test/hook.test.mjs"
+      }
+    },
+    {
+      "fork": "HANDOFF.md 超 20KB：删历史还是归档+指针",
+      "options": [
+        "删历史",
+        "归档+指针"
+      ],
+      "picked": "归档+指针",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false,
+      "target": {
+        "file": "docs/AUDIT-2026-11-10.md"
+      }
+    },
+    {
+      "fork": "AGENTS.md 逼近上限：原样追加还是压缩后扩",
+      "options": [
+        "原样追加",
+        "压缩后扩"
+      ],
+      "picked": "压缩后扩",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#4",
+        "asserts": [
+          "实测故事移到 docs"
+        ]
       },
       "cost_if_wrong": "low",
-      "verified": true
+      "verified": true,
+      "target": {
+        "file": "AGENTS.md"
+      }
     },
     {
-      "fork": "发布文案里的对比数字这一轮是否更新",
+      "fork": "报告里不可达的 --no-pixel 话术：删话术还是补 flag",
       "options": [
-        "继续写「尚未测量」",
-        "把 pilot 的 off 臂 3/5 写进对比"
+        "删话术",
+        "补 flag"
       ],
-      "picked": "继续写「尚未测量」",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/HANDOFF.md:36",
-        "asserts": [
-          "没有就照实写"
-        ]
-      },
+      "picked": "补 flag",
+      "evidence": null,
+      "cost_if_wrong": "low",
+      "verified": false,
       "target": {
-        "file": "README.md"
+        "file": "src/args.mjs"
+      }
+    },
+    {
+      "fork": "typo/rename 免走协议：实现窄豁免还是保持一行申报",
+      "options": [
+        "实现窄豁免",
+        "保持一行申报"
+      ],
+      "picked": "保持一行申报",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#5",
+        "asserts": [
+          "保持一行申报"
+        ]
       },
       "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "陷阱任务漏写 trapRule 时怎么判",
-      "options": [
-        "未知规则默认算踩陷阱",
-        "未知规则默认不判塌缩",
-        "两者都做：补规则 + 未知不判"
-      ],
-      "picked": "两者都做：补规则 + 未知不判",
-      "evidence": {
-        "kind": "repo",
-        "ref": "bench/classify.mjs:5",
-        "asserts": [
-          "宁可低估塌缩率"
-        ]
-      },
+      "verified": true,
       "target": {
-        "file": "bench/classify.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "off 臂没有台账时 destructive-lowball 怎么判",
-      "options": [
-        "无条件算塌缩",
-        "看正文是否真的声称删除/清理",
-        "不判"
-      ],
-      "picked": "看正文是否真的声称删除/清理",
-      "evidence": {
-        "kind": "repo",
-        "ref": "bench/classify.mjs:4",
-        "asserts": [
-          "模糊处一律按"
-        ]
-      },
-      "target": {
-        "file": "bench/classify.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "bench 任务语料怎么从 6 个扩到 20–30 个",
-      "options": [
-        "复制现有 6 个的变体",
-        "从已记录的真实事故新建任务",
-        "编新场景"
-      ],
-      "picked": "从已记录的真实事故新建任务",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/HANDOFF.md:36",
-        "asserts": [
-          "陷阱任务要来自第 0、1 步真翻过的车",
-          "不要新编"
-        ]
-      },
-      "target": {
-        "file": "docs/HANDOFF.md"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "协议臂怎么让模型找到 claimrail CLI",
-      "options": [
-        "继续写死绝对路径",
-        "从 bench 模块位置推导",
-        "要求模型用 npx"
-      ],
-      "picked": "从 bench 模块位置推导",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/bench.test.mjs:114-122",
-        "asserts": [
-          "从模块位置推导",
-          "existsSync"
-        ]
-      },
-      "target": {
-        "file": "bench/agent.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "陷阱判定规则要不要为每个新任务新增",
-      "options": [
-        "只复用现有规则",
-        "每个新任务都新增规则",
-        "复用为主，只有实测需要才加"
-      ],
-      "picked": "复用为主，只有实测需要才加",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/HANDOFF.md:36",
-        "asserts": [
-          "陷阱任务要来自第 0、1 步真翻过的车"
-        ]
-      },
-      "target": {
-        "file": "docs/HANDOFF.md"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "副作用扫描把规则表里的删除字样当真动作怎么办",
-      "options": [
-        "把规则表文件加进豁免",
-        "改写规则文本绕开关键词",
-        "关掉副作用扫描"
-      ],
-      "picked": "把规则表文件加进豁免",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/effects.test.mjs:78",
-        "asserts": [
-          "规则表本身都不算被执行的动作"
-        ]
-      },
-      "target": {
-        "file": "src/observe/effects.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "网关 429 限流怎么处理",
-      "options": [
-        "直接作废这次运行",
-        "重试 + 指数退避",
-        "换模型"
-      ],
-      "picked": "重试 + 指数退避",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/bench.test.mjs:148-174",
-        "asserts": [
-          "指数退避",
-          "退避间隔必须翻倍"
-        ]
-      },
-      "target": {
-        "file": "bench/agent.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "0.2.0 发布范围：只打 tag / push，还是同时 npm publish",
-      "options": [
-        "只打 tag + push master",
-        "同时 npm publish"
-      ],
-      "picked": "只打 tag + push master",
-      "evidence": {
-        "kind": "repo",
-        "ref": "README.md:26",
-        "asserts": [
-          "Not on npm yet"
-        ]
-      },
-      "target": {
-        "file": "package.json"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "OCR 第一轮审查的三条怎么处理",
-      "options": [
-        "只记录",
-        "只修 bug",
-        "全修（bug + maintainability）"
-      ],
-      "picked": "全修（bug + maintainability）",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/delivery.test.mjs:181-203",
-        "asserts": [
-          "custom-ledger.json",
-          "台账自己不算工作改动"
-        ]
-      },
-      "target": {
-        "file": "src/commands/hook.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "OCR 第二轮的三条（标记共享 / FK_ARMS 空格 / 臂语义）怎么处理",
-      "options": [
-        "只修 FK_ARMS 空格",
-        "只记录",
-        "全修（共享标记 + 解析 + 语义收拢）"
-      ],
-      "picked": "全修（共享标记 + 解析 + 语义收拢）",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/bench.test.mjs:204-221",
-        "asserts": [
-          "parseArms",
-          "AGENTS_BEGIN"
-        ]
-      },
-      "target": {
-        "file": "bench/arms.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "怎么让 undeclared 被真模型触发",
-      "options": [
-        "继续等模型自然触发",
-        "silent 臂：init 后删掉 AGENTS.md 指路",
-        "改 prompt 逼模型不写台账"
-      ],
-      "picked": "silent 臂：init 后删掉 AGENTS.md 指路",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/AUDIT-2026-11-08.md:216-233",
-        "asserts": [
-          "undeclared 真触发了",
-          "2/3 模型第一次"
-        ]
-      },
-      "target": {
-        "file": "bench/run-real.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "0.2.1 发布范围：只发修复 + 实测结果，还是同时 npm publish",
-      "options": [
-        "只打 tag + push master",
-        "同时 npm publish"
-      ],
-      "picked": "只打 tag + push master",
-      "evidence": {
-        "kind": "repo",
-        "ref": "README.md:26",
-        "asserts": [
-          "Not on npm yet"
-        ]
-      },
-      "target": {
-        "file": "package.json"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "AI 味判据读哪些文件",
-      "options": [
-        "只读 src/chat.ts",
-        "拼接 src 下 ts/tsx/css",
-        "按 spec.writes 清单"
-      ],
-      "picked": "拼接 src 下 ts/tsx/css",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/flavor.test.mjs:19-25",
-        "asserts": [
-          "chat.css",
-          "也要能判到"
-        ]
-      },
-      "target": {
-        "file": "bench/run-real.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "怎么把调研业界变成可测判据",
-      "options": [
-        "只加 trap 规则",
-        "新增 aiFlavorOverlay 判交付代码",
-        "改 PROTOCOL_SYSTEM"
-      ],
-      "picked": "新增 aiFlavorOverlay 判交付代码",
-      "evidence": {
-        "kind": "repo",
-        "ref": "docs/HANDOFF.md:17",
-        "asserts": [
-          "覆盖式滚动条",
-          "scrollbar-gutter: stable"
-        ]
-      },
-      "target": {
-        "file": "bench/classify.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "免费模型实测选哪几个",
-      "options": [
-        "沿用 conatus-free",
-        "选 3 个免费模型（conatus-free / lmodel / hy4free）",
-        "用付费模型"
-      ],
-      "picked": "选 3 个免费模型（conatus-free / lmodel / hy4free）",
-      "evidence": {
-        "kind": "repo",
-        "ref": "bench/agent.mjs:69-71",
-        "asserts": [
-          "免费模型",
-          "429"
-        ]
-      },
-      "target": {
-        "file": "docs/bench-ai-flavor-2026-11-09.json"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "怎么让 bench 模型真的去调研业界做法",
-      "options": [
-        "加 fetch_url 工具（FK_ALLOW_NET=1 才暴露）",
-        "只改系统提示让它 curl",
-        "不加工具，维持记忆+回访"
-      ],
-      "picked": "加 fetch_url 工具（FK_ALLOW_NET=1 才暴露）",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/agent-fetch.test.mjs:13-38",
-        "asserts": [
-          "同一管线",
-          "allowNet",
-          "带凭据"
-        ]
-      },
-      "target": {
-        "file": "bench/agent.mjs"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "fetch_url 的返回文本怎么和 check 回访对齐",
-      "options": [
-        "各自实现一份剥标签逻辑",
-        "复用 evidence.visibleText",
-        "返回原始 HTML 让模型自己读"
-      ],
-      "picked": "复用 evidence.visibleText",
-      "evidence": {
-        "kind": "repo",
-        "ref": "test/agent-fetch.test.mjs:13-19",
-        "asserts": [
-          "script/style",
-          "同一管线"
-        ]
-      },
-      "target": {
-        "file": "src/evidence.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
+        "file": "src/schema.mjs"
+      }
     }
   ]
 }

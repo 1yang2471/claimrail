@@ -7,10 +7,10 @@
 //   3. 指纹：工作区变了、台账没变 = 沿用上次申报，拦一次。check 无状态，判不了这一条。
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { check, readBaseline } from './check.mjs';
-import { changedLines, diffSince } from '../observe/git.mjs';
+import { changedLines, diffSince, gitToplevel } from '../observe/git.mjs';
 import { readDelivery, overclaims, declaresUnverified } from '../overclaim.mjs';
 import { isProtocolPath } from '../undeclared.mjs';
 import { treeHash, ledgerHash, readSnapshot, writeSnapshot, recordViolation } from '../delivery.mjs';
@@ -18,26 +18,42 @@ import { LEDGER_PATH, BASELINE_PATH, TEMPLATE_HASH_PATH } from '../paths.mjs';
 
 export async function readIncoming() {
   if (process.stdin.isTTY) return null;
+  // 上限：宿主不关闭 stdin 时，钩子会一直挂着（宿主那边只能等超时）。
+  // 事件 payload 只有几 KB，五秒读不到就当没有事件。
+  let timer;
   try {
-    // 上限：宿主不关闭 stdin 时，钩子会一直挂着（宿主那边只能等超时）。
-    // 事件 payload 只有几 KB，五秒读不到就当没有事件。
     const raw = await Promise.race([
+      // 立即调用不能少：审查抓到过这里少了一对括号，Promise.race 拿到的是函数本身
+      // 而不是 Promise，raw.trim() 抛 TypeError 被 catch 吞掉 → payload 永远 null，
+      // stop_hook_active 与"正文逐条声明"两道防线在生产里从未生效过。
       (async () => {
         let buf = '';
         for await (const chunk of process.stdin) buf += chunk;
         return buf;
+      })(),
+      new Promise((resolve) => {
+        // unref：流读完时定时器不许拖住进程——实测少这一步，每轮 Stop 钩子多等 5 秒
+        timer = setTimeout(() => resolve(''), 5000);
+        timer.unref?.();
       }),
-      new Promise((resolve) => setTimeout(() => resolve(''), 5000)),
     ]);
     return raw.trim() ? JSON.parse(raw) : null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const p = payload ?? {};
   const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  // 宿主可能在子目录里启动钩子：所有路径以仓库根为基准，否则门在子目录里静默消失
+  // （找不到台账 = 按"没初始化"放行）。check 内部也会再解析一次仓库根，两边同基准。
+  const root = (await gitToplevel(dir)) ?? dir;
+  const ledgerAbs = isAbsolute(ledger) ? ledger : resolve(root, ledger);
+  // 折算成仓库根相对路径：changedLines 的键是根相对，过滤台账自身要用同一基准
+  const ledgerRel = relative(root, ledgerAbs).split(sep).join('/');
   const continuedBefore = p?.stop_hook_active === true || p?.stopHookActive === true;
   const at = new Date().toISOString();
   // 本地状态写不进去（只读仓库、路径被占）不许把交付打成宿主故障：
@@ -45,7 +61,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   // 否则只读仓库里 stale 会反复拦，却没人知道快照其实一次都没推进。
   const bestEffort = (label, fn) => async (entry) => {
     try {
-      await fn(dir, entry);
+      await fn(root, entry);
     } catch (err) {
       process.stderr.write(`claimrail hook: ${label}写不进去（${err.code ?? err.message}），继续放行\n`);
     }
@@ -54,17 +70,17 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const logViolation = bestEffort('违规记录', recordViolation);
 
   // 台账被删：初始化过（有 baseline 或模板指纹）就不是"不在协议里"，而是绕开。
-  if (!existsSync(join(dir, ledger))) {
-    const initialized = existsSync(join(dir, BASELINE_PATH)) || existsSync(join(dir, TEMPLATE_HASH_PATH));
+  if (!existsSync(ledgerAbs)) {
+    const initialized = existsSync(join(root, BASELINE_PATH)) || existsSync(join(root, TEMPLATE_HASH_PATH));
     if (!initialized) return { code: 0, text: '' };
     if (continuedBefore) {
       await logViolation({ at, reason: 'ledger-deleted' });
       return { code: 0, text: '台账被删了；本轮已续过一次，不再重复阻断。' };
     }
-    return { code: 2, text: `台账被删了：恢复 ${ledger}，或重新跑 claimrail init。` };
+    return { code: 2, text: `台账被删了：恢复 ${ledgerRel}，或重新跑 claimrail init。` };
   }
 
-  const r = await check({ cwd: dir, ledger });
+  const r = await check({ cwd: root, ledger: ledgerAbs });
 
   // 1. check 本身不过：未申报 / 结构 / 证据 / 代价。
   if (r.code !== 0) {
@@ -84,20 +100,22 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   }
 
   // 2. 指纹：工作区变了、台账没变 = 沿用上次申报。
-  const base = await readBaseline(dir);
-  const changedNow = await changedLines(dir, base);
+  const base = await readBaseline(root);
+  const changedNow = await changedLines(root, base);
   // 自定义台账路径也要当协议文件排除：否则台账自己会被算成"这次改了 N 个文件"里的一条。
-  const ledgerPosix = String(ledger).replaceAll('\\', '/');
+  // 过滤用仓库根相对路径（changedLines 的键就是这个基准）。
   const touched = changedNow
     ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])].filter(
-        (f) => !isProtocolPath(f) && f !== ledgerPosix,
+        (f) => !isProtocolPath(f) && f !== ledgerRel,
       )
     : [];
-  const diff = await diffSince(dir, base);
+  const diff = await diffSince(root, base);
   const tHash = treeHash({ touched, diffText: diff });
-  const lHash = ledgerHash(await readFile(join(dir, ledger), 'utf8'));
-  const snap = await readSnapshot(dir);
-  if (snap && tHash !== snap.treeHash && lHash === snap.ledgerHash) {
+  const lHash = ledgerHash(await readFile(ledgerAbs, 'utf8'));
+  const snap = await readSnapshot(root);
+  // 只改了协议文件（.claimrail/、AGENTS.md、.gitignore）时 touched 过滤后是 0：
+  // 以前照样进 stale 分支，拦一句"这次改了 0 个文件"（审查实测复现）。
+  if (snap && touched.length > 0 && tHash !== snap.treeHash && lHash === snap.ledgerHash) {
     if (continuedBefore) {
       await logViolation({ at, reason: 'stale', changed: touched.slice(0, 5), changedTotal: touched.length });
       await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });

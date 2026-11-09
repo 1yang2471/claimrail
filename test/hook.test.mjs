@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, hook } from '../src/cli.mjs';
+import { check, hook, init } from '../src/cli.mjs';
 import { repoWithEvidence, repoWithUnverified } from './helpers.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -119,13 +119,25 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
 // 走真正的命令行入口（起进程），而不是直接调函数。
 // 入口层的接线错一次，单元测试会全绿而实际钩子跑不起来——审查时就是这样发现的：
 // 拆文件后 readIncoming 没接上，hook 在命令行里返回"没跑成：readIncoming is not defined"。
+// hook 的文本走 stderr（退出码才是宿主的接口），所以必须 stdout+stderr 都收，
+// 否则"放行但留了原因"的分支测不到输出（execFileSync 只在失败时给 stderr）。
 const runCli = (args, { cwd, stdin = '' }) => {
-  try {
-    const out = execFileSync('node', [join(repo, 'src', 'cli.mjs'), ...args], { cwd, input: stdin, encoding: 'utf8', stdio: 'pipe' });
-    return { code: 0, out };
-  } catch (err) {
-    return { code: err.status ?? -1, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
-  }
+  const r = spawnSync(process.execPath, [join(repo, 'src', 'cli.mjs'), ...args], { cwd, input: stdin, encoding: 'utf8' });
+  return { code: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+};
+
+// git 仓库 + 已提交 + init 过（模板台账 + baseline），给入口层用例用。
+const repoWithTemplate = async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-hook-tpl-'));
+  const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+  g(['init', '-q']);
+  g(['config', 'user.email', 't@t']);
+  g(['config', 'user.name', 't']);
+  await writeFile(join(dir, 'package.json'), '{"name":"probe"}', 'utf8');
+  g(['add', '-A']);
+  g(['commit', '-qm', 'init']);
+  await init({ cwd: dir });
+  return dir;
 };
 
 test('命令行入口：hook 真的跑得起来，不许停在"没跑成"', async () => {
@@ -159,6 +171,61 @@ test('命令行入口：hook 真的跑得起来，不许停在"没跑成"', asyn
     const noLedger = runCli(['hook'], { cwd: await mkdtemp(join(tmpdir(), 'fk-cli-hook2-')), stdin: '{}' });
     assert.equal(noLedger.code, 0, noLedger.out);
     assert.equal(noLedger.out.trim(), '');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 审查抓到的 P0：readIncoming 里的 async IIFE 少了一对括号，Promise.race 拿到的是函数
+// 而不是 Promise → payload 永远 null → stop_hook_active 在命令行入口从未生效过。
+// 这条走真进程 + 真 stdin，钉住"只拦一次"的护栏在入口层也存在。
+test('命令行入口：stop_hook_active 经 stdin 生效（防死循环护栏不许只在单元层活着）', async () => {
+  const dir = await repoWithTemplate();
+  try {
+    await writeFile(join(dir, 'work.ts'), 'export const a = 1;\n', 'utf8');
+    const first = runCli(['hook'], { cwd: dir, stdin: '{}' });
+    assert.equal(first.code, 2, first.out);
+    assert.match(first.out, /未申报/);
+
+    const again = runCli(['hook'], { cwd: dir, stdin: JSON.stringify({ stop_hook_active: true }) });
+    assert.equal(again.code, 0, again.out);
+    assert.match(again.out, /不再重复阻断/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 同一个 bug 的另一半：定时器不 unref 时进程要多等 5 秒才退出，宿主每轮 Stop 白等。
+test('命令行入口：hook 在流读完时立即返回，不吊着 5 秒定时器', async () => {
+  const dir = await repoWithTemplate();
+  try {
+    const t0 = Date.now();
+    runCli(['hook'], { cwd: dir, stdin: '{}' });
+    const elapsed = Date.now() - t0;
+    assert.ok(elapsed < 2000, `hook 跑了 ${elapsed}ms：定时器没有随流结束清理`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 审查抓到的误拦：touched 过滤掉协议文件后是 0，但 diff 哈希（含 AGENTS.md）变了，
+// 照样进 stale 分支，拦一句"这次改了 0 个文件"。
+test('只改已跟踪的协议文件（AGENTS.md）：不触发 stale', async () => {
+  const dir = await repoWithEvidence();
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    // 协议文件必须已被 git 跟踪：未跟踪文件不进 diff 哈希，打不到 stale 的真实形状
+    await writeFile(join(dir, 'AGENTS.md'), '# r\n', 'utf8');
+    g(['add', 'AGENTS.md']);
+    g(['commit', '-qm', 'agents']);
+    const first = await hook({ cwd: dir });
+    assert.equal(first.code, 0, first.text);
+    // 快照已记下；第二次：工作区只动了已跟踪的 AGENTS.md（协议脚印），touched 过滤后为 0
+    await writeFile(join(dir, 'AGENTS.md'), '# r\n加一行。\n', 'utf8');
+    const second = await hook({ cwd: dir });
+    assert.equal(second.code, 0, second.text);
+    assert.doesNotMatch(second.text, /未申报/);
+    assert.doesNotMatch(second.text, /改了 0 个文件/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -370,6 +370,30 @@ test('滚动容器/固定条被截断时也要改判"不作数"', () => {
   assert.match(b.detail, /截断/);
 });
 
+// 审查补上的最后两类截断守卫：focusVisibleOk 没查 interactive、bottomNotCovered 没查
+// scrollContainers。四类采集必须一个不漏——截断的报告出 true 还能被 render 证据引用成"已验证"。
+test('交互元素/滚动容器被截断时，焦点与遮挡检查同样改判"不作数"', () => {
+  const f = focusVisibleOk({
+    interactive: Array.from({ length: 120 }, (_, i) => ({
+      selector: `#i${i}`,
+      rect: { x: 0, y: 0, w: 44, h: 44 },
+      focusable: true,
+      hasVisibleFocus: true,
+    })),
+    raw: { interactive: 121 },
+  });
+  assert.equal(f.ok, null, `交互元素被截断却报了 ${f.ok}：${f.detail}`);
+  assert.match(f.detail, /截断/);
+
+  const b = bottomNotCovered({
+    scrollContainers: [{ selector: '#sc', rect: { x: 0, y: 0, w: 300, h: 1000 }, scrollableY: true }],
+    fixedRects: [{ selector: '.rule', rect: { x: 0, y: 990, w: 60, h: 2 } }],
+    raw: { scrollContainers: 61 },
+  });
+  assert.equal(b.ok, null, `滚动容器被截断却报了 ${b.ok}：${b.detail}`);
+  assert.match(b.detail, /截断/);
+});
+
 // 透明文字（sr-only、图标字体）没有对比度可言：把 rgba(0,0,0,0) 合成到底色上得到 1.00，
 // 报"对比度不足"是纯假红——真站上这类元素能一次性造一排红。
 test('透明文字不算"对比度不足"，也不冒充"已核"', () => {

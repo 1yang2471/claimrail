@@ -34,11 +34,12 @@ cd claimrail && npm install && npm link   # npm link 让 claimrail 命令进 PAT
 
 ```bash
 claimrail init              # 写台账模板 + AGENTS.md 指路段 + 记 baseline
-claimrail check             # 交付前校验；退出码 0 才放行；台账仍是模板会拦（CI / npx 同理）
+claimrail check             # 交付前校验；退出码 0 才放行；台账仍是模板会拦
 claimrail web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检查（需 playwright）
 claimrail record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
-claimrail rules             # 现行规则 + 原始否决 + 来源
+claimrail rules             # 现行规则表 + 原始否决 + 来源
 claimrail invalidate <key>  # 作废一条规则；原始 log 一条不动
+claimrail --help            # 全部命令与选项
 ```
 
 `check --json` 把同一份判定以结构化 JSON 交出去（给宿主和脚本用）——文本只是这份结论的视图，不是第二次计算。
@@ -103,13 +104,13 @@ PRD 要求 20–30 个陷阱任务，才能对外引用"静默塌缩率"。`benc
 - 现代色值写法一度整类漏判：`iana.org/help/example-domains` 一页 49 处文本里有 40 处文字色写的是 `oklch()`，报告原话却是"采不到实色背景"——把矛头指向背景，而真正读不出来的是前景。现在色值改由浏览器本人换算（在 canvas 上画一个像素再读回来），`oklch()`、`lab()`、`color()`、`color-mix()` 都能判：同一个页面从判 9 处变成判满 49 处，抓出 31 处真实缺陷，最低 2.45:1。浏览器自己也认不出的值仍然报"未判"。
 - SPA 壳页读不到正文：`m3.material.io` 200 + 62KB HTML，可见正文只剩 15 个字符。设计系统站普遍如此，`precedent` 这档现在够不着它们。
 - 引文命中 ≠ 页面在推荐该做法。实测有两处命中的是例外条款；`url + quote` 留给 reviewer 抽查上下文，这是这一档唯一的人防线。
-- 登录闭环已在本地真实的登录门站上验证（匿名被踢到 `/login`；带 `--state` 才拿到受保护内容）。第三方真实产品页未跑——那需要你的凭据。
+- 登录闭环已在本地登录门站与第三方真实站点上验证（saucedemo.com，用的是它登录页自己公示的演示账号，`FK_NET=1` 才外发）。需要你真实凭据的私有产品页仍未跑。
 - `newestTrackedMtime` 要对每个跟踪文件取 mtime。上限 200000，真实项目够不着（6000 文件实测 148ms）；超过才返回 `null`，render 证据报未判而不是猜。
 
 ## 开发
 
 ```bash
-node --test    # 370 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 394 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

@@ -171,3 +171,30 @@ test('文件级 fan-in 要认相对写法：./helper.mjs 也算引用', async ()
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 删除也是"代码改动"：删文件只更新父目录的 mtime，被删路径本身 stat 不到。不补这一类，
+// "截图之后删了文件"仍算截图是新的——render 新鲜度对删除失明（审查实测复现）。
+test('删除文件也抬升"最后改动时间"', async () => {
+  const { newestTrackedMtime } = await import('../src/observe/git.mjs');
+  const { utimes } = await import('node:fs/promises');
+  const dir = await mkdtemp(join(tmpdir(), 'fk-del-'));
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    await mkdir(join(dir, 'a'), { recursive: true });
+    await writeFile(join(dir, 'a', 'b.ts'), 'export const x = 1;\n', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'init']);
+    await rm(join(dir, 'a', 'b.ts'));
+    // 删除只动父目录的 mtime：把父目录拨到可断言的未来时刻，结论不靠墙钟
+    const future = new Date(Date.now() + 5_000);
+    await utimes(join(dir, 'a'), future, future);
+    const newest = await newestTrackedMtime(dir);
+    assert.equal(typeof newest, 'number', `删除路径的父目录没被纳入：返回 ${newest}`);
+    assert.ok(newest >= future.getTime(), `删除没有抬升最后改动时间：${newest} < ${future.getTime()}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

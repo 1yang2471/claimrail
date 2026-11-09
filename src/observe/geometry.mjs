@@ -170,6 +170,11 @@ export function contrastOk(page) {
 export function focusVisibleOk(page) {
   const focusables = (page.interactive ?? []).filter((el) => el.focusable !== false);
   if (!focusables.length) return skip('focus-visible-ok', '没有可聚焦元素可查');
+  // 采集被截断时改判"不作数"：第 121 个可聚焦元素的焦点环看不见没看见，这一轮就是不知道。
+  // 少了这条守卫，截断的报告照样出 true，还能被 render 档证据引用成"已验证"。
+  if (truncated(page, 'interactive')) {
+    return skip('focus-visible-ok', `可聚焦元素采集被截断（${page.raw.interactive} > ${page.interactive.length}），判不了`);
+  }
 
   // hasVisibleFocus === null 表示探针没跑或 Tab 没走到：不许冒充看过焦点环
   const measured = focusables.filter((el) => el.hasVisibleFocus === true || el.hasVisibleFocus === false);
@@ -201,6 +206,11 @@ export function bottomNotCovered(page) {
   // 这一轮就是不知道——不许写成"已核 40 个固定元素"。
   if (truncated(page, 'fixedRects')) {
     return skip('bottom-not-covered', `固定元素采集被截断（${page.raw.fixedRects} > ${page.fixedRects.length}），判不了`);
+  }
+  // 滚动容器被截断同理：第 61 个容器被贴底固定条压住，这一轮永远查不到，
+  // 报告却写"已核 N 个固定元素"。四类采集一个都不能漏（AGENTS 规则表原文）。
+  if (truncated(page, 'scrollContainers')) {
+    return skip('bottom-not-covered', `滚动容器采集被截断（${page.raw.scrollContainers} > ${page.scrollContainers.length}），判不了`);
   }
 
   const hit = [];

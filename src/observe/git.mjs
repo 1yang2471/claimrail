@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { statSync, readFileSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 
 const run = promisify(execFile);
 
@@ -39,6 +39,16 @@ export async function gitState(cwd) {
   if (r.code === 0) return r.stdout.trim() === 'true' ? 'repo' : 'unknown';
   const text = `${r.stderr}${r.stdout}`.toLowerCase();
   return /not a git repository \(or any of the parent directories\)/.test(text) ? 'none' : 'unknown';
+}
+
+// 仓库根。子目录运行时（check 从 pkg/ 下跑、hook 由宿主在任意目录启动）所有路径必须
+// 以仓库根为基准——git diff 的键是根相对路径，文件读取也要在同一基准上，否则
+// "先干后证"和 repo 证据两条守卫在子目录里一个漏拦、一个误拦（审查实测复现）。
+export async function gitToplevel(cwd) {
+  const r = await gitRaw(['rev-parse', '--show-toplevel'], cwd);
+  if (r.code !== 0) return null;
+  const p = r.stdout.trim();
+  return p || null;
 }
 
 export async function tagPointsAtHead(cwd) {
@@ -301,6 +311,18 @@ export async function newestTrackedMtime(cwd, limit = 200_000) {
       .filter((p) => !SELF_ARTIFACT.test(p));
   }
 
+  // 删除也是"代码改动"。删文件只更新其父目录的 mtime，被删路径本身 stat 不到，
+  // 不补这一类的话"截图之后删了文件"仍算截图是新的——render 新鲜度对删除失明。
+  // 状态码 XY 里含 D 的记录即删除；-z 的 rename 第二段（旧路径）没有状态前缀，
+  // 不会被 `^(..) ` 匹配到。
+  const deleted = [];
+  if (st.code === 0) {
+    for (const e of splitZ(st.stdout)) {
+      const m = /^(..) /.exec(e);
+      if (m && m[1].includes('D')) deleted.push(toPosix(e.slice(3)));
+    }
+  }
+
   let max = 0;
   for (const f of [...tracked, ...untracked]) {
     try {
@@ -308,6 +330,14 @@ export async function newestTrackedMtime(cwd, limit = 200_000) {
       if (t > max) max = t;
     } catch {
       /* 已删除：剩下的时间戳仍是有意义的下界 */
+    }
+  }
+  for (const p of deleted.filter((p) => !SELF_ARTIFACT.test(p))) {
+    try {
+      const t = statSync(dirname(join(cwd, p))).mtimeMs;
+      if (t > max) max = t;
+    } catch {
+      /* 父目录也没了：后面还有别的信号兜底 */
     }
   }
   return max || null;

@@ -27,7 +27,7 @@ Not on npm yet (`npm view claimrail` returns 404). Install from source:
 
 ```bash
 git clone https://github.com/1yang2471/claimrail.git
-cd claimrail && npm install && npm link   # npm link puts the claimrail command on PATH
+cd claimrail && npm install && npm link   # npm link puts the claimrail command on PATH (junction/symlink install works — the CLI resolves its own real path)
 ```
 
 Then use `claimrail`; from a repo checkout, `node src/cli.mjs` works the same:
@@ -104,13 +104,13 @@ A second 6-task pilot ran with that gate (`docs/bench-pilot-2026-11-09.json`, 12
 - Modern CSS colour syntaxes used to be skipped wholesale: on `iana.org/help/example-domains`, 40 of 49 text runs are coloured with `oklch()`, and the report blamed "no solid background sampled" — pointing at the background when the foreground was what went unread. Colours are now resolved by the browser itself (one pixel painted and read back), so `oklch()`, `lab()`, `color()` and `color-mix()` are judged too: that page now measures 49/49 and turns up 31 real defects, the worst at 2.45:1. Anything the browser itself rejects is still reported as undecided.
 - SPA shells expose no readable text: `m3.material.io` returns 200 with 62KB of HTML and 15 visible characters. Most design-system sites are like this, so the `precedent` tier can't reach them.
 - A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
-- The logged-in flow is verified against a local login-gated site (anonymous → redirected to `/login`; with `--state` → real content collected). A third-party production page has not been run — that needs your credentials.
+- The logged-in flow is verified against a local login-gated site, and against a real third-party site (saucedemo.com, using the demo credentials it publishes on its own login page — gated behind `FK_NET=1` so nothing is sent by default). A page behind *your* real credentials has not been run.
 - `newestTrackedMtime` stats every tracked file. The cap is 200,000 — high enough that no real repo hits it (6000 files measured at 148ms); beyond it, render evidence is reported undecided rather than guessed.
 
 ## Development
 
 ```bash
-node --test    # 370 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 394 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

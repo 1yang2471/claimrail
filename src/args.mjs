@@ -28,8 +28,10 @@ const HELP = [
   '  --allow-net       precedent / web 两档要真回访时必须显式打开（外发查询）',
   '  --viewport <列表> web 的视口，默认 390x700,1280x800',
   '  --state <文件>    web 的 Playwright storageState（登录态）',
-  '  --out <目录>      web 的截图输出目录',
- '  --json            check 输出结构化判定（JSON），供宿主/脚本消费；文本只是视图',
+  '  --out <目录>      web 的截图输出目录（相对仓库根；仓库外路径报错）',
+  '  --name <前缀>     web 的截图文件名前缀（默认按 URL 指纹生成）',
+  '  --no-pixel        web 跳过像素补背景采样（对比度覆盖率会降）',
+  '  --json            check 输出结构化判定（JSON），供宿主/脚本消费；文本只是视图',
   '',
   '退出码：0 放行 / 1 拦住（含参数错误）/ 2 仅 hook：拦住并续一轮',
 ].join('\n');
@@ -71,6 +73,7 @@ export function parse(argv) {
     what: undefined,
     why: undefined,
     anchor: false,
+    pixel: true,
     json: false,
     unknown: cmd === 'unknown' ? first : undefined,
   };
@@ -88,6 +91,7 @@ export function parse(argv) {
     else if (a === '--viewport') flags.viewport = argv[++i];
     else if (a === '--out') flags.out = argv[++i];
     else if (a === '--name') flags.name = argv[++i];
+    else if (a === '--no-pixel') flags.pixel = false;
     else if (a === '--key') flags.key = argv[++i];
     else if (a === '--what') flags.what = argv[++i];
     else if (a === '--why') flags.why = argv[++i];

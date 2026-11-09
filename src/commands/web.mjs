@@ -1,10 +1,11 @@
 // web 命令：起浏览器、按视口采集、渲染一屏报告。
 // 从 cli.mjs 拆出来是因为提交钩子按 token 拒收超大文件——这一段没有自己的状态，
 // 只依赖 driver 与 web 观察层，单独成文件不引入任何第二份实现。
-import { join } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { renderPage } from '../observe/web.mjs';
 import { openPage, launchBrowser, parseViewports, nameFromUrl } from '../observe/driver.mjs';
+import { gitToplevel } from '../observe/git.mjs';
 
 // launch / open 可注入：不然这个命令一行都测不到，只能靠真浏览器手跑——
 // 退出码在这种地方最容易说谎（"五项全未判"曾经返回 0，CI 会当成检查通过）。
@@ -17,8 +18,20 @@ export async function web({
   cwd = process.cwd(),
   launch = launchBrowser,
   open = openPage,
+  pixel = true,
 } = {}) {
   if (!url) return { code: 1, text: '用法：claimrail web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .claimrail/shots]' };
+
+  // 截图目录与 ref 都以仓库根为基准：evidence 的 ref 必须是仓库根相对路径，
+  // check 回验时才找得到它。--out 给绝对路径也行，但必须在仓库内——仓库外的
+  // 绝对路径写不出可回验的 ref，早报错而不是让 mkdir 抛 ENOENT（审查实测）。
+  const root = (await gitToplevel(cwd)) ?? cwd;
+  const outAbs = resolve(cwd, out);
+  const relOut = relative(root, outAbs);
+  if (!relOut || relOut.startsWith('..') || isAbsolute(relOut)) {
+    return { code: 1, text: `--out 必须落在仓库内（${outAbs} 在 ${root} 之外）：仓库外的路径写不出可回验的 ref` };
+  }
+  const outRel = relOut.split(sep).join('/');
 
   let browser;
   try {
@@ -47,13 +60,15 @@ export async function web({
         const vlabel = String(vp).replace(/×/g, 'x');
         const shotName = `${base}@${vlabel}`;
         const report = await renderPage(session.page, {
-          outDir: join(cwd, out),
+          outDir: outAbs,
           name: shotName,
           label: `${url} @ ${vlabel}`,
           focusProbe: session.focusProbe,
+          pixel,
         });
 
-        const ref = join(out, `${shotName}.png`).replaceAll('\\', '/');
+        // ref 用仓库根相对路径（evidence 回验按这个基准找文件）
+        const ref = `${outRel}/${shotName}.png`;
         const green = report.checks.filter((c) => c.ok === true).map((c) => c.id);
         const undecided = report.checks.filter((c) => c.ok === null).map((c) => c.id);
         if (report.checks.some((c) => c.ok === false)) red = true;

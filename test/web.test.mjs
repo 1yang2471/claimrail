@@ -198,3 +198,41 @@ test('web 命令把 limitations 打到屏幕上，不只留在报告里', async 
     assert.match(r.text, /文本采集被截断/);
   });
 });
+
+// 审查抓到的顺序 bug：截图排在 Tab 焦点探测之后，而 Tab 会滚动页面（真站实测一次
+// 0→911→1532）。探测之后拍，像素采样拿"滚动前"的矩形坐标去读"滚动后"的截图——
+// 颜色对不上号，假绿假红都可能，报告还标 backgroundFrom:'pixel'。
+test('截图先于焦点探测落盘：Tab 滚动不许污染像素采样的基准图', async () => {
+  await withDir(async (dir) => {
+    const calls = [];
+    const page = {
+      evaluate: async () => {
+        calls.push('evaluate');
+        return { ...defectData, interactive: [] };
+      },
+      screenshot: async ({ path }) => {
+        calls.push('screenshot');
+        await writeFile(path, 'PNG-bytes');
+      },
+    };
+    await renderPage(page, { outDir: dir, name: 'order', focusProbe: async () => { calls.push('focusProbe'); return []; } });
+    assert.deepEqual(calls, ['evaluate', 'screenshot', 'focusProbe']);
+  });
+});
+
+// 审查抓到的可用性问题：--out 给绝对路径时 join(cwd, out) 拼成 <cwd>\D:\x（ENOENT）；
+// 而且仓库外的路径写不出可回验的 ref（evidence 回验找不到文件）。早报错。
+test('web --out：仓库外报错，仓库内绝对路径放行', async () => {
+  await withDir(async (dir) => {
+    const outside = await mkdtemp(join(tmpdir(), 'fk-web-out-'));
+    const r = await runWeb(defectData, { cwd: dir, out: outside });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /必须落在仓库内/);
+
+    // 仓库内的绝对路径不该被拼坏：能走到浏览器（fake）并正常出报告，
+    // ref 是仓库根相对路径（URL 指纹名 + 视口标签）
+    const ok = await runWeb(defectData, { cwd: dir, out: join(dir, 'shots') });
+    assert.equal(ok.code, 1, ok.text); // defectData 本身带红项
+    assert.match(ok.text, /shots\/[A-Za-z0-9_-]+@390x700\.png/);
+  });
+});

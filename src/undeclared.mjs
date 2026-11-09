@@ -22,15 +22,21 @@ async function readTemplateHash(cwd) {
   return templateHash();
 }
 
+// 台账是不是还停留在 init 模板（哈希或占位理由）。check 的 fail-closed 判定
+// 与 undeclaredBlock 共用这一把尺，两处各写一份迟早漂移。
+export async function isTemplateLedger({ cwd, ledgerText, ledger }) {
+  const ledgerHash = createHash('sha256').update(ledgerText).digest('hex');
+  const seed = await readTemplateHash(cwd);
+  return ledgerHash === seed || (ledger.forks.length === 0 && isTemplateReason(ledger.no_fork_reason));
+}
+
 export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [], ledgerPath = LEDGER_PATH }) {
   // 自定义台账路径也算协议文件：台账自己不该出现在"工作区有改动"的清单里。
   const ledgerPosix = String(ledgerPath).replaceAll('\\', '/');
   const workTouched = changed.filter((f) => !isProtocolPath(f) && String(f).replaceAll('\\', '/') !== ledgerPosix);
   if (!workTouched.length) return null;
 
-  const ledgerHash = createHash('sha256').update(ledgerText).digest('hex');
-  const seed = await readTemplateHash(cwd);
-  const stillTemplate = ledgerHash === seed || (ledger.forks.length === 0 && isTemplateReason(ledger.no_fork_reason));
+  const stillTemplate = await isTemplateLedger({ cwd, ledgerText, ledger });
   if (!stillTemplate) return null;
 
   const shown = workTouched.slice(0, 5);
