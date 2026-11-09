@@ -481,7 +481,7 @@
       "picked": "选 3 个免费模型（conatus-free / lmodel / hy4free）",
       "evidence": {
         "kind": "repo",
-        "ref": "bench/agent.mjs:38-40",
+        "ref": "bench/agent.mjs:69-71",
         "asserts": [
           "免费模型",
           "429"
@@ -491,6 +491,51 @@
         "file": "docs/bench-ai-flavor-2026-11-09.json"
       },
       "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "怎么让 bench 模型真的去调研业界做法",
+      "options": [
+        "加 fetch_url 工具（FK_ALLOW_NET=1 才暴露）",
+        "只改系统提示让它 curl",
+        "不加工具，维持记忆+回访"
+      ],
+      "picked": "加 fetch_url 工具（FK_ALLOW_NET=1 才暴露）",
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/agent-fetch.test.mjs:13-38",
+        "asserts": [
+          "同一管线",
+          "allowNet",
+          "带凭据"
+        ]
+      },
+      "target": {
+        "file": "bench/agent.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "fetch_url 的返回文本怎么和 check 回访对齐",
+      "options": [
+        "各自实现一份剥标签逻辑",
+        "复用 evidence.visibleText",
+        "返回原始 HTML 让模型自己读"
+      ],
+      "picked": "复用 evidence.visibleText",
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/agent-fetch.test.mjs:13-19",
+        "asserts": [
+          "script/style",
+          "同一管线"
+        ]
+      },
+      "target": {
+        "file": "src/evidence.mjs"
+      },
+      "cost_if_wrong": "high",
       "verified": true
     }
   ]
