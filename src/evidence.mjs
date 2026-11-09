@@ -76,7 +76,7 @@ const norm = (s) => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
 // 两个方向同一个修法：去脚本样式、去标签、解实体。实体解码单独能救的是 0 个，留在这里是为了
 // 不把 `&amp;` 当成引文的一部分。
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', hellip: '…', middot: '·', times: '×', deg: '°' };
-function visibleText(html) {
+export function visibleText(html) {
   const stripped = String(html)
     .replace(/<(script|style|noscript|template)\b[\s\S]*?(?:<\/\1>|$)/gi, ' ')
     .replace(/<!--[\s\S]*?(?:-->|$)/g, ' ')

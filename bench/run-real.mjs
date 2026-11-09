@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { check, init } from '../src/cli.mjs';
-import { runRealAgent, PROTOCOL_SYSTEM, PLAIN_SYSTEM, BUDGET } from './agent.mjs';
+import { runRealAgent, PROTOCOL_SYSTEM, PLAIN_SYSTEM, BUDGET, NET_NOTE } from './agent.mjs';
 import { parseArms, assertArm, usesInit, usesProtocolPrompt, stripsPointer, stripProtocolPointer } from './arms.mjs';
 import { trapTaken, aiFlavorOverlay } from './classify.mjs';
 
@@ -14,6 +14,8 @@ const g = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 const TASKS = process.argv.slice(2).length ? process.argv.slice(2) : ['published-lowball'];
 const ARMS = parseArms(process.env.FK_ARMS);
 for (const p of ARMS) assertArm(p);
+// 模型侧联网与 harness 回访共用同一个同意开关（FK_ALLOW_NET=1）。
+const ALLOW_NET = process.env.FK_ALLOW_NET === '1';
 
 const PROMPT = (spec) => `任务：${spec.prompt}
 
@@ -48,7 +50,7 @@ async function one(taskDir, protocol) {
       }
     }
 
-    const run = await runRealAgent({ dir, prompt: PROMPT(spec), system: (usesProtocolPrompt(protocol) ? PROTOCOL_SYSTEM : PLAIN_SYSTEM) + BUDGET, maxSteps: Number(process.env.FK_MAX_STEPS ?? spec.maxSteps ?? 20) });
+    const run = await runRealAgent({ dir, prompt: PROMPT(spec), system: (usesProtocolPrompt(protocol) ? PROTOCOL_SYSTEM : PLAIN_SYSTEM) + BUDGET + (ALLOW_NET ? NET_NOTE : ''), maxSteps: Number(process.env.FK_MAX_STEPS ?? spec.maxSteps ?? 20), allowNet: ALLOW_NET });
 
     let ledger = null;
     let rawLedger = null;
@@ -71,7 +73,7 @@ async function one(taskDir, protocol) {
       // 模型自己跑的 check 默认不联网（网络要用户同意）；harness 再以"用户已同意"的身份回验一次，
       // 否则 precedent/web 档永远卡在"未获同意"，测到的就不是引文本身了。
       const hasNet = (ledger?.forks ?? []).some((f) => ['precedent', 'web'].includes(f?.evidence?.kind));
-      if (hasNet && process.env.FK_ALLOW_NET === '1') {
+      if (hasNet && ALLOW_NET) {
         const n = await check({ cwd: dir, allowNet: true });
         netCode = n.code;
         netText = n.text;
@@ -98,6 +100,7 @@ async function one(taskDir, protocol) {
     return {
       task: spec.id, protocol, model: process.env.FK_MODEL ?? 'loomy/spark-x2.6', seconds: Math.round((Date.now() - started) / 1000),
       steps: run.steps, toolCalls: run.toolCalls.length, endedNaturally: run.stopReason === 'end_turn',
+      fetchCalls: run.toolCalls.filter((t) => t === 'fetch_url').length,
       stopReason: run.stopReason, textLen: run.text.length,
       declaredForks: declared,
       ledgerSummary: (ledger?.forks ?? []).map((f) => ({ fork: f.fork, kind: f.evidence?.kind ?? null, ref: f.evidence?.ref ?? null, sources: f.evidence?.sources?.length ?? null, verified: f.verified })),

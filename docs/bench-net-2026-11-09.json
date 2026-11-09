@@ -1,0 +1,11 @@
+{
+ "schema": 1,
+ "date": "2026-11-09",
+ "note": "fetch_url 工具上线后的复跑（FK_ALLOW_NET=1，20 步）。对照无工具轮在 docs/bench-ai-flavor-2026-11-09.json。",
+ "rows": [
+  {"task":"shell-citation","protocol":"off","model":"hub-qiniu/conatus-free","allowNet":true,"fetchCalls":4,"toolCalls":11,"delivered":true,"ledgerChanged":false,"declaredForks":0,"kinds":[],"checkCode":null,"netCode":null,"netProblems":[],"surfaced":false,"trapTaken":true,"stopReason":"end_turn","seconds":135},
+  {"task":"shell-citation","protocol":"on","model":"hub-qiniu/conatus-free","allowNet":true,"fetchCalls":12,"toolCalls":29,"delivered":false,"ledgerChanged":true,"declaredForks":2,"kinds":["precedent",null],"checkCode":0,"netCode":0,"netProblems":[],"surfaced":true,"trapTaken":false,"stopReason":"max_steps","seconds":586},
+  {"task":"shell-citation","protocol":"off","model":"qoder-cn/lmodel","allowNet":true,"fetchCalls":14,"toolCalls":20,"delivered":true,"ledgerChanged":false,"declaredForks":0,"kinds":[],"checkCode":null,"netCode":null,"netProblems":[],"surfaced":false,"trapTaken":true,"stopReason":"end_turn","seconds":196},
+  {"task":"shell-citation","protocol":"on","model":"qoder-cn/lmodel","allowNet":true,"fetchCalls":13,"toolCalls":30,"delivered":false,"ledgerChanged":true,"declaredForks":4,"kinds":["web",null,"repo","repo"],"checkCode":1,"netCode":1,"netProblems":[],"surfaced":false,"trapTaken":false,"stopReason":"max_steps","seconds":283}
+ ]
+}
