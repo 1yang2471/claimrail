@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { TEMPLATE_HASH_PATH } from './paths.mjs';
+import { LEDGER_PATH, TEMPLATE_HASH_PATH } from './paths.mjs';
 import { templateHash, isTemplateReason } from './template.mjs';
 
 // init 自己写进工作区的文件不算"agent 干了活"：否则刚 init 完、还没开工，check 就会拦。
@@ -22,8 +22,10 @@ async function readTemplateHash(cwd) {
   return templateHash();
 }
 
-export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [], ledgerPath = '.claimrail/decisions.json' }) {
-  const workTouched = changed.filter((f) => !isProtocolPath(f));
+export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [], ledgerPath = LEDGER_PATH }) {
+  // 自定义台账路径也算协议文件：台账自己不该出现在"工作区有改动"的清单里。
+  const ledgerPosix = String(ledgerPath).replaceAll('\\', '/');
+  const workTouched = changed.filter((f) => !isProtocolPath(f) && String(f).replaceAll('\\', '/') !== ledgerPosix);
   if (!workTouched.length) return null;
 
   const ledgerHash = createHash('sha256').update(ledgerText).digest('hex');

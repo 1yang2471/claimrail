@@ -175,3 +175,32 @@ test('违规记录写不进去：仍然放行', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 自定义台账路径：提示必须指向实际文件。OCR 审查发现 undeclared 那条修了，
+// stale 与"台账被删"两条仍写死默认路径——同一类 bug 在 hook 侧还有两处。
+test('自定义台账路径：stale 与删台账的提示都写实际路径', async () => {
+  const dir = await repoWithLedger();
+  try {
+    const custom = join(dir, 'custom-ledger.json');
+    await writeFile(custom, `${JSON.stringify(DECLARED, null, 2)}\n`, 'utf8');
+
+    assert.equal((await hook({ cwd: dir, ledger: 'custom-ledger.json' })).code, 0);
+
+    await writeFile(join(dir, 'src-two.ts'), 'export const b = 2;\n', 'utf8');
+    const stale = await hook({ cwd: dir, ledger: 'custom-ledger.json' });
+    assert.equal(stale.code, 2, stale.text);
+    assert.match(stale.text, /custom-ledger\.json/);
+    assert.doesNotMatch(stale.text, /\.claimrail\/decisions\.json/);
+    const changedLine = stale.text.split('\n').find((l) => l.startsWith('这次改了'));
+    assert.ok(changedLine, stale.text);
+    assert.doesNotMatch(changedLine, /custom-ledger\.json/, '台账自己不算工作改动');
+
+    await unlink(custom);
+    const gone = await hook({ cwd: dir, ledger: 'custom-ledger.json' });
+    assert.equal(gone.code, 2, gone.text);
+    assert.match(gone.text, /custom-ledger\.json/);
+    assert.doesNotMatch(gone.text, /\.claimrail\/decisions\.json/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

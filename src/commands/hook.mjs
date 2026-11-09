@@ -41,17 +41,17 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   const continuedBefore = p?.stop_hook_active === true || p?.stopHookActive === true;
   const at = new Date().toISOString();
   // 本地状态写不进去（只读仓库、路径被占）不许把交付打成宿主故障：
-  // 快照/违规记录是尽力而为的审计线索，不是交付的前置条件。
-  const saveSnapshot = async (entry) => {
+  // 快照/违规记录是尽力而为的审计线索，不是交付的前置条件。写失败留一行 stderr，
+  // 否则只读仓库里 stale 会反复拦，却没人知道快照其实一次都没推进。
+  const bestEffort = (label, fn) => async (entry) => {
     try {
-      await writeSnapshot(dir, entry);
-    } catch {}
+      await fn(dir, entry);
+    } catch (err) {
+      process.stderr.write(`claimrail hook: ${label}写不进去（${err.code ?? err.message}），继续放行\n`);
+    }
   };
-  const logViolation = async (entry) => {
-    try {
-      await recordViolation(dir, entry);
-    } catch {}
-  };
+  const saveSnapshot = bestEffort('快照', writeSnapshot);
+  const logViolation = bestEffort('违规记录', recordViolation);
 
   // 台账被删：初始化过（有 baseline 或模板指纹）就不是"不在协议里"，而是绕开。
   if (!existsSync(join(dir, ledger))) {
@@ -61,7 +61,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
       await logViolation({ at, reason: 'ledger-deleted' });
       return { code: 0, text: '台账被删了；本轮已续过一次，不再重复阻断。' };
     }
-    return { code: 2, text: '台账被删了：恢复 .claimrail/decisions.json，或重新跑 claimrail init。' };
+    return { code: 2, text: `台账被删了：恢复 ${ledger}，或重新跑 claimrail init。` };
   }
 
   const r = await check({ cwd: dir, ledger });
@@ -86,9 +86,11 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
   // 2. 指纹：工作区变了、台账没变 = 沿用上次申报。
   const base = await readBaseline(dir);
   const changedNow = await changedLines(dir, base);
+  // 自定义台账路径也要当协议文件排除：否则台账自己会被算成"这次改了 N 个文件"里的一条。
+  const ledgerPosix = String(ledger).replaceAll('\\', '/');
   const touched = changedNow
     ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])].filter(
-        (f) => !isProtocolPath(f),
+        (f) => !isProtocolPath(f) && f !== ledgerPosix,
       )
     : [];
   const diff = await diffSince(dir, base);
@@ -108,7 +110,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
         `这次改了 ${touched.length} 个文件：${touched.slice(0, 5).join('、')}${
           touched.length > 5 ? `（另有 ${touched.length - 5} 个）` : ''
         }`,
-        '更新 .claimrail/decisions.json：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。',
+        `更新 ${ledger}：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。`,
         '沿用上次的申报不算这次申报——哪怕结论一样，也要把理由改成这次的理由。',
       ].join('\n'),
     };
