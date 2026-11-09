@@ -340,6 +340,72 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "OCR 第一轮审查的三条怎么处理",
+      "options": [
+        "只记录",
+        "只修 bug",
+        "全修（bug + maintainability）"
+      ],
+      "picked": "全修（bug + maintainability）",
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/delivery.test.mjs:181-203",
+        "asserts": [
+          "custom-ledger.json",
+          "台账自己不算工作改动"
+        ]
+      },
+      "target": {
+        "file": "src/commands/hook.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "OCR 第二轮的三条（标记共享 / FK_ARMS 空格 / 臂语义）怎么处理",
+      "options": [
+        "只修 FK_ARMS 空格",
+        "只记录",
+        "全修（共享标记 + 解析 + 语义收拢）"
+      ],
+      "picked": "全修（共享标记 + 解析 + 语义收拢）",
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/bench.test.mjs:204-221",
+        "asserts": [
+          "parseArms",
+          "AGENTS_BEGIN"
+        ]
+      },
+      "target": {
+        "file": "bench/arms.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "怎么让 undeclared 被真模型触发",
+      "options": [
+        "继续等模型自然触发",
+        "silent 臂：init 后删掉 AGENTS.md 指路",
+        "改 prompt 逼模型不写台账"
+      ],
+      "picked": "silent 臂：init 后删掉 AGENTS.md 指路",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/AUDIT-2026-11-08.md:216-233",
+        "asserts": [
+          "undeclared 真触发了",
+          "2/3 模型第一次"
+        ]
+      },
+      "target": {
+        "file": "bench/run-real.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
