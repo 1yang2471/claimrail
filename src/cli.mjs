@@ -18,6 +18,7 @@ import { TEMPLATE_TEXT, templateHash } from './template.mjs';
 import { parse, help, unknownCmd } from './args.mjs';
 import { check, readJson, writeBaseline, readBaseline } from './commands/check.mjs';
 import { hook, readIncoming } from './commands/hook.mjs';
+import { AGENTS_BEGIN, AGENTS_END } from './agents.mjs';
 
 export { web, parse, help, unknownCmd, LEDGER_PATH, check, hook };
 export { readJson, writeBaseline, readBaseline } from './commands/check.mjs';
@@ -30,8 +31,7 @@ const NOTICE = `数据去向：
 
 // 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
 // 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
-const AGENTS_BEGIN = '<!-- claimrail:begin -->';
-const AGENTS_END = '<!-- claimrail:end -->';
+// 标记常量住在 agents.mjs：bench 的 silent 臂要删同一段，两处各写一份字面量会漂移。
 // 指路块里刻意不写"去加载 claimrail 技能"：技能要靠 SKILL.md 装进宿主的 skills 目录才算注册，
 // npm 安装只把 skill/ 放在包里，不会自动装。写"读技能"会让 agent 去找一个没注册的技能。
 // 改成指向包里那个真实存在的文件路径——它一定在，且能直接读。

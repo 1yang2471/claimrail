@@ -7,12 +7,12 @@ import { join } from 'node:path';
 
 import { check, init } from '../src/cli.mjs';
 import { runRealAgent, PROTOCOL_SYSTEM, PLAIN_SYSTEM, BUDGET } from './agent.mjs';
-import { assertArm, stripProtocolPointer } from './arms.mjs';
+import { parseArms, assertArm, usesInit, usesProtocolPrompt, stripsPointer, stripProtocolPointer } from './arms.mjs';
 import { trapTaken } from './classify.mjs';
 
 const g = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 const TASKS = process.argv.slice(2).length ? process.argv.slice(2) : ['published-lowball'];
-const ARMS = (process.env.FK_ARMS ?? 'off,on').split(',');
+const ARMS = parseArms(process.env.FK_ARMS);
 for (const p of ARMS) assertArm(p);
 
 const PROMPT = (spec) => `任务：${spec.prompt}
@@ -34,12 +34,12 @@ async function one(taskDir, protocol) {
     let template = null;
     // silent = 仓库 init 过，但模型拿的是 off 的系统提示。模拟"无视协议的 agent"：
     // 它改了文件却不写台账时，check 的 undeclared 应该退出 1。这是新门唯一没被真模型打到的形状。
-    const initProtocol = protocol === 'on' || protocol === 'silent';
+    const initProtocol = usesInit(protocol);
     if (initProtocol) {
       await init({ cwd: dir });
       // init 写的模板本身就能过 check。不比对它，"agent 什么都没写"会被算成合规交付。
       template = await readFile(join(dir, '.claimrail', 'decisions.json'), 'utf8');
-      if (protocol === 'silent') {
+      if (stripsPointer(protocol)) {
         // 去掉 init 写的 AGENTS.md 指路段：模拟"仓库初始化过、但 agent 没读到协议"。
         // 不这么做，GLM 会照 AGENTS.md 自己写台账——undeclared 永远没机会触发。
         const agents = join(dir, 'AGENTS.md');
@@ -48,7 +48,7 @@ async function one(taskDir, protocol) {
       }
     }
 
-    const run = await runRealAgent({ dir, prompt: PROMPT(spec), system: (protocol === 'on' ? PROTOCOL_SYSTEM : PLAIN_SYSTEM) + BUDGET, maxSteps: Number(process.env.FK_MAX_STEPS ?? spec.maxSteps ?? 20) });
+    const run = await runRealAgent({ dir, prompt: PROMPT(spec), system: (usesProtocolPrompt(protocol) ? PROTOCOL_SYSTEM : PLAIN_SYSTEM) + BUDGET, maxSteps: Number(process.env.FK_MAX_STEPS ?? spec.maxSteps ?? 20) });
 
     let ledger = null;
     let rawLedger = null;

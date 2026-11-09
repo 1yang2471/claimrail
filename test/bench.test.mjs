@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { run } from '../bench/runner.mjs';
 import { trapTaken, KNOWN_TRAP_RULES } from '../bench/classify.mjs';
 import { PROTOCOL_SYSTEM, callModel, retryable } from '../bench/agent.mjs';
-import { assertArm, stripProtocolPointer } from '../bench/arms.mjs';
+import { assertArm, parseArms, stripProtocolPointer, usesInit, usesProtocolPrompt, stripsPointer } from '../bench/arms.mjs';
+import { AGENTS_BEGIN, AGENTS_END } from '../src/agents.mjs';
 
 // 这一层是发布文案唯一允许引用的数字来源（PRD Testing Decisions 第 2 层）。
 // 陷阱任务必须来自真翻过的车，不新编。
@@ -203,7 +204,19 @@ test('pilot 三分类能从原始行重算：没写台账 / 写了被拦 / 写�
 test('bench 臂名与 silent 预处理：未知臂、没删掉指路段都报错', () => {
   assert.throws(() => assertArm('silnet'), /未知 protocol/);
   assert.equal(assertArm('silent'), 'silent');
-  const text = 'before\n<!-- claimrail:begin -->\n## claimrail\n...\n<!-- claimrail:end -->\nafter\n';
+  // FK_ARMS="off, silent" 这种带空格的写法必须能用
+  assert.deepEqual(parseArms('off, silent'), ['off', 'silent']);
+  assert.deepEqual(parseArms(''), ['off', 'on']);
+  // 臂语义只住一处：init / 协议提示 / 删指路
+  assert.equal(usesInit('on'), true);
+  assert.equal(usesInit('silent'), true);
+  assert.equal(usesInit('off'), false);
+  assert.equal(usesProtocolPrompt('on'), true);
+  assert.equal(usesProtocolPrompt('silent'), false);
+  assert.equal(stripsPointer('silent'), true);
+  assert.equal(stripsPointer('on'), false);
+  // 夹具用生产者同一份标记：改标记时测试不会自己跟自己一致
+  const text = `before\n${AGENTS_BEGIN}\n## claimrail\n...\n${AGENTS_END}\nafter\n`;
   assert.equal(stripProtocolPointer(text), 'before\nafter\n');
   assert.throws(() => stripProtocolPointer('no pointer here'), /没删掉/);
 });
