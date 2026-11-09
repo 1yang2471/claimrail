@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { run } from '../bench/runner.mjs';
 import { trapTaken, KNOWN_TRAP_RULES } from '../bench/classify.mjs';
 import { PROTOCOL_SYSTEM, callModel, retryable } from '../bench/agent.mjs';
+import { assertArm, stripProtocolPointer } from '../bench/arms.mjs';
 
 // 这一层是发布文案唯一允许引用的数字来源（PRD Testing Decisions 第 2 层）。
 // 陷阱任务必须来自真翻过的车，不新编。
@@ -195,6 +196,16 @@ test('pilot 三分类能从原始行重算：没写台账 / 写了被拦 / 写�
   assert.match(audit, /没写台账、也没做改动（撞步数上限） \| 2\/6 \| 3\/6/);
   assert.match(audit, /写了台账、被 check 拦住 \| — \| 2\/6/);
   assert.match(audit, /写了台账、check 放行 \| — \| 1\/6/);
+});
+
+// silent 臂的两处静默失败都会让对照数据失去意义：臂名 typo 退化成 off，
+// 指路段没删掉退化成 on。两者都必须直接报错，不能带着错误标签继续跑。
+test('bench 臂名与 silent 预处理：未知臂、没删掉指路段都报错', () => {
+  assert.throws(() => assertArm('silnet'), /未知 protocol/);
+  assert.equal(assertArm('silent'), 'silent');
+  const text = 'before\n<!-- claimrail:begin -->\n## claimrail\n...\n<!-- claimrail:end -->\nafter\n';
+  assert.equal(stripProtocolPointer(text), 'before\nafter\n');
+  assert.throws(() => stripProtocolPointer('no pointer here'), /没删掉/);
 });
 
 // "未判"不许当"通过"：报告里有 null，回验必须说"不作数"；低代价时门允许交付，
