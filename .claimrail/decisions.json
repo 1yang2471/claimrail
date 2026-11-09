@@ -426,6 +426,72 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "AI 味判据读哪些文件",
+      "options": [
+        "只读 src/chat.ts",
+        "拼接 src 下 ts/tsx/css",
+        "按 spec.writes 清单"
+      ],
+      "picked": "拼接 src 下 ts/tsx/css",
+      "evidence": {
+        "kind": "repo",
+        "ref": "test/flavor.test.mjs:19-25",
+        "asserts": [
+          "chat.css",
+          "也要能判到"
+        ]
+      },
+      "target": {
+        "file": "bench/run-real.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "怎么把调研业界变成可测判据",
+      "options": [
+        "只加 trap 规则",
+        "新增 aiFlavorOverlay 判交付代码",
+        "改 PROTOCOL_SYSTEM"
+      ],
+      "picked": "新增 aiFlavorOverlay 判交付代码",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/HANDOFF.md:17",
+        "asserts": [
+          "覆盖式滚动条",
+          "scrollbar-gutter: stable"
+        ]
+      },
+      "target": {
+        "file": "bench/classify.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "免费模型实测选哪几个",
+      "options": [
+        "沿用 conatus-free",
+        "选 3 个免费模型（conatus-free / lmodel / hy4free）",
+        "用付费模型"
+      ],
+      "picked": "选 3 个免费模型（conatus-free / lmodel / hy4free）",
+      "evidence": {
+        "kind": "repo",
+        "ref": "bench/agent.mjs:38-40",
+        "asserts": [
+          "免费模型",
+          "429"
+        ]
+      },
+      "target": {
+        "file": "docs/bench-ai-flavor-2026-11-09.json"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
