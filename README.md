@@ -86,15 +86,34 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 `hook` reads the event from stdin; exit code 2 means "block and continue one more turn", with stderr handed to the model. Repos without a ledger pass silently; once a turn has already been continued, `stop_hook_active` prevents blocking again (otherwise it loops forever).
 
-## Benchmarks: not yet measured
+## Benchmarks: 20 trap tasks × 2 arms (measured 2026-11-11)
 
-The PRD calls for 20–30 trap tasks before any "silent-collapse rate" can be quoted publicly. `bench/tasks/` now holds **20 tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
+`bench/tasks/` holds **20 trap tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
 
-The first real-model pass (`hub-qiniu/conatus-free`, local Anthropic-compatible gateway) ran all 20 tasks on the off arm with a 6-step budget, and **the data is invalid**: 7 runs were voided by 429 rate limits, and of the 13 valid runs only 1 ended naturally and delivered — the other 12 hit the step cap. A 10-step, 6-task pilot then completed with 12/12 valid runs, but 5/6 protocol-arm runs never wrote a ledger, so the gate had nothing to judge. That gap is now a blocking rule: `check` exits 1 when the diff is non-empty and the ledger is still the `init` template; the Stop hook also blocks a stale ledger once, then records the pass locally.
+`bench/run-real.mjs` then ran those tasks twice: once with a plain system prompt (`off`), once with `claimrail init` and the protocol system prompt (`on`). Model: `workbuddy-ai/deepseek-v4.1-flash-sg` through a local Anthropic-compatible gateway; 20-step budget; network enabled (`FK_ALLOW_NET=1`). Rows: `docs/bench-2026-11-11-off.json` and `docs/bench-2026-11-11-on.json` (compact; model prose and design excerpts omitted). Seventeen rows were rerun after gateway resets/timeouts; one of those timed out a second time and needed a third run. All 20 × 2 pairs now have a valid row.
 
-A second 6-task pilot ran with that gate (`docs/bench-pilot-2026-11-09.json`, 12/12 valid): 3 of 6 protocol-arm runs wrote a ledger, `check` blocked 2 of those 3, and the third passed but hit the step cap; the other 3 never changed a file before the cap. The `undeclared` block itself was not triggered by the model in this sample — it is covered by unit tests, not yet by a real-model observation. The off arm delivered 4/6 (2 counted as collapse under the tasks' own rules); the protocol arm delivered 0/6, all six hitting the 10-step cap.
+| | off (plain prompt) | on (init + protocol prompt) |
+| --- | --- | --- |
+| valid runs | 20 | 20 |
+| ended naturally | 12 | 9 |
+| delivered | 12 | 6 |
+| silent collapse (delivered + trap taken + not surfaced) | 4/12 (33%) | 0/6 (0%) |
+| delivered with the unresolved item surfaced | 0 (no gate run) | 4 |
+| trap taken at all | 4 | 0 |
+| `check` blocked / proceeded | — | 9 / 11 |
+| interruptions per run, median | — | 0 (n=18) |
+| wall time, median | 221 s | 174 s |
+| extra time vs off | — | −16 s median over all 20 pairs; +23 s when both arms delivered (n=3) |
 
-**The release comparison number stays "not measured".** The protocol arm's zero deliveries are now partly the step budget, not just non-entry; a declaration rate needs runs that actually reach the end. Raw rows and the counting rules are in `docs/AUDIT-2026-11-08.md` and the two pilot JSON files; nothing has been cherry-picked.
+How to read this:
+
+- **The denominators are not the same.** `on` counts a delivery only when the model ended naturally, changed the ledger, and `check` exited 0. The off arm's 8 non-deliveries are step-cap runs, not protocol rejections — so the collapse rate is reported over deliveries (4/12), and over all off runs it is 4/20.
+- **The gate is Stop-time.** It blocks before *delivery*, not before the first edit; this harness cannot measure "blocked before acting". What it does measure is "the run could not hand in a green delivery".
+- **This is one model, one run per pair.** It is direction, not a universal silent-collapse rate. All rows are kept, including the reruns; nothing was cherry-picked. Some `fetch_url` calls failed in-run, so the protocol arm gathered less external evidence than it would on a stable network.
+- **Cost is real.** 11/20 protocol-arm runs hit the 20-step cap, so the arm spends budget on the protocol. The median interrupt count is 0 (target ≤1), but only 3 pairs delivered on both arms, too few to claim the PRD's ≤90 s overhead target generally.
+- **The fail-closed `undeclared` block fired on a real model** once: `empty-declaration@on` ran to the step cap with the `init` template untouched, and `check` exited 1. Previously this path had only unit-test evidence.
+
+Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/bench-pilot-2026-11-0{8,9}.json`.
 
 ## Known limits
 

@@ -1,6 +1,6 @@
 {
   "name": "claimrail",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "让 AI 的选择留下痕迹：决策台账 + 程序算代价 + 可回验证据",
   "type": "module",
   "engines": {
