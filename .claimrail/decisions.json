@@ -1,19 +1,19 @@
 {
   "schema": 1,
-  "task_class": "docs-new",
+  "task_class": "refactor",
   "forks": [
     {
-      "fork": "验证结果落地范围：A/B 两支都验还是只验 A",
+      "fork": "D 支审查方式：缺 provider key 时跳过还是走 ocr delegate",
       "options": [
-        "只验 A（Stop 钩子真机）",
-        "A/B 两支都验"
+        "跳过",
+        "ocr delegate 免 key 委托审查"
       ],
-      "picked": "A/B 两支都验",
+      "picked": "ocr delegate 免 key 委托审查",
       "evidence": {
         "kind": "memory",
-        "ref": "log#6",
+        "ref": "log#8",
         "asserts": [
-          "A/B 真机闭环"
+          "ocr delegate"
         ]
       },
       "target": {
@@ -23,64 +23,63 @@
       "verified": true
     },
     {
-      "fork": "探针落点：真实仓库还是隔离副本+隔离 home",
+      "fork": "委托审查发现的 stdin 超时缺陷：修还是只记录",
       "options": [
-        "真实仓库 + 现有 config",
-        "隔离副本 + 隔离 home"
+        "只记录",
+        "修 + 补测试 + 变异验证"
       ],
-      "picked": "隔离副本 + 隔离 home",
+      "picked": "修 + 补测试 + 变异验证",
       "evidence": {
         "kind": "memory",
-        "ref": "log#6",
+        "ref": "log#9",
         "asserts": [
-          "A/B 真机闭环"
+          "超时必须销毁 stdin"
         ]
       },
       "target": {
-        "file": "docs/VERIFY-2026-11-10.md"
+        "file": "src/commands/hook.mjs"
       },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "验证结论是否写回仓库并推 GitHub",
+      "fork": "C 支 bench 跑法：完整 20×2 还是 6 任务 pilot",
       "options": [
-        "归档并推 GitHub",
-        "只本地 commit",
-        "不动仓库"
+        "6 任务 pilot",
+        "完整 20×2"
       ],
-      "picked": "只本地 commit",
+      "picked": "完整 20×2",
       "evidence": {
         "kind": "memory",
-        "ref": "log#7",
+        "ref": "log#10",
         "asserts": [
-          "只本地 commit"
+          "完整 20 任务 × 2 臂"
         ]
       },
       "target": {
-        "file": "docs/VERIFY-2026-11-10.md"
+        "file": "docs/bench-full-2026-11-10.json"
       },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "旧文档归因怎么修：删掉还是换成真机证据",
+      "fork": "发布范围：GitHub Release 还是 npm publish",
       "options": [
-        "只删旧说法",
-        "替换为真机证据 + 指向 VERIFY 档案"
+        "只建 GitHub Release",
+        "npm publish"
       ],
-      "picked": "替换为真机证据 + 指向 VERIFY 档案",
+      "picked": "只建 GitHub Release",
       "evidence": {
-        "kind": "repo",
-        "ref": "docs/AUDIT-2026-11-10.md:1",
+        "kind": "memory",
+        "ref": "log#11",
         "asserts": [
-          "对抗式审查第二轮"
+          "只建 GitHub Release"
         ]
       },
       "target": {
-        "file": "docs/BOUNDARIES.md"
+        "file": "README.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     }
   ]

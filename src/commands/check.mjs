@@ -148,11 +148,13 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     // 只拦模板：模型写明 forks / no_fork_reason 的申报仍然有效（降级提示照旧）。
     // 「确实不是仓库」（none）是 BOUNDARIES 写明的显式降级模式，模板放行有既有测试钉住；
     // 要拦的是 repo 里 baseline 缺失 / git 读不出、以及 git 本身用不了（unknown）这三种。
+    // none 也算 workVisible，所以这里不用再排除一次。
     const workVisible = git === 'none' || (git === 'repo' && base !== null && changedNow !== null);
-    if (!workVisible && (await isTemplateLedger({ cwd: root, ledgerText: raw.text, ledger: raw.value })) && git !== 'none') {
-      const reason = git === 'repo' && base === null
+    if (!workVisible && (await isTemplateLedger({ cwd: root, ledgerText: raw.text, ledger: raw.value }))) {
+      const reason =
+        git === 'repo' && base === null
           ? '没有 baseline（init 跑在没有提交的仓库里，或 baseline 被删）：已提交的改动扫不到'
-        : 'git 读不出仓库状态：工作区是否改过无从判断（查 GIT_DIR、safe.directory、git 是否可用）';
+          : 'git 读不出仓库状态：工作区是否改过无从判断（查 GIT_DIR、safe.directory、git 是否可用）';
       const data = {
         schema: 1,
         action: 'block',

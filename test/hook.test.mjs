@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { check, hook, init } from '../src/cli.mjs';
+import { readIncoming } from '../src/commands/hook.mjs';
 import { repoWithEvidence, repoWithUnverified } from './helpers.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -206,6 +207,28 @@ test('命令行入口：hook 在流读完时立即返回，不吊着 5 秒定时
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// 2026-11-10 真机复现：stdin 保持打开但不给数据时，只让定时器赢下 Promise.race 不够——
+// 挂着的异步迭代器仍持有事件循环，`sleep 12 | hook` 会等到 stdin 关闭（宿主那边是 30s
+// 超时），注释里承诺的 5 秒上限形同虚设。超时必须销毁流。
+test('readIncoming：stdin 不关也不给数据时，超时上限真的生效', async () => {
+  const { PassThrough } = await import('node:stream');
+  const stdin = new PassThrough();
+  const t0 = Date.now();
+  const got = await readIncoming({ stdin, timeoutMs: 60 });
+  const elapsed = Date.now() - t0;
+  assert.equal(got, null);
+  assert.ok(elapsed < 1000, `超时后仍被 stdin 拖住：${elapsed}ms`);
+  assert.equal(stdin.destroyed, true, '超时没有销毁流，事件循环仍被持有');
+});
+
+test('readIncoming：流正常关闭时返回解析后的 payload', async () => {
+  const { PassThrough } = await import('node:stream');
+  const stdin = new PassThrough();
+  const p = readIncoming({ stdin, timeoutMs: 1000 });
+  stdin.end('{"stop_hook_active":true}');
+  assert.deepEqual(await p, { stop_hook_active: true });
 });
 
 // 审查抓到的误拦：touched 过滤掉协议文件后是 0，但 diff 哈希（含 AGENTS.md）变了，

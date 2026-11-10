@@ -16,27 +16,33 @@ import { isProtocolPath } from '../undeclared.mjs';
 import { treeHash, ledgerHash, readSnapshot, writeSnapshot, recordViolation } from '../delivery.mjs';
 import { LEDGER_PATH, BASELINE_PATH, TEMPLATE_HASH_PATH } from '../paths.mjs';
 
-export async function readIncoming() {
-  if (process.stdin.isTTY) return null;
+export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } = {}) {
+  if (stdin.isTTY) return null;
   // 上限：宿主不关闭 stdin 时，钩子会一直挂着（宿主那边只能等超时）。
   // 事件 payload 只有几 KB，五秒读不到就当没有事件。
+  // 超时后必须把流销毁：只让定时器赢下 Promise.race 不够——挂着的 stdin 异步迭代器
+  // 仍然持有事件循环，实测 `sleep 12 | hook` 会一直等到 stdin 关闭（宿主那边就是 30s
+  // 超时），注释里承诺的 5 秒上限形同虚设（2026-11-10 真机复现）。
   let timer;
+  const readAll = (async () => {
+    let buf = '';
+    for await (const chunk of stdin) buf += chunk;
+    return buf;
+  })().catch(() => ''); // 超时销毁流会让迭代器抛错；这是预期路径，不是异常
+  const timeout = new Promise((resolve) => {
+    // unref：流读完时定时器不许拖住进程——实测少这一步，每轮 Stop 钩子多等 5 秒
+    timer = setTimeout(() => {
+      try {
+        stdin.destroy?.();
+      } catch {
+        /* 流已关：没什么可销毁的 */
+      }
+      resolve('');
+    }, timeoutMs);
+    timer.unref?.();
+  });
   try {
-    const raw = await Promise.race([
-      // 立即调用不能少：审查抓到过这里少了一对括号，Promise.race 拿到的是函数本身
-      // 而不是 Promise，raw.trim() 抛 TypeError 被 catch 吞掉 → payload 永远 null，
-      // stop_hook_active 与"正文逐条声明"两道防线在生产里从未生效过。
-      (async () => {
-        let buf = '';
-        for await (const chunk of process.stdin) buf += chunk;
-        return buf;
-      })(),
-      new Promise((resolve) => {
-        // unref：流读完时定时器不许拖住进程——实测少这一步，每轮 Stop 钩子多等 5 秒
-        timer = setTimeout(() => resolve(''), 5000);
-        timer.unref?.();
-      }),
-    ]);
+    const raw = await Promise.race([readAll, timeout]);
     return raw.trim() ? JSON.parse(raw) : null;
   } catch {
     return null;
