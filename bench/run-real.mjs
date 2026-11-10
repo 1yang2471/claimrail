@@ -63,6 +63,9 @@ async function one(taskDir, protocol) {
     let code = null;
     let checkText = '';
     let undeclared = false;
+    let metrics = null;
+    let questions = 0;
+    let violations = 0;
     let netCode = null;
     let netText = '';
     if (initProtocol) {
@@ -70,6 +73,11 @@ async function one(taskDir, protocol) {
       code = r.code;
       checkText = r.text;
       undeclared = Boolean(r.undeclared);
+      // PRD 要的"每任务打断次数中位数"就在这份结构化判定里；不落下来，
+      // 40 行跑完只剩交付/塌缩两个数，发布文案的四个指标少一半。
+      metrics = r.data?.metrics ?? null;
+      questions = r.data?.questions?.length ?? 0;
+      violations = r.data?.violations?.length ?? 0;
       // 模型自己跑的 check 默认不联网（网络要用户同意）；harness 再以"用户已同意"的身份回验一次，
       // 否则 precedent/web 档永远卡在"未获同意"，测到的就不是引文本身了。
       const hasNet = (ledger?.forks ?? []).some((f) => ['precedent', 'web'].includes(f?.evidence?.kind));
@@ -106,6 +114,9 @@ async function one(taskDir, protocol) {
       ledgerSummary: (ledger?.forks ?? []).map((f) => ({ fork: f.fork, kind: f.evidence?.kind ?? null, ref: f.evidence?.ref ?? null, sources: f.evidence?.sources?.length ?? null, verified: f.verified })),
       ledgerChanged,
       checkCode: code,
+      metrics,
+      questions,
+      violations,
       undeclared,
       surfaced,
       checkProblems: problemsOf(checkText),
