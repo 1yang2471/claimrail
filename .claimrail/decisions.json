@@ -1,170 +1,87 @@
 {
   "schema": 1,
-  "task_class": "refactor",
+  "task_class": "docs-new",
   "forks": [
     {
-      "fork": "审查修复范围：只修 P0 还是 P0/P1/P2 全修",
+      "fork": "验证结果落地范围：A/B 两支都验还是只验 A",
       "options": [
-        "只修 P0",
-        "P0/P1/P2 全修"
+        "只验 A（Stop 钩子真机）",
+        "A/B 两支都验"
       ],
-      "picked": "P0/P1/P2 全修",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "src/commands/hook.mjs"
-      }
-    },
-    {
-      "fork": "fail-closed 范围：none（确实不是仓库）保持放行还是全拦",
-      "options": [
-        "全拦",
-        "none 照旧放行"
-      ],
-      "picked": "none 照旧放行",
+      "picked": "A/B 两支都验",
       "evidence": {
         "kind": "memory",
-        "ref": "log#2",
+        "ref": "log#6",
         "asserts": [
-          "none（确实不是仓库）照旧放行"
+          "A/B 真机闭环"
         ]
       },
-      "cost_if_wrong": "low",
-      "verified": true,
       "target": {
-        "file": "src/commands/check.mjs"
-      }
+        "file": "docs/VERIFY-2026-11-10.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     },
     {
-      "fork": "readIncoming 修法：只补括号还是连定时器一起修",
+      "fork": "探针落点：真实仓库还是隔离副本+隔离 home",
       "options": [
-        "只补括号",
-        "补括号+unref/clearTimeout"
+        "真实仓库 + 现有 config",
+        "隔离副本 + 隔离 home"
       ],
-      "picked": "补括号+unref/clearTimeout",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "src/commands/hook.mjs"
-      }
-    },
-    {
-      "fork": "主模块判断：realpath 比对还是引 is-main 包",
-      "options": [
-        "realpathSync 比对",
-        "引第三方包"
-      ],
-      "picked": "realpathSync 比对",
+      "picked": "隔离副本 + 隔离 home",
       "evidence": {
         "kind": "memory",
-        "ref": "log#3",
+        "ref": "log#6",
         "asserts": [
-          "realpathSync 比对"
+          "A/B 真机闭环"
         ]
       },
-      "cost_if_wrong": "low",
-      "verified": true,
       "target": {
-        "file": "src/cli.mjs"
-      }
+        "file": "docs/VERIFY-2026-11-10.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     },
     {
-      "fork": "入口层用例：挤进超限的 cli.test 还是拆新文件",
+      "fork": "验证结论是否写回仓库并推 GitHub",
       "options": [
-        "留在 cli.test",
-        "拆 test/entry.test.mjs"
+        "归档并推 GitHub",
+        "只本地 commit",
+        "不动仓库"
       ],
-      "picked": "拆 test/entry.test.mjs",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "test/entry.test.mjs"
-      }
-    },
-    {
-      "fork": "runCli 助手：execFileSync 还是 spawnSync",
-      "options": [
-        "execFileSync",
-        "spawnSync"
-      ],
-      "picked": "spawnSync",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "test/hook.test.mjs"
-      }
-    },
-    {
-      "fork": "HANDOFF.md 超 20KB：删历史还是归档+指针",
-      "options": [
-        "删历史",
-        "归档+指针"
-      ],
-      "picked": "归档+指针",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "docs/AUDIT-2026-11-10.md"
-      }
-    },
-    {
-      "fork": "AGENTS.md 逼近上限：原样追加还是压缩后扩",
-      "options": [
-        "原样追加",
-        "压缩后扩"
-      ],
-      "picked": "压缩后扩",
+      "picked": "只本地 commit",
       "evidence": {
         "kind": "memory",
-        "ref": "log#4",
+        "ref": "log#7",
         "asserts": [
-          "实测故事移到 docs"
+          "只本地 commit"
         ]
       },
-      "cost_if_wrong": "low",
-      "verified": true,
       "target": {
-        "file": "AGENTS.md"
-      }
+        "file": "docs/VERIFY-2026-11-10.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     },
     {
-      "fork": "报告里不可达的 --no-pixel 话术：删话术还是补 flag",
+      "fork": "旧文档归因怎么修：删掉还是换成真机证据",
       "options": [
-        "删话术",
-        "补 flag"
+        "只删旧说法",
+        "替换为真机证据 + 指向 VERIFY 档案"
       ],
-      "picked": "补 flag",
-      "evidence": null,
-      "cost_if_wrong": "low",
-      "verified": false,
-      "target": {
-        "file": "src/args.mjs"
-      }
-    },
-    {
-      "fork": "typo/rename 免走协议：实现窄豁免还是保持一行申报",
-      "options": [
-        "实现窄豁免",
-        "保持一行申报"
-      ],
-      "picked": "保持一行申报",
+      "picked": "替换为真机证据 + 指向 VERIFY 档案",
       "evidence": {
-        "kind": "memory",
-        "ref": "log#5",
+        "kind": "repo",
+        "ref": "docs/AUDIT-2026-11-10.md:1",
         "asserts": [
-          "保持一行申报"
+          "对抗式审查第二轮"
         ]
       },
-      "cost_if_wrong": "low",
-      "verified": true,
       "target": {
-        "file": "src/schema.mjs"
-      }
+        "file": "docs/BOUNDARIES.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
