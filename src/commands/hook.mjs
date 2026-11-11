@@ -135,7 +135,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
           touched.length > 5 ? `（另有 ${touched.length - 5} 个）` : ''
         }`,
         `更新 ${ledger}：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。`,
-        '沿用上次的申报不算这次申报——哪怕结论一样，也要把理由改成这次的理由。',
+        '沿用上次的申报不算这次申报：把台账改成针对这次改动的申报——结论可以一样，理由必须是这次的理由，不是上次的旧文。',
       ].join('\n'),
     };
   }

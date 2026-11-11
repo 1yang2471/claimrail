@@ -49,6 +49,7 @@ export async function undeclaredBlock({ cwd, ledgerText, ledger, changed = [], l
         workTouched.length > shown.length ? `（另有 ${workTouched.length - shown.length} 个）` : ''
       }`,
       `写 ${ledgerPath}：有分叉就写 forks；没有就写 "forks": [] 和 no_fork_reason。`,
+      '无分叉的活最省事：把台账里 no_fork_reason 的占位行改成你的原因，改完重跑 check。',
       '不要求你想清楚每个分叉，只要求把"这次有没有分叉"写下来。',
     ].join('\n'),
   };

@@ -3,7 +3,7 @@
 // 只判「有没有写」，不判「写得对不对」——后者归 schema、证据回访和代价覆写。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile, unlink } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,6 +46,9 @@ test('工作区有改动、台账仍是模板：退出 1，并点名改动文件
     const r = await check({ cwd: dir });
     assert.equal(r.code, 1, r.text);
     assert.match(r.text, /未申报 · 台账仍是 init 模板/);
+    // 第一堵墙要给出最省事的修法：模板里那行 no_fork_reason 占位文字本来就在，
+    // 改它比重写整个文件便宜（UX 审查 #13）
+    assert.match(r.text, /占位行改成你的原因/);
     assert.match(r.text, /src-note\.ts/);
     assert.equal(r.data.action, 'block');
     assert.equal(r.data.undeclared.changedTotal, 1);
@@ -68,6 +71,44 @@ test('写了 forks: [] + 自己的理由：算已申报，放行', async () => {
     const r = await check({ cwd: dir });
     assert.equal(r.code, 0, r.text);
     assert.equal(r.data.undeclared ?? null, null);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 0.2.5 老仓库里存的是旧模板指纹；重新序列化过的老模板（哈希对不上）靠占位行兜底。
+// 占位行文案这轮扩了 task_class 提示：旧串不再等于新常量，不兼容的话老仓库会静默漏拦。
+test('0.2.5 老模板的占位行（重新序列化后哈希对不上）仍算没申报', async () => {
+  const dir = await repoWithTemplate();
+  try {
+    await writeFile(join(dir, 'src-note.ts'), 'export const a = 1;\n', 'utf8');
+    await writeFile(
+      ledgerPath(dir),
+      '{"schema":1,"task_class":"ui-new","forks":[],"no_fork_reason":"把本行改成\\"为什么这次没有分叉\\"，或者填 forks"}\n',
+      'utf8',
+    );
+    const r = await check({ cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /未申报/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('宿主插件的运行时状态文件不算工作改动：undeclared 清单不再列出用户没碰过的东西', async () => {
+  const dir = await repoWithTemplate();
+  try {
+    await writeFile(join(dir, 'src-note.ts'), 'export const a = 1;\n', 'utf8');
+    // 本机实测（2026-11-11）：ZCode 插件每次 Bash 都往仓库丢 .mimosa/hook-state/*.json。
+    // 模型没碰它，但旧逻辑把它算进"工作区有改动"，拦截消息列出用户没改的文件，
+    // 甚至单独触发 stale 假拦截（UX 审查 #2，sim 仓库实测复现）。
+    await mkdir(join(dir, '.mimosa', 'hook-state'), { recursive: true });
+    await writeFile(join(dir, '.mimosa', 'hook-state', 'sess_x.json'), '{"ok":1}\n', 'utf8');
+    const r = await check({ cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /src-note\.ts/);
+    assert.doesNotMatch(r.text, /\.mimosa/, `噪音文件出现在拦截消息里：${r.text}`);
+    assert.equal(r.data.undeclared.changedTotal, 1);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

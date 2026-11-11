@@ -137,6 +137,6 @@ test('理由句说「已推送/已发布」并带上游名——不再把功能�
     const res = await check({ cwd: dir });
     assert.equal(res.code, 1, res.text);
     assert.match(res.text, /已推送\/已发布或有副作用：pushed:origin\/main/, res.text);
-    assert.match(res.text, /【开工前 1 条 · 需你定】/, res.text);
+    assert.match(res.text, /【交付被拦 · 1 条需你定】/, res.text);
   });
 });

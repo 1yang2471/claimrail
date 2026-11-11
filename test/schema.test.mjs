@@ -184,3 +184,33 @@ test('段中 ".." 路径段一律拒收（ref 与 target 同规）', () => {
   // 文件名里合法的 ..（如 "v1..2.png"）不误伤
   assert.equal(validateLedger(ledger({ forks: [fork({ evidence: { kind: 'render', ref: 'shots/v1..2.png', asserts: ['x'] } })] })).ok, true);
 });
+
+// UX 审查 #12（2026-11-11 实测复现）：设计类整拒 web 档后，还连坐报它的 ref/asserts
+// 形状错——AI 会去修一个本不该存在的字段。整拒之后，形状检查一并跳过。
+test('设计类整拒 web 档后不再连坐：只报可行动的错误', () => {
+  const v = validateLedger(ledger({
+    forks: [{
+      fork: '列表行高',
+      options: ['44px', '48px'],
+      picked: '44px',
+      evidence: { kind: 'web', asserts: ['行高'] },
+      cost_if_wrong: 'low',
+      verified: true,
+    }],
+  }));
+  assert.equal(v.ok, false);
+  assert.equal(v.errors.length, 1, JSON.stringify(v.errors));
+  assert.equal(v.errors[0].rule, 'evidence.design-needs-precedent');
+});
+
+// UX 审查 #3：未知字段报错只说"只许申报下面这些字段"，下面却什么都没列。
+// 新手唯一的信息源只剩协议示例，第一次写台账就要靠猜。
+test('未知字段报错把合法字段清单真的列出来', () => {
+  const v = validateLedger(ledger({
+    forks: [{ ...fork(), candidates: [{ option: 'a' }] }],
+  }));
+  assert.equal(v.ok, false);
+  const err = v.errors.find((e) => e.rule === 'field.unknown');
+  assert.ok(err, JSON.stringify(v.errors));
+  assert.match(err.msg, /fork\/options\/picked\/evidence\/target\/cost_if_wrong\/verified/);
+});

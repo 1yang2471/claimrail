@@ -23,6 +23,12 @@ export async function gitRaw(args, cwd) {
 const splitZ = (text) => text.split('\0').filter(Boolean);
 const toPosix = (p) => String(p).split(sep).join('/');
 
+// 宿主/代理的运行时状态目录：本机实测（2026-11-11 UX 审查），ZCode 插件每次工具调用都往仓库
+// 丢 .mimosa/hook-state/*.json，模型没碰它们。算进"工作区有改动"会让拦截消息列出用户没改的
+// 文件，甚至单独触发 stale 假拦截（抢在正文对撞之前）。名单只收 agent 宿主的运行时目录，
+// 一个个来：有实测才加；用户源码目录永远不收。
+const HOST_NOISE = /(^|\/)(\.mimosa|\.claude|\.zcode|\.codebuddy|\.trae|\.cursor)(\/|$)/;
+
 // 这个目录到底在不在 git 里。用来把"降级模式"与"实测出的高代价"分开：
 // 两者在报告里长得一样（都是 high），但一个该去 `git init`，一个该去拆改动。
 //
@@ -167,12 +173,12 @@ export async function changedLines(cwd, base = null) {
     }
   }
 
-  // 未跟踪：新写的文件根本没进 diff
+  // 未跟踪：新写的文件根本没进 diff。宿主状态目录（HOST_NOISE）不算工作改动。
   const untracked = [];
   for (const entry of splitZ(statusRes.stdout)) {
     if (!entry.startsWith('??')) continue;
     const p = toPosix(entry.slice(2).split('\0')[0].trim());
-    if (p) untracked.push(p);
+    if (p && !HOST_NOISE.test(p)) untracked.push(p);
   }
 
   return { ranges, untracked, renamed: renames };
@@ -308,7 +314,7 @@ export async function newestTrackedMtime(cwd, limit = 200_000) {
     untracked = splitZ(st.stdout)
       .filter((e) => e.startsWith('??'))
       .map((e) => toPosix(e.slice(2).trim()))
-      .filter((p) => !SELF_ARTIFACT.test(p));
+      .filter((p) => !SELF_ARTIFACT.test(p) && !HOST_NOISE.test(p));
   }
 
   // 删除也是"代码改动"。删文件只更新其父目录的 mtime，被删路径本身 stat 不到，

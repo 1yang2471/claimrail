@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（407 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（414 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
@@ -39,7 +39,8 @@
 | 判定要能结构化交出去 | `check.mjs` 返回 `data`（schema=1）；`--json` 打印它，文本是同一份决策的视图 |
 | 申报无分叉要留审计线索 | `audit.mjs` + `check.mjs`：`forks: []` 且 diff 落在该类文件面上 → 审计项 + `emptyDeclaration`，不参与退出码 |
 | 报告必须带 name | `evidence.mjs` render 档：工具产物永远带 name，"没写"只可能是手写报告在绕开 |
-| init 不许替目标仓库决定忽略什么 | `cli.mjs` 的 init 只写五条自有产物路径（`memory/log.jsonl`、`memory/denied.json` 与 `.claimrail/` 三项），不用 `memory/` 吞掉目标仓库整个目录，也不写 `*.png` 通配 |
+| init 不许替目标仓库决定忽略什么 | `cli.mjs` 的 init 只写六条自有产物路径（`memory/log.jsonl`、`memory/denied.json` 与 `.claimrail/` 四项，含登录态 `storage.json`——不忽略它，照协议做的用户会把 cookie 提交进 git），不用 `memory/` 吞掉目标仓库整个目录，也不写 `*.png` 通配 |
+| 宿主运行时状态不算工作改动 | `observe/git.mjs` 的 `HOST_NOISE`：`.mimosa`/`.claude`/`.zcode`/`.codebuddy`/`.trae`/`.cursor` 目录的未跟踪文件不进改动面、stale 与 mtime；名单只收实测过的宿主目录，用户源码目录永不收 |
 | 协议指路必须能在任何目标仓库读到 | `claimrail skill` 从安装包自身打印 `skill/SKILL.md`；`init` 写的 AGENTS 指路段指向这个命令，不依赖目标仓库的 `node_modules`（`test/args.test.mjs`、`test/cli.test.mjs`） |
 | hook 的联网同意必须真的传下去 | `hook()` 把 `allowNet` 传给 `check()`；`test/hook-net.test.mjs` 用本地 HTTP 证明不传不外发、传了才回访 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `touchTargetsOk` 排除 |
@@ -81,5 +82,9 @@
 
 <!-- claimrail:begin -->
 ## claimrail
-动界面/文档/接口前读 `skill/SKILL.md`，写 `.claimrail/decisions.json`；交付前跑 `node src/cli.mjs check`。
+
+动界面、文档、接口之前，先跑 `claimrail skill` 读协议（它从安装包自身打印，不依赖本仓库的 node_modules），
+写 `.claimrail/decisions.json` 申报分叉与证据；
+交付前跑 `claimrail check`——结构不合规先修申报，红的不许交。
+命令不存在时：到 claimrail 源码目录 npm link，或用 node 直接跑它的 src/cli.mjs。
 <!-- claimrail:end -->

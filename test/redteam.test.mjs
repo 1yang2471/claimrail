@@ -148,7 +148,7 @@ test('非 ASCII 路径必须参与时间戳计算（承重是 -z：git 在该格
     assert.ok(typeof newest === 'number' && newest >= future.getTime(), `中文名文件的 mtime 没被算进去：newest=${newest} < ${future.getTime()}（多半是 git 把路径八进制转义后 stat 失败被吞掉了）`);
   });
 });
-test('规则四的代价由程序逐候选算：选更贵的那个照样被拦，自填字段连台账都进不去', async () => {
+test('候选代价由程序逐候选算：选更贵的那个照样被拦，自填字段连台账都进不去', async () => {
   await withRepo(async (dir) => {
     // hot 被 40 个文件引用（≥FAN_IN_HIGH），cold 没人引用。两个候选各自带 target。
     const refs = ['const x = hot;'];
@@ -169,7 +169,7 @@ test('规则四的代价由程序逐候选算：选更贵的那个照样被拦�
         options: OPTS,
         picked,
         // 分叉级 target 跟着选中的候选走：否则引用数取不到 → 档位 high → 规则一先拦，
-        // 这条用例就测不到规则四的独立作用了
+        // 这条用例就测不到候选代价这条规则的独立作用了
         target: OPTS.find((o) => o.label === picked).target,
         evidence: null,
         cost_if_wrong: 'low',

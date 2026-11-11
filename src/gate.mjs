@@ -7,7 +7,7 @@ import { apply } from './cost.mjs';
 //   高代价 + 无证据 → 人在则阻塞，人不在则硬停
 //   低代价 + 无证据 → 照做，但必须进末尾汇总，不许静默
 //   无证据却选了改起来更贵的候选 → 拦（"静默塌缩到众数"最直接的形状）
-//   上一条算不出来 → 不当没事发生，报"规则四未启用"，让逃逸可统计
+//   上一条算不出来 → 不当没事发生，报"候选代价未算出"，让逃逸可统计
 //
 // optionsCosts 只能由程序算（cli 对每个候选各跑一遍 observe）。
 // 台账里模型自填的 options_cost 一律不采信：约束的输入不能来自被约束的一方。
@@ -107,7 +107,7 @@ export function decide(enriched, { humanPresent = true, noForkReason = null } = 
       interrupts,
       unverified: unverified.length,
       violations: violations.length,
-      rule4NotEnabled: notEnabled.length,
+      optionsCostUnavailable: notEnabled.length,
     },
   };
 }
@@ -122,7 +122,7 @@ export function render(decision) {
   const out = [];
 
   if (questions.length) {
-    out.push(`【开工前 ${questions.length} 条 · 需你定】`);
+    out.push(`【交付被拦 · ${questions.length} 条需你定】`);
     for (const [i, f] of byCostDesc(questions).entries()) {
       // 位置直接挂在标题后面，仍然是三行——多一行就没人读了
       out.push(`  ${i + 1}. ${f.fork}${f.where ? ` · ${f.where}` : ''}`);
@@ -143,9 +143,10 @@ export function render(decision) {
     for (const f of unverified) out.push(`  • ${f.fork}｜已选 ${f.picked}｜${f.evidenceWhy}`);
   }
 
-  // 逃逸要可见：算不出来不等于没问题，只是这一轮没查
+  // 逃逸要可见：算不出来不等于没问题，只是这一轮没查。
+  // "规则四"是内部编号，读输出的人没有 PRD——标签直接说这是什么、缺什么（UX 审查 #3）。
   if (notEnabled.length) {
-    out.push(`【规则四未启用 ${notEnabled.length} 条 · 候选代价没算出来】`);
+    out.push(`【候选代价未算出 ${notEnabled.length} 条 · 每个候选配 target 才能算】`);
     for (const f of notEnabled) {
       out.push(`  • ${f.fork}｜给每个候选配 target 才能比：${f.options.map((o, i) => `${o}=${f.targets[i] ? '有' : '缺'}`).join(' ')}`);
     }

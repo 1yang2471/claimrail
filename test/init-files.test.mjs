@@ -25,7 +25,10 @@ test('init 建模板、说清数据去向，并让偏好与截图不进 git', as
     assert.deepEqual(ledger.forks, []);
 
     const gi = await readFile(join(dir, '.gitignore'), 'utf8');
-    for (const p of ['memory/log.jsonl', 'memory/denied.json', '.claimrail/shots/']) assert.ok(gi.includes(p), p);
+    for (const p of ['memory/log.jsonl', 'memory/denied.json', '.claimrail/shots/', '.claimrail/storage.json']) assert.ok(gi.includes(p), p);
+    // storage.json 是 SKILL.md 教的 --state 落点，里面是登录 cookie：不忽略它，照协议做的
+    // 用户会把凭据提交进 git（UX 审查 2026-11-11 阻断项）。init 的输出也要把这一条说破。
+    assert.match(res.text, /登录态/, 'init 的数据去向通知没提登录态文件');
     assert.ok(!/^memory\/$/m.test(gi), `init 把整个 memory/ 目录忽略了：${gi}`);
     // 不许写 '*.png'：那会把目标仓库里所有真实图片一起排除掉（静默丢数据）
     assert.ok(!gi.includes('*.png'), `init 给目标仓库写了 *.png 通配：${gi}`);
@@ -43,7 +46,10 @@ test('init 的 AGENTS 指路段指向 claimrail skill 命令，不是目标仓�
     await init({ cwd: dir });
     const agents = await readFile(join(dir, 'AGENTS.md'), 'utf8');
     assert.match(agents, /claimrail skill/, agents);
-    assert.doesNotMatch(agents, /node_modules[\\/]claimrail[\\/]skill[\\/]SKILL\.md/, agents);
+    assert.doesNotMatch(agents, /node_modules[\\/]claimrail[\\/]skill[\\/]SKILL.md/, agents);
+    // 指路段只给命令不给退路：目标仓库（Python/Go）里 claimrail 不在 PATH 时，
+    // agent 照做会撞 command not found 然后无人指路（UX 审查 2026-11-11 #10）
+    assert.match(agents, /npm link/, agents);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

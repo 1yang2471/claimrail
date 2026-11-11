@@ -13,6 +13,7 @@ import { observe, whyUnknown } from '../observe/index.mjs';
 import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState, gitToplevel } from '../observe/git.mjs';
 import { readLog } from '../store.mjs';
 import { surfaceFiles } from '../audit.mjs';
+import { fetchWithRedirects } from './fetch-guard.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from '../paths.mjs';
 import { undeclaredBlock, isTemplateLedger, isProtocolPath } from '../undeclared.mjs';
 
@@ -44,70 +45,13 @@ async function readJson(path) {
   }
 }
 
-// SSRF 防线：ctx.fetch 是给台账里的 URL 用的，URL 由模型/用户填。
-// 默认 redirect: follow 会让一个 302 把请求送进内网；改成手动跟随，每跳都重新过主机检查。
-export function isPrivateHost(host) {
-  const h = String(host ?? '').toLowerCase().replace(/^\[|\]$/g, '');
-  if (!h || h === '0.0.0.0' || h === '::') return true;
-  if (h === 'metadata.google.internal' || h === '169.254.169.254') return true;
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (m) {
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    // link-local（含云元数据）一律拒；其它私网/loopback 是用户自己的文档站，允许直连
-    if (a === 169 && b === 254) return true;
-    if (a === 0) return true;
-  }
-  return false;
-}
-
-// 重定向目标比直连更严格：公网上一个 URL 不该把请求送进用户的内网/本机。
-export function isPrivateRedirectTarget(host) {
-  const h = String(host ?? '').toLowerCase().replace(/^\[|\]$/g, '');
-  if (!h || h === 'localhost' || h === '0.0.0.0' || h === '::' || h === '::1') return true;
-  if (h === 'metadata.google.internal' || h === '169.254.169.254') return true;
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
-  if (m) {
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-  }
-  return false;
-}
-
-async function fetchWithRedirects(url, allowNet) {
-  if (!allowNet) return null;
-  let current = url;
-  if (isPrivateHost(new URL(current).hostname)) throw new Error('私网/元数据地址，已拒绝');
-  for (let i = 0; i < 5; i += 1) {
-    const res = await globalThis.fetch(current, {
-      signal: AbortSignal.timeout(10_000),
-      redirect: 'manual',
-      headers: { 'accept-language': 'en' },
-    });
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get('location');
-      if (!loc) return { status: res.status, text: '' };
-      const next = new URL(loc, current);
-      if (isPrivateRedirectTarget(next.hostname)) throw new Error('重定向指向私网/元数据地址，已拒绝');
-      current = next.href;
-      continue;
-    }
-    return { status: res.status, text: await res.text() };
-  }
-  throw new Error('重定向次数过多');
-}
-
 function blockedData({ task_class, undeclared, noForkReason, degraded }) {
   return {
     schema: 1,
     action: 'block',
     task_class,
     total: 0,
-    metrics: { interrupts: 0, unverified: 0, violations: 0, rule4NotEnabled: 0 },
+    metrics: { interrupts: 0, unverified: 0, violations: 0, optionsCostUnavailable: 0 },
     degraded,
     no_fork_reason: noForkReason ?? null,
     emptyDeclaration: null,
@@ -211,7 +155,13 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
 
   const v = validateLedger(raw.value);
   if (!v.ok) {
-    return { code: 1, text: ['台账结构不合规，后续检查没开始：', ...v.errors.map((e) => `  ${e.path} · ${e.msg}`)].join('\n') };
+    // --json 承诺"structured verdict for hosts and scripts"（README）：新用户最常撞的
+    // schema 拒收路径也得给结构化 errors，不能塞一坨中文散文进 error 字符串（UX 审查 #8）。
+    return {
+      code: 1,
+      data: { schema: 1, action: 'error', errors: v.errors },
+      text: ['台账结构不合规，后续检查没开始：', ...v.errors.map((e) => `  ${e.path} · ${e.msg}`)].join('\n'),
+    };
   }
 
   try {
@@ -283,6 +233,10 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       return { code: 1, undeclared, data, text: undeclared.text };
     }
 
+    // 改动面：门这次到底看见了什么。通过态也列出来——被拦态有清单、通过态什么都不列，
+    // 用户想知道"门有没有看见我的改动"只能自己设计实验（UX 审查 #4）。
+    // 协议文件与台账自身不算改动。
+    const workFiles = touched.filter((f) => !isProtocolPath(f) && f !== ledgerRel);
     const auditFiles = raw.value.forks.length === 0
       ? surfaceFiles(raw.value.task_class, touched.filter((f) => !isProtocolPath(f)))
       : [];
@@ -389,6 +343,8 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       unverified: d.unverified.map(item),
       violations: d.violations.map((f) => ({ ...item(f), rule: f.rule, cheaper: f.cheap })),
       notEnabled: d.notEnabled.map(item),
+      // 改动面进 JSON：宿主/脚本要知道门看见了什么，不用再做实验（UX 审查 #4）
+      changedFiles: workFiles,
     };
 
     return {
@@ -397,17 +353,19 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       unverified: d.unverified.map((f) => ({ fork: f.fork, picked: f.picked, why: f.evidenceWhy })),
       data,
       text: [
-        `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需打断 ${d.metrics.interrupts} 次 · 未验证 ${d.metrics.unverified} 条`,
+        `任务类型 ${raw.value.task_class} · 分叉 ${d.total} 条 · 需你定 ${d.metrics.interrupts} 条 · 未验证 ${d.metrics.unverified} 条`,
         ...(overrides.length ? ['【程序覆写档位】', ...overrides.map((o) => `  ${o}`)] : []),
         render(d),
+        ...(workFiles.length
+          ? [
+              `改动面 ${workFiles.length} 个文件：${workFiles.slice(0, 5).join('、')}${
+                workFiles.length > 5 ? `（另有 ${workFiles.length - 5} 个）` : ''
+              }`,
+            ]
+          : []),
         ...(emptyDeclaration
           ? [
               `【申报无分叉的审计项 · 本次改动落在 ${raw.value.task_class} 的面上】`,
-              `  改动文件 ${emptyDeclaration.touchedTotal} 个：${emptyDeclaration.touched.join('、')}${
-                emptyDeclaration.touchedTotal > emptyDeclaration.touched.length
-                  ? `（另有 ${emptyDeclaration.touchedTotal - emptyDeclaration.touched.length} 个）`
-                  : ''
-              }`,
               '  不拦交付：程序判不了"有没有分叉"，只把"申报无分叉却动了这类文件"记下来供抽查',
             ]
           : []),

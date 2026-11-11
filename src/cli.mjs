@@ -20,7 +20,8 @@ export { parse, help, unknownCmd, LEDGER_PATH, check, hook };
 const NOTICE = `数据去向：
   .claimrail/decisions.json  进 git（它是给你 review 的东西）
   memory/log.jsonl、memory/denied.json  不进 git（个人偏好，只在你机器上）
-  截图（.claimrail/shots/）      不进 git（真实产品画面）`;
+  截图（.claimrail/shots/）      不进 git（真实产品画面）
+  登录态（.claimrail/storage.json）不进 git（存的是 cookie，提交进仓库就是泄露凭据）`;
 
 // 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
 // 仓库根的 AGENTS.md。所以 init 在这里写一段带 marker 的指路：可幂等、可卸载、不动原内容。
@@ -35,6 +36,7 @@ const AGENTS_BLOCK = [
   '动界面、文档、接口之前，先跑 `claimrail skill` 读协议（它从安装包自身打印，不依赖本仓库的 node_modules），',
   '写 `.claimrail/decisions.json` 申报分叉与证据；',
   '交付前跑 `claimrail check`——结构不合规先修申报，红的不许交。',
+  '命令不存在时：到 claimrail 源码目录 npm link，或用 node 直接跑它的 src/cli.mjs。',
   AGENTS_END,
 ].join('\n');
 
@@ -63,7 +65,7 @@ export async function init({ cwd = process.cwd() } = {}) {
   const lines = existsSync(gi) ? (await readFile(gi, 'utf8')).split('\n') : [];
   // 只写自己产物所在的目录。曾经还写过 '*.png'：那会把目标仓库里所有真实图片
   // 一起排除在提交之外（静默丢数据），而 init 的本意只是别让截图进库。
-  const add = ['memory/log.jsonl', 'memory/denied.json', '.claimrail/shots/', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
+  const add = ['memory/log.jsonl', 'memory/denied.json', '.claimrail/shots/', '.claimrail/storage.json', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
   // baseline 在"文件存在但解析不出 sha"（init 跑在没有提交的仓库里，只写了个空文件）时
@@ -81,6 +83,7 @@ export async function init({ cwd = process.cwd() } = {}) {
       base ? `起点记在 ${BASELINE_PATH}：${base.slice(0, 8)}（之后 commit 掉的改动照样会被 check 看到）` : '没找到 HEAD：本次任务请尽早 check，改动一旦提交就无法确定起点',
       '',
       NOTICE,
+      '下一步：跑 claimrail skill 读协议（AGENTS.md 指路段也指向它）。',
     ].join('\n'),
   };
 }

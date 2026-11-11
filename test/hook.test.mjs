@@ -254,6 +254,44 @@ test('只改已跟踪的协议文件（AGENTS.md）：不触发 stale', async ()
   }
 });
 
+// 宿主插件在任务中途往仓库丢运行时状态（本机实测：.mimosa/hook-state/*.json，每次 Bash 一条）。
+// 台账没变、工作区只多了这些噪音：旧逻辑照进 stale 分支——"台账自上次放行后未变"的假警报，
+// 还会抢在正文对撞之前触发（UX 审查 #2 实测复现）。
+test('hook：工作区只多了宿主插件的运行时状态文件，不触发 stale', async () => {
+  const dir = await repoWithEvidence();
+  try {
+    const first = await hook({ cwd: dir });
+    assert.equal(first.code, 0, first.text);
+    await mkdir(join(dir, '.mimosa', 'hook-state'), { recursive: true });
+    await writeFile(join(dir, '.mimosa', 'hook-state', 'sess_x.json'), '{"ok":1}\n', 'utf8');
+    const second = await hook({ cwd: dir });
+    assert.equal(second.code, 0, second.text);
+    assert.doesNotMatch(second.text, /台账自上次放行后未变/, second.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// UX 审查 #8：--json 承诺"structured verdict for hosts and scripts"，而新用户最常撞的
+// schema 拒收路径只给一坨塞进 error 字符串的中文散文，没有结构化字段。
+test('命令行入口：schema 拒收时 --json 给结构化 errors，不是散文', async () => {
+  const dir = await repoWithUnverified();
+  try {
+    await writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify({
+      schema: 1, task_class: 'refactor',
+      forks: [{ fork: 'x' }],
+    }), 'utf8');
+    const r = runCli(['check', '--json'], { cwd: dir });
+    assert.equal(r.code, 1);
+    const data = JSON.parse(r.out);
+    assert.equal(data.action, 'error');
+    assert.ok(Array.isArray(data.errors) && data.errors.length > 0, '没有结构化 errors 数组');
+    assert.match(data.errors[0].path, /forks\[0\]/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 // 结构化判定（host 面）：同一个 check，既可读文本也可取 JSON。
 // 这条走真命令行入口，钉住 --json 的输出形状与退出码语义不变。
 test('命令行入口：check --json 输出可解析的结构化判定', async () => {
@@ -271,6 +309,7 @@ test('命令行入口：check --json 输出可解析的结构化判定', async (
     assert.equal(typeof data.unverified[0].why, 'string');
     assert.ok(Array.isArray(data.questions) && Array.isArray(data.violations) && Array.isArray(data.notEnabled));
     assert.ok(Array.isArray(data.overrides));
+    assert.ok(Array.isArray(data.changedFiles), 'changedFiles 必须总是数组（宿主要靠它知道门看见了什么）');
     assert.equal(data.degraded, null, '真仓库不该报降级');
 
     // 要求了 JSON 但台账读不到：仍然给 JSON（带 error），不许混出一段中文

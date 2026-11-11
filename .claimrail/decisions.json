@@ -3,243 +3,56 @@
   "task_class": "refactor",
   "forks": [
     {
-      "fork": "AGENTS 指路段怎么修：继续指向 node_modules 还是改用 claimrail skill 命令",
-      "options": [
-        "继续指向 node_modules/claimrail/skill/SKILL.md",
-        "新增 claimrail skill 命令，从安装包自身打印"
-      ],
-      "picked": "新增 claimrail skill 命令，从安装包自身打印",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#16",
-        "asserts": [
-          "claimrail skill"
-        ]
-      },
-      "target": {
-        "file": "src/cli.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "memory/ 冲突怎么修：迁到 .claimrail/memory 还是只忽略自己的两个文件",
-      "options": [
-        "迁到 .claimrail/memory/",
-        "只忽略 memory/log.jsonl 与 memory/denied.json"
-      ],
-      "picked": "只忽略 memory/log.jsonl 与 memory/denied.json",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#17",
-        "asserts": [
-          "memory/log.jsonl"
-        ]
-      },
-      "target": {
-        "file": "src/cli.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "英文交付识别：只写文档说明还是补正则",
-      "options": [
-        "只写文档",
-        "补中英双语的全称断言/否定/声明/否认模式"
-      ],
-      "picked": "补中英双语的全称断言/否定/声明/否认模式",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#18",
-        "asserts": [
-          "中英双语"
-        ]
-      },
-      "target": {
-        "file": "src/overclaim.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "hook 的联网同意：保持不可用还是把 allowNet 传下去",
-      "options": [
-        "保持不可用",
-        "hook 把 allowNet 传给 check"
-      ],
-      "picked": "hook 把 allowNet 传给 check",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#19",
-        "asserts": [
-          "allowNet"
-        ]
-      },
-      "target": {
-        "file": "src/commands/hook.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "repo 证据的 junction/symlink 逃逸：记入边界还是修 containment",
-      "options": [
-        "记入已知边界",
-        "解析 realpath 后拒绝仓库外"
-      ],
-      "picked": "解析 realpath 后拒绝仓库外",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#20",
-        "asserts": [
-          "realpath"
-        ]
-      },
-      "target": {
-        "file": "src/commands/check.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "未知 --flag：继续静默忽略还是报错",
-      "options": [
-        "继续静默忽略",
-        "报错并提示 --help"
-      ],
-      "picked": "报错并提示 --help",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#21",
-        "asserts": [
-          "未知 --flag",
-          "直接报错"
-        ]
-      },
-      "target": {
-        "file": "src/args.mjs"
-      },
+      "fork": "噪音过滤的落点：改 changedLines 源头还是只在输出层过滤",
+      "options": ["改 changedLines 源头", "只在输出层过滤"],
+      "picked": "改 changedLines 源头",
+      "evidence": { "kind": "memory", "ref": "log#30", "asserts": ["宿主运行时状态"] },
+      "target": { "file": "src/observe/git.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "web --name 路径穿越：记入边界还是在入口拒掉",
-      "options": [
-        "记入已知边界",
-        "入口直接拒绝路径分隔符与 .."
-      ],
-      "picked": "入口直接拒绝路径分隔符与 ..",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#23",
-        "asserts": [
-          "web --name"
-        ]
-      },
-      "target": {
-        "file": "src/commands/web.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "ctx.fetch 的 SSRF：保持 redirect:follow 还是手动跟随",
-      "options": [
-        "保持 redirect:follow",
-        "手动跟随，每跳重新主机检查"
-      ],
-      "picked": "手动跟随，每跳重新主机检查",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#24",
-        "asserts": [
-          "ctx.fetch"
-        ]
-      },
-      "target": {
-        "file": "src/commands/check.mjs"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "git 输出语言：信任 stderr 文本还是设 LC_ALL=C",
-      "options": [
-        "信任 stderr",
-        "设 LC_ALL=C 与 LANG=C"
-      ],
-      "picked": "设 LC_ALL=C 与 LANG=C",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#25",
-        "asserts": [
-          "LC_ALL=C"
-        ]
-      },
-      "target": {
-        "file": "src/observe/git.mjs"
-      },
+      "fork": "rule4NotEnabled 字段：更名还是保留加文档",
+      "options": ["更名为 optionsCostUnavailable", "保留并写文档"],
+      "picked": "更名为 optionsCostUnavailable",
+      "evidence": { "kind": "memory", "ref": "log#31", "asserts": ["规则四"] },
+      "target": { "file": "src/gate.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "overclaim 否定窗口：8/16 字符还是 24/32",
-      "options": [
-        "8/16 字符",
-        "24/32 字符"
-      ],
-      "picked": "24/32 字符",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#26",
-        "asserts": [
-          "24/12"
-        ]
-      },
-      "target": {
-        "file": "src/overclaim.mjs"
-      },
+      "fork": "模板占位行改文案：怎么兼容老仓库里被重新序列化的旧模板",
+      "options": ["isTemplateReason 同时认旧占位串", "只认新串"],
+      "picked": "isTemplateReason 同时认旧占位串",
+      "evidence": { "kind": "memory", "ref": "log#32", "asserts": ["兼容旧占位串"] },
+      "target": { "file": "src/template.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "RENDER_CHECK_IDS 与 CHECK_IDS：各写一份还是合并",
-      "options": [
-        "各写一份",
-        "合并到 src/observe/check-ids.mjs"
-      ],
-      "picked": "合并到 src/observe/check-ids.mjs",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#27",
-        "asserts": [
-          "check-ids.mjs"
-        ]
-      },
-      "target": {
-        "file": "src/observe/check-ids.mjs"
-      },
+      "fork": "schema 拒收的 --json：给结构化 errors 还是维持散文",
+      "options": ["给结构化 errors 数组", "维持散文 error 字符串"],
+      "picked": "给结构化 errors 数组",
+      "evidence": { "kind": "memory", "ref": "log#33", "asserts": ["structured verdict"] },
+      "target": { "file": "src/commands/check.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "check 的两处 block 数据对象：手写两份还是提取工厂",
-      "options": [
-        "手写两份",
-        "提取 blockedData 工厂"
-      ],
-      "picked": "提取 blockedData 工厂",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#28",
-        "asserts": [
-          "blockedData 工厂"
-        ]
-      },
-      "target": {
-        "file": "src/commands/check.mjs"
-      },
+      "fork": "设计类整拒 web 档后的连坐报错：跳过还是保留",
+      "options": ["跳过该档的形状检查", "保留连坐报错"],
+      "picked": "跳过该档的形状检查",
+      "evidence": { "kind": "memory", "ref": "log#34", "asserts": ["连坐报错"] },
+      "target": { "file": "src/schema.mjs" },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "通过态改动面：新增统一一行还是复用审计项列表",
+      "options": ["新增改动面一行加 JSON changedFiles", "复用审计项列表"],
+      "picked": "新增改动面一行加 JSON changedFiles",
+      "evidence": { "kind": "memory", "ref": "log#35", "asserts": ["changedFiles"] },
+      "target": { "file": "src/commands/check.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     }

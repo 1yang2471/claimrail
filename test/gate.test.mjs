@@ -26,7 +26,7 @@ test('每条分叉都有可回验证据：不打断，直接放行', () => {
   assert.equal(render(d), '【无需打断 · 1 条分叉均有可回验证据】');
 });
 
-test('高代价 + 无证据 + 人在：开工前阻塞等一句话', () => {
+test('高代价 + 人在：交付被拦等一句话', () => {
   const d = run([fork()], { observations: [HIGH], verifications: [NONE] });
   assert.equal(d.action, 'block');
   assert.equal(d.questions.length, 1);
@@ -71,34 +71,34 @@ test('无证据却选了改起来更贵的候选——静默塌缩最典型的�
 test('有证据时选贵的做法是知情决定，不拦也不报未启用', () => {
   const d = run([fork()], { observations: [LOW], verifications: [GOOD], optionsCosts: [COSTS_EXPENSIVE_PICKED] });
   assert.equal(d.violations.length, 0);
-  assert.equal(d.metrics.rule4NotEnabled, 0);
+  assert.equal(d.metrics.optionsCostUnavailable, 0);
   assert.equal(d.action, 'proceed');
 });
 
-test('候选代价算不出来不等于没事——当场报"规则四未启用"，让逃逸可统计', () => {
+test('候选代价算不出来不等于没事——当场报"候选代价未算出"，让逃逸可统计', () => {
   const d = run([fork()], { observations: [LOW], verifications: [NONE] });
   assert.equal(d.violations.length, 0);
-  assert.equal(d.metrics.rule4NotEnabled, 1);
+  assert.equal(d.metrics.optionsCostUnavailable, 1);
   const text = render(d);
-  assert.match(text, /规则四未启用 1 条/);
+  assert.match(text, /候选代价未算出 1 条/);
   assert.match(text, /覆盖式=缺 留 gutter=缺/);
 });
 
 test('候选标签对不上程序算出来的档位，同样按未启用处理', () => {
   const d = run([fork()], { observations: [LOW], verifications: [NONE], optionsCosts: [{ a: 'low', b: 'low' }] });
-  assert.equal(d.metrics.rule4NotEnabled, 1, '映射不上就是没数据，不能当成"都便宜"');
+  assert.equal(d.metrics.optionsCostUnavailable, 1, '映射不上就是没数据，不能当成"都便宜"');
 });
 
 test('部分候选有 target 也不判：半截数据比没数据更危险', () => {
   const half = [fork({ options: [{ label: '覆盖式', target: { file: 'x.ts' } }, '留 gutter'] })];
   const d = decide(enrich({ forks: half }, { observations: [LOW], verifications: [NONE] }), {});
-  assert.equal(d.metrics.rule4NotEnabled, 1);
+  assert.equal(d.metrics.optionsCostUnavailable, 1);
 });
 
 test('模型在台账里自填的 options_cost 一律不采信（被约束的一方不能提供约束的输入）', () => {
   const d = run([fork({ options_cost: { 覆盖式: 'low', '留 gutter': 'high' } })], { observations: [LOW], verifications: [NONE] });
   assert.equal(d.violations.length, 0, '自填的档位不该让规则判红');
-  assert.equal(d.metrics.rule4NotEnabled, 1, '程序没算出来，就报未启用');
+  assert.equal(d.metrics.optionsCostUnavailable, 1, '程序没算出来，就报未启用');
 });
 
 test('两条一字不差的分叉也算两次打断（按文本去重会低估负担）', () => {
@@ -125,7 +125,7 @@ test('一屏呈现：需你定在前，未验证汇总在后，每条固定三�
     ),
   );
   const lines = text.split('\n');
-  assert.ok(lines[0].startsWith('【开工前 1 条'));
+  assert.ok(lines[0].startsWith('【交付被拦 · 1 条'));
   assert.ok(lines.findIndex((l) => l.startsWith('【交付末尾')) > 3);
   // 分叉 / 候选与已选 / 代价与凭什么
   assert.equal(lines.filter((l) => /^     /.test(l)).length, 2);

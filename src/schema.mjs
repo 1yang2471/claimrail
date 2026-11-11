@@ -151,7 +151,10 @@ function checkFork(fork, i, taskClass) {
     }
     // 设计类分叉不许靠单一网页转述收场。这一条是产品主张的直接落实：
     // "业界公认的好做法"必须是多来源收敛，而不是"我搜到一篇文章这么说"。
-    if (DESIGN_CLASSES.includes(taskClass) && evidence.kind === 'web') {
+    // 整档被拒之后（designRejected）不再连坐报它的 ref/asserts 形状错——那会让 AI 去修
+    // 一个本不该存在的字段（UX 审查 #12 实测：三条错里只有一条可行动）。
+    const designRejected = DESIGN_CLASSES.includes(taskClass) && evidence.kind === 'web';
+    if (designRejected) {
       at('evidence.design-needs-precedent', `${taskClass} 是设计类任务：单一网页转述不算依据，要么给仓库既有做法（repo），要么给业界收敛（precedent，≥3 独立域名）`);
     }
     if (!EVIDENCE_KINDS.includes(evidence.kind)) {
@@ -159,12 +162,14 @@ function checkFork(fork, i, taskClass) {
     } else if (evidence.kind === 'precedent') {
       const errs = checkPrecedent(evidence);
       for (const [rule, msg] of errs) at(rule, msg);
+    } else if (designRejected) {
+      /* 整档已拒：ref/asserts 的形状错不再报，别让人修不该存在的字段 */
     } else if (hasParentSegment(evidence.ref ?? '')) {
       at('evidence.ref', 'ref 不许包含 ".." 路径段：ref 会被 join 到仓库根上，越界即拒绝');
     } else if (!REF_PATTERNS[evidence.kind].test(String(evidence.ref ?? ''))) {
       at('evidence.ref', `${evidence.kind} 的 ref 格式不符：${evidence.ref ?? '(空)'}`);
     }
-    if (evidence.kind !== 'precedent') {
+    if (evidence.kind !== 'precedent' && !designRejected) {
       const need = ASSERTS_REQUIRED.includes(evidence.kind);
       if (!Array.isArray(evidence.asserts) || evidence.asserts.length === 0) {
         if (need) at('evidence.asserts', `${evidence.kind} 证据必须写明声称要点，否则无从回验`);
@@ -181,7 +186,7 @@ function checkFork(fork, i, taskClass) {
   // options_cost 以前就在这里——第四条门规则的输入居然由被约束的一方填。
   const ALLOWED = new Set(['fork', 'options', 'picked', 'evidence', 'target', 'cost_if_wrong', 'verified']);
   for (const key of Object.keys(fork)) {
-    if (!ALLOWED.has(key)) at('field.unknown', `未知字段 "${key}" 不被接受：台账里只许申报下面这些字段，代价与证据都由程序算`);
+    if (!ALLOWED.has(key)) at('field.unknown', `未知字段 "${key}" 不被接受：fork 只认这些字段——fork/options/picked/evidence/target/cost_if_wrong/verified；代价与证据都由程序算`);
   }
 
   // 测量对象可缺省。缺省时 fanIn 必然取不到，cost 会判 high——

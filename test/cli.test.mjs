@@ -20,10 +20,25 @@ test('端到端：证据查得到 + 代价算得低 → 放行，退出码 0', a
     const res = await check({ cwd: dir });
     assert.equal(res.code, 0, res.text);
     assert.match(res.text, /✓ 可以交付/);
-    assert.match(res.text, /分叉 1 条 · 需打断 0 次/);
+    assert.match(res.text, /分叉 1 条 · 需你定 0 条/);
     // 光有这两条不够：低代价但证据不成立时也会绿（审查抓到的弱断言）
     assert.match(res.text, /未验证 0 条/, res.text);
     assert.match(res.text, /均有可回验证据/, res.text);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// UX 审查 #4：被拦态列改动文件、通过态什么都不列——用户想知道"门到底看见我的改动没有"
+// 只能自己设计实验。通过态与 --json 现在都给同一份改动面。
+test('通过态也列改动面，--json 给 changedFiles', async () => {
+  const dir = await repoWithEvidence();
+  try {
+    await writeFile(join(dir, 'extra-note.md'), 'note\n', 'utf8');
+    const res = await check({ cwd: dir });
+    assert.equal(res.code, 0, res.text);
+    assert.match(res.text, /改动面 1 个文件：extra-note\.md/, res.text);
+    assert.ok(Array.isArray(res.data.changedFiles) && res.data.changedFiles.includes('extra-note.md'), JSON.stringify(res.data.changedFiles));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -34,7 +49,7 @@ test('端到端：没有测量对象 → 程序把 low 覆写成 high → 拦住
   assert.equal(res.code, 1, res.text);
   assert.match(res.text, /申报 low → 程序 high/);
   assert.match(res.text, /引用数取不到/);
-  assert.match(res.text, /【开工前 1 条 · 需你定】/);
+  assert.match(res.text, /【交付被拦 · 1 条需你定】/);
   assert.match(res.text, /✗ 交付被拦住（block）/);
 });
 

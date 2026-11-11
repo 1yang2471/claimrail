@@ -47,6 +47,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 规则，不是建议：
 
 - `options` 至少两项。只写得出一种，说明你还没找到分叉，不是这里没有分叉。
+- 要程序比较候选的代价：候选写成 `{ "label": "覆盖式", "target": { "file": "src/Chat.tsx" } }`——**每个候选都带 target 才算得出**；缺一个，输出只报"候选代价未算出"（合法但逃逸可统计）。
 - 每个字段一行，不许内联代码。台账要进 git 给人 review。
 - `cost_if_wrong` 你只能往高报。程序会算，你报低了会被覆写并打印出来——那次覆写就是你要重新想一遍的地方。
 - `evidence: null` 时 `verified` 必须是 `false`。"我还没来得及查"是合法状态，"我没查但我说查了"不是。
@@ -55,7 +56,13 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 
 ## 三、证据分五档
 
-本地三档优先（便宜、离线、权威），然后：
+本地三档优先（便宜、离线、权威），先说清它们长什么样：
+
+- **repo**（仓库既有做法）——`{ "kind": "repo", "ref": "src/Chat.tsx:88", "asserts": ["scrollbar-gutter"] }`。
+- **memory**（本仓库的历史否决）——`{ "kind": "memory", "ref": "log#16", "asserts": ["覆盖式滚动条"] }`；ref 只认 `log#n`，asserts 是 ≥3 字符、对得上那条 log 内容的要点。`claimrail record` 写的就是这个文件。
+- **render**（真浏览器报告）——`{ "kind": "render", "ref": ".claimrail/shots/名字.png", "asserts": [五项检查里判绿的 id] }`；**照 `claimrail web` 输出末尾给的一行抄，不要手写**——报告里没判的项写成判了，是最不能出现的伪造。
+
+然后：
 
 - **precedent（业界收敛）**——**设计类任务在 `repo` 与 `memory` 都拿不到依据时，必须走这一档，不许直接采用"最常见做法"**。理由：`repo` 回答的是"这个库怎么一致"，回答不了"业界公认的好做法是什么"；绿色项目没有前者，而只对齐仓库既有水平会把产出永久钉在平均值上。这一档就是用来对抗"AI 交出自己见得最多的那个"的。
 
@@ -97,6 +104,8 @@ claimrail web --url http://localhost:5173/chat --state .claimrail/storage.json
 
 多视口是默认的（390×700 和 1280×800）——覆盖式滚动条压字这类缺陷只在窄屏出现，只跑宽屏等于放过。
 
+五项检查是：**滚动条压字**（scrollbar-clears-text）、**触摸目标**（touch-targets-ok）、**对比度**（contrast-ok）、**焦点可见**（focus-visible-ok）、**底栏遮挡**（bottom-not-covered）。报告里 `null` 是"没判"，不是"合格"；asserts 只抄判绿的 id。
+
 页面起不来或需要登录又没登录态：**不许静默跳过**。在交付说明里写明"这一条我没能视觉验证，原因是 X"，并跑能跑的部分。
 
 输出末尾会给一行可直接粘贴的 `evidence`，`asserts` 里只有程序判绿的项。照抄它，不要自己列——把 `null`（未判）写成"已验证"是这套机制最不能出现的事。
@@ -110,6 +119,8 @@ claimrail record --key card-gap --what "卡片上下间距至少 16px" --why "�
 同一条命中两次才升格成规则；`claimrail invalidate <key>` 废掉一条规则，但原始 log 不动（log 是真相，规则是缓存）。
 
 用户说"不是这个"的时候，你要记的是**要什么**（`--what`），不是他那句抱怨的原话。下次动手前先 `claimrail rules`。
+
+`--anchor` 记的是**参照物**：用户点名"照这个做"的正例（"按我们仓库的惯例来"）。它不参与升格，不会变成规则——它的用途是下次同类分叉时点名"照 log#n 那个参照物做"，并在 `claimrail rules` 里单独一列。
 
 ## 不许做
 
@@ -163,6 +174,7 @@ If the diff touches files of that task class (UI / docs / API), `check` also pri
 Rules, not suggestions:
 
 - `options` needs at least two entries. If you can only think of one, you haven't found the fork — it doesn't mean there isn't one.
+- To let the program compare option costs: write options as `{ "label": "overlay", "target": { "file": "src/Chat.tsx" } }` — **every option needs a target or the cost can't be computed**; with one missing, the output just says the option costs couldn't be computed (legal, but it goes on the escape tally).
 - One field per line, no inline code. The ledger goes into git for humans to review.
 - `cost_if_wrong` can only be raised by you. The program computes its own grade; if yours is lower it gets overwritten and printed — that overwrite is the place to think again.
 - When `evidence` is `null`, `verified` must be `false`. "I haven't checked yet" is a legal state; "I didn't check but said I did" is not.
@@ -171,7 +183,13 @@ Rules, not suggestions:
 
 ## 3. Five evidence tiers
 
-Local tiers first (cheap, offline, authoritative), then:
+Local tiers first (cheap, offline, authoritative). What they look like:
+
+- **repo** (existing practice in this repo) — `{ "kind": "repo", "ref": "src/Chat.tsx:88", "asserts": ["scrollbar-gutter"] }`.
+- **memory** (this repo's recorded rejections) — `{ "kind": "memory", "ref": "log#16", "asserts": ["overlay scrollbar"] }`; ref is always `log#n`, asserts are ≥3-char keys that match that log entry's content. `claimrail record` writes this file.
+- **render** (real-browser report) — `{ "kind": "render", "ref": ".claimrail/shots/name.png", "asserts": [ids of checks that passed] }`; **copy the paste-ready line from the end of `claimrail web` output, never write it by hand** — writing a null (not-judged) as "verified" is the one thing this mechanism must never do.
+
+Then:
 
 - **precedent (industry convergence)** — for design tasks, when neither `repo` nor `memory` gives you grounds, you must use this tier; taking "the most common approach" directly is not allowed. `repo` answers "how is this codebase consistent", not "what is the accepted good practice"; a greenfield project has no former, and aligning only with the repo pins output at the average forever. This tier exists to counter "AI ships what it has seen most".
 
@@ -213,6 +231,8 @@ claimrail web --url http://localhost:5173/chat --state .claimrail/storage.json
 
 Multiple viewports are the default (390×700 and 1280×800) — defects like an overlay scrollbar covering text only show up on narrow screens, so running wide-only means letting them through.
 
+The five checks: **scrollbar clears text** (scrollbar-clears-text), **touch targets** (touch-targets-ok), **contrast** (contrast-ok), **focus visible** (focus-visible-ok), **bottom bar not covered** (bottom-not-covered). A `null` in the report means "not judged", not "fine"; copy only the ids that actually went green into `asserts`.
+
 If the page won't load, or needs a login you don't have: **never skip silently**. State in your delivery notes "I could not visually verify this item, because X" and run whatever you can.
 
 The output ends with a paste-ready `evidence` line whose `asserts` contain only checks the program passed. Copy it verbatim, don't write your own — turning `null` (undecided) into "verified" is the one thing this mechanism must never do.
@@ -226,6 +246,8 @@ claimrail record --key card-gap --what "card vertical gap at least 16px" --why "
 A key must be hit twice before it becomes a rule; `claimrail invalidate <key>` retracts a rule, and the raw log stays untouched (the log is truth, rules are cache).
 
 When the user says "not this", record **what they want** (`--what`), not their complaint verbatim. Run `claimrail rules` before your next change.
+
+`--anchor` records a **reference** (positive example): when the user points at something to imitate ("follow our repo's convention"). It never becomes a rule — its use is naming it next time ("do it like reference log#n"), listed separately in `claimrail rules`.
 
 ## Never do this
 

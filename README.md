@@ -19,7 +19,7 @@ It does not make AI tasteful. It stops AI from passing off guesses as evidence.
 | "The screenshot proves it's fine" | Screenshot must be newer than the last code change; `null` (undecided) items in the report never count as passing |
 | "I followed the existing pattern" | Re-reads the cited `file:line`; lines added/modified in this session don't count as an existing pattern |
 | "I remember you rejected X" | `log#n` must exist and match; a misaligned line number is a hard error |
-| "There are no forks in this task" | If the ledger is still the `init` template and the diff is non-empty, `check` exits 1: nothing ships until the agent writes a declaration. A written `forks: []` plus `no_fork_reason` counts as a declaration; when the diff touches files of that task class, `check` prints an audit item and `check --json` exposes `emptyDeclaration`. The program cannot tell whether a fork existed — it only makes the escape countable |
+| "There are no forks in this task" | Still the `init` template + non-empty diff → `check` exits 1 — no declaration, no ship. Writing `forks: []` plus `no_fork_reason` counts as declaring. If the diff also touches that task class's files, `check` prints an audit item (`emptyDeclaration` in `--json`): the program cannot tell whether a fork existed — it only makes the escape countable |
 
 ## Usage
 
@@ -27,7 +27,7 @@ Not on npm yet (`npm view claimrail` returns 404). Install from source:
 
 ```bash
 git clone https://github.com/1yang2471/claimrail.git
-cd claimrail && npm install && npm link   # npm link puts the claimrail command on PATH (junction/symlink install works — the CLI resolves its own real path)
+cd claimrail && npm install && npm link   # puts the claimrail command on PATH
 ```
 
 Then use `claimrail`; from a repo checkout, `node src/cli.mjs` works the same:
@@ -45,9 +45,11 @@ claimrail --help            # all commands and flags
 
 `check --json` prints the same verdict as structured JSON (for hosts and scripts) — the text is a view of that one decision, not a second calculation.
 
-`check` does not touch the network by default. The `precedent` and `web` evidence tiers need real re-fetching, so they require `--allow-net` — an explicit outbound request.
+`check` does not touch the network by default. The `precedent` and `web` **evidence kinds** (not the `web` command) need real re-fetching, so they require `--allow-net` — an explicit outbound request.
 
 `web` depends on Playwright (an optional peer dependency). Without it, `web` fails loudly rather than pretending to have checked.
+
+The five checks: scrollbar covering text, touch target size, contrast, visible focus, bottom bar covered. In the report a `null` means "not judged", never "fine" — `asserts` should only quote ids that actually went green.
 
 ### Wiring it into an agent
 
@@ -111,7 +113,8 @@ How to read this:
 - **The denominators are not the same.** `on` counts a delivery only when the model ended naturally, changed the ledger, and `check` exited 0. The off arm's 8 non-deliveries are step-cap runs, not protocol rejections — so the collapse rate is reported over deliveries (4/12), and over all off runs it is 4/20.
 - **The gate is Stop-time.** It blocks before *delivery*, not before the first edit; this harness cannot measure "blocked before acting". What it does measure is "the run could not hand in a green delivery".
 - **This is one model, one run per pair.** It is direction, not a universal silent-collapse rate. All rows are kept, including the reruns; nothing was cherry-picked. Some `fetch_url` calls failed in-run, so the protocol arm gathered less external evidence than it would on a stable network.
-- **Cost is real.** 11/20 protocol-arm runs hit the 20-step cap, so the arm spends budget on the protocol. The median interrupt count is 0 (target ≤1), but only 3 pairs delivered on both arms, too few to claim the PRD's ≤90 s overhead target generally.
+- **Cost is real.** 11/20 protocol-arm runs hit the 20-step cap, so the arm spends budget on the protocol. The median interrupt count is 0 (target ≤1), but only 3 pairs delivered on both arms, not enough to claim the PRD's ≤90 s overhead target generally.
+- **Reading the numbers correctly:** −16 s is the median of the 20 per-pair differences (on−off), not the difference of the two medians in the table; `n=18` counts the rows whose interrupt count could be parsed (2 rows' `check` output couldn't be — counted as missing, not zero).
 - **The fail-closed `undeclared` block fired on a real model** once: `empty-declaration@on` ran to the step cap with the `init` template untouched, and `check` exited 1. Previously this path had only unit-test evidence.
 
 Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/bench-pilot-2026-11-0{8,9}.json`.
@@ -126,11 +129,12 @@ Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/
 - A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
 - The logged-in flow is verified against a local login-gated site, and against a real third-party site (saucedemo.com, using the demo credentials it publishes on its own login page — gated behind `FK_NET=1` so nothing is sent by default). A page behind *your* real credentials has not been run.
 - `newestTrackedMtime` stats every tracked file. The cap is 200,000 — high enough that no real repo hits it (6000 files measured at 148ms); beyond it, render evidence is reported undecided rather than guessed.
+- Untracked files under agent-host runtime dirs (`.mimosa`, `.claude`, `.zcode`, `.codebuddy`, `.trae`, `.cursor`) don't count as work changes: host plugins drop state files on every tool call, and counting them made every block message list files the user never touched — and could fire a stale block on noise alone (measured 2026-11-11). This separates machine-written state from human/model work; it is not an escape hatch — real code files are never on this list.
 
 ## Development
 
 ```bash
-node --test    # 407 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 414 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).
