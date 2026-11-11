@@ -51,7 +51,7 @@ export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } =
   }
 }
 
-export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
+export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet = false } = {}) {
   const p = payload ?? {};
   const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
   // 宿主可能在子目录里启动钩子：所有路径以仓库根为基准，否则门在子目录里静默消失
@@ -86,7 +86,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null } = {}) {
     return { code: 2, text: `台账被删了：恢复 ${ledgerRel}，或重新跑 claimrail init。` };
   }
 
-  const r = await check({ cwd: root, ledger: ledgerAbs });
+  const r = await check({ cwd: root, ledger: ledgerAbs, allowNet });
 
   // 1. check 本身不过：未申报 / 结构 / 证据 / 代价。
   if (r.code !== 0) {

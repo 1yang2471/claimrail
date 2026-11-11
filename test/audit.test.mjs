@@ -115,6 +115,21 @@ test('文档类任务动了 README 也留下审计项', async () => {
   }
 });
 
+test('协议文件不算审计面：AGENTS.md / .gitignore / .claimrail 不混进 touched', async () => {
+  const dir = await repoWithLedger({ schema: 1, task_class: 'docs-new', forks: [], no_fork_reason: '只补一句安装说明' });
+  try {
+    await writeFile(join(dir, 'README.md'), '# probe\n\n补一句。\n', 'utf8');
+    await writeFile(join(dir, 'AGENTS.md'), '# probe agents\n', 'utf8');
+    await writeFile(join(dir, '.gitignore'), 'node_modules/\n', 'utf8');
+    const res = await check({ cwd: dir });
+    assert.equal(res.code, 0, res.text);
+    assert.deepEqual(res.data.emptyDeclaration.touched, ['README.md'], res.text);
+    assert.equal(res.data.emptyDeclaration.touchedTotal, 1);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('审计项超过展示上限时如实说"另有 N 个"，不许假装全列了', async () => {
   const dir = await repoWithLedger(emptyUI());
   try {

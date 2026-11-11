@@ -39,6 +39,7 @@ claimrail web --url http://127.0.0.1:5173/   # 双视口截图 + 五项几何检
 claimrail record --key ui.spacing --what "别用覆盖式滚动条" --why "压住右对齐气泡"
 claimrail rules             # 现行规则表 + 原始否决 + 来源
 claimrail invalidate <key>  # 作废一条规则；原始 log 一条不动
+claimrail skill             # 打印完整协议；任何目标仓库都能用（不依赖 node_modules）
 claimrail --help            # 全部命令与选项
 ```
 
@@ -52,18 +53,18 @@ claimrail --help            # 全部命令与选项
 
 分两步：**指路**（必做，`init` 自动写）和**装技能**（可选，让 agent 能主动加载协议）。
 
-**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），指向 `node_modules/claimrail/skill/SKILL.md`。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 claimrail。
+**指路**：`init` 会往目标仓库的 `AGENTS.md` 写一段带 marker 的指路（幂等、不动原有内容），让 agent 跑 `claimrail skill` 读它打印的协议。这条命令从安装包自身读 `SKILL.md`，所以目标仓库不需要有 `node_modules/claimrail`——Python/Go 仓库同样成立。这是实测能让 agent 主动加载协议的接法：只靠 skill description，ZCode 0.17.1 连跑三次设计任务都没加载 claimrail。
 
 **装技能**（可选）：`npm install` 只把技能放在包里，**不会**注册到宿主的 skills 目录。要让 agent 能按需加载，把它链到宿主扫描的目录（以 ZCode / CodeBuddy / Trae 共用的 `~/.agents/skills` 为例）：
 
 ```bash
-# Linux / macOS
-ln -s "$(pwd)/node_modules/claimrail/skill" ~/.agents/skills/claimrail
+# Linux / macOS（在 claimrail 源码目录执行）
+ln -s "$(pwd)/skill" ~/.agents/skills/claimrail
 # Windows（管理员或开发者模式）
-mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\node_modules\claimrail\skill"
+mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\skill"
 ```
 
-不装也能用：`AGENTS.md` 里给的是文件路径，agent 直接读那个文件即可，只是不会在你没提到时主动加载。
+不装也能用：`AGENTS.md` 里给的是真实命令（`claimrail skill`），agent 可以按需读协议，只是不会在你没提到时主动加载。
 
 Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 
@@ -84,7 +85,7 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 }
 ```
 
-`hook` 从 stdin 读事件；退出码 2 = 拦住并续一轮，stderr 交给模型去修。没有台账的仓库静默放行；`stop_hook_active` 为真时不再重复阻断，否则会打成死循环。
+`hook` 从 stdin 读事件；退出码 2 = 拦住并续一轮，stderr 交给模型去修。没有台账的仓库静默放行；`stop_hook_active` 为真时不再重复阻断，否则会打成死循环。只有台账里用了 `precedent`/`web` 证据、且你同意每次 Stop 都外发查询时，才在钩子命令后面加 `--allow-net`。
 
 ## 基准：20 个陷阱任务 × 2 臂（2026-11-11 实测）
 
@@ -129,7 +130,7 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 ## 开发
 
 ```bash
-node --test    # 396 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 406 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

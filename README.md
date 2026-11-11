@@ -39,6 +39,7 @@ claimrail web --url http://127.0.0.1:5173/   # two viewports, five geometry chec
 claimrail record --key ui.spacing --what "no overlay scrollbars" --why "covers right-aligned bubbles"
 claimrail rules             # current rules + raw rejections + provenance
 claimrail invalidate <key>  # retract a rule; the raw log is untouched
+claimrail skill             # print the protocol; works in any target repo (no node_modules needed)
 claimrail --help            # all commands and flags
 ```
 
@@ -52,18 +53,18 @@ claimrail --help            # all commands and flags
 
 Two steps: **pointing** (required, written by `init`) and **installing the skill** (optional, lets the agent load the protocol on its own).
 
-**Pointing**: `init` appends a marker block to the target repo's `AGENTS.md` (idempotent, existing content untouched) that points at `node_modules/claimrail/skill/SKILL.md`. This is the wiring that measurably works: relying on the skill description alone, ZCode 0.17.1 ran three design tasks without ever loading claimrail.
+**Pointing**: `init` appends a marker block to the target repo's `AGENTS.md` (idempotent, existing content untouched) that tells the agent to run `claimrail skill` and read the protocol it prints. The command reads the skill from the installed package itself, so the target repo does not need `node_modules/claimrail` — it works for Python/Go repos too. This is the wiring that measurably works: relying on the skill description alone, ZCode 0.17.1 ran three design tasks without ever loading claimrail.
 
 **Installing the skill** (optional): `npm install` puts the skill in the package but does **not** register it in your host's skills directory. To let the agent load it on demand, link it where the host scans (shown for `~/.agents/skills`, shared by ZCode / CodeBuddy / Trae):
 
 ```bash
-# Linux / macOS
-ln -s "$(pwd)/node_modules/claimrail/skill" ~/.agents/skills/claimrail
+# Linux / macOS (run from the claimrail source checkout)
+ln -s "$(pwd)/skill" ~/.agents/skills/claimrail
 # Windows (admin or developer mode)
-mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\node_modules\claimrail\skill"
+mklink /D "%USERPROFILE%\.agents\skills\claimrail" "%CD%\skill"
 ```
 
-Skipping this is fine: the `AGENTS.md` block gives a real file path, so the agent can just read it — it simply won't load the protocol unprompted.
+Skipping this is fine: the `AGENTS.md` block names a real command (`claimrail skill`), so the agent can read the protocol on demand — it simply won't load it unprompted.
 
 Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
@@ -84,7 +85,7 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 }
 ```
 
-`hook` reads the event from stdin; exit code 2 means "block and continue one more turn", with stderr handed to the model. Repos without a ledger pass silently; once a turn has already been continued, `stop_hook_active` prevents blocking again (otherwise it loops forever).
+`hook` reads the event from stdin; exit code 2 means "block and continue one more turn", with stderr handed to the model. Repos without a ledger pass silently; once a turn has already been continued, `stop_hook_active` prevents blocking again (otherwise it loops forever). Add `--allow-net` to the hook command only if your ledger uses `precedent`/`web` evidence and you consent to outbound fetches on every Stop.
 
 ## Benchmarks: 20 trap tasks × 2 arms (measured 2026-11-11)
 
@@ -129,7 +130,7 @@ Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/
 ## Development
 
 ```bash
-node --test    # 396 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 406 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

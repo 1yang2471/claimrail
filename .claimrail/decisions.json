@@ -3,163 +3,144 @@
   "task_class": "refactor",
   "forks": [
     {
-      "fork": "D 支审查方式：缺 provider key 时跳过还是走 ocr delegate",
+      "fork": "AGENTS 指路段怎么修：继续指向 node_modules 还是改用 claimrail skill 命令",
       "options": [
-        "跳过",
-        "ocr delegate 免 key 委托审查"
+        "继续指向 node_modules/claimrail/skill/SKILL.md",
+        "新增 claimrail skill 命令，从安装包自身打印"
       ],
-      "picked": "ocr delegate 免 key 委托审查",
+      "picked": "新增 claimrail skill 命令，从安装包自身打印",
       "evidence": {
         "kind": "memory",
-        "ref": "log#8",
+        "ref": "log#16",
         "asserts": [
-          "ocr delegate"
+          "claimrail skill"
         ]
       },
       "target": {
-        "file": "docs/VERIFY-2026-11-10.md"
+        "file": "src/cli.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
-      "fork": "委托审查发现的 stdin 超时缺陷：修还是只记录",
+      "fork": "memory/ 冲突怎么修：迁到 .claimrail/memory 还是只忽略自己的两个文件",
       "options": [
-        "只记录",
-        "修 + 补测试 + 变异验证"
+        "迁到 .claimrail/memory/",
+        "只忽略 memory/log.jsonl 与 memory/denied.json"
       ],
-      "picked": "修 + 补测试 + 变异验证",
+      "picked": "只忽略 memory/log.jsonl 与 memory/denied.json",
       "evidence": {
         "kind": "memory",
-        "ref": "log#9",
+        "ref": "log#17",
         "asserts": [
-          "超时必须销毁 stdin"
+          "memory/log.jsonl"
+        ]
+      },
+      "target": {
+        "file": "src/cli.mjs"
+      },
+      "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "英文交付识别：只写文档说明还是补正则",
+      "options": [
+        "只写文档",
+        "补中英双语的全称断言/否定/声明/否认模式"
+      ],
+      "picked": "补中英双语的全称断言/否定/声明/否认模式",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#18",
+        "asserts": [
+          "中英双语"
+        ]
+      },
+      "target": {
+        "file": "src/overclaim.mjs"
+      },
+      "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "hook 的联网同意：保持不可用还是把 allowNet 传下去",
+      "options": [
+        "保持不可用",
+        "hook 把 allowNet 传给 check"
+      ],
+      "picked": "hook 把 allowNet 传给 check",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#19",
+        "asserts": [
+          "allowNet"
         ]
       },
       "target": {
         "file": "src/commands/hook.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
-      "fork": "C 支 bench 跑法：完整 20×2 还是 6 任务 pilot",
+      "fork": "repo 证据的 junction/symlink 逃逸：记入边界还是修 containment",
       "options": [
-        "6 任务 pilot",
-        "完整 20×2"
+        "记入已知边界",
+        "解析 realpath 后拒绝仓库外"
       ],
-      "picked": "完整 20×2",
+      "picked": "解析 realpath 后拒绝仓库外",
       "evidence": {
         "kind": "memory",
-        "ref": "log#10",
+        "ref": "log#20",
         "asserts": [
-          "完整 20 任务 × 2 臂"
+          "realpath"
         ]
       },
       "target": {
-        "file": "docs/bench-2026-11-11-off.json"
+        "file": "src/commands/check.mjs"
+      },
+      "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "未知 --flag：继续静默忽略还是报错",
+      "options": [
+        "继续静默忽略",
+        "报错并提示 --help"
+      ],
+      "picked": "报错并提示 --help",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#21",
+        "asserts": [
+          "未知 --flag",
+          "直接报错"
+        ]
+      },
+      "target": {
+        "file": "src/args.mjs"
       },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "发布范围：GitHub Release 还是 npm publish",
+      "fork": "公开与发布：保持私有还是转 public + 双语 Release",
       "options": [
-        "只建 GitHub Release",
-        "npm publish"
+        "保持私有，只本地修复",
+        "转 public + 双语 GitHub Release"
       ],
-      "picked": "只建 GitHub Release",
+      "picked": "转 public + 双语 GitHub Release",
       "evidence": {
         "kind": "memory",
-        "ref": "log#11",
+        "ref": "log#22",
         "asserts": [
-          "只建 GitHub Release"
+          "双语 GitHub Release"
         ]
       },
       "target": {
         "file": "README.md"
       },
       "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "bench 用哪个模型继续测：换稳定的本机免费模型还是继续等原模型额度",
-      "options": [
-        "继续等 autoclaw 额度",
-        "换本机网关免费模型 workbuddy-ai/deepseek-v4.1-flash-sg"
-      ],
-      "picked": "换本机网关免费模型 workbuddy-ai/deepseek-v4.1-flash-sg",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#12",
-        "asserts": [
-          "deepseek-v4.1-flash-sg"
-        ]
-      },
-      "target": {
-        "file": "docs/bench-2026-11-11-on.json"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "网关重置导致的错误行：换模型重跑全量还是同模型只补错误行",
-      "options": [
-        "换模型重跑全量",
-        "同模型只补错误行"
-      ],
-      "picked": "同模型只补错误行",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#13",
-        "asserts": [
-          "17 行重跑"
-        ]
-      },
-      "target": {
-        "file": "docs/bench-2026-11-11-off.json"
-      },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "off 臂撞步数上限的运行：算协议拦截还是单独披露",
-      "options": [
-        "算协议拦截",
-        "单独披露，不计入静默塌缩分母"
-      ],
-      "picked": "单独披露，不计入静默塌缩分母",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#14",
-        "asserts": [
-          "4/12"
-        ]
-      },
-      "target": {
-        "file": "README.md"
-      },
-      "cost_if_wrong": "high",
-      "verified": true
-    },
-    {
-      "fork": "40 行原始数据怎么提交：整份进 git 还是精简后分臂",
-      "options": [
-        "整份 76KB 进 git",
-        "精简掉正文/设计摘录后分臂两文件"
-      ],
-      "picked": "精简掉正文/设计摘录后分臂两文件",
-      "evidence": {
-        "kind": "memory",
-        "ref": "log#15",
-        "asserts": [
-          "去掉模型正文"
-        ]
-      },
-      "target": {
-        "file": "docs/bench-2026-11-11-on.json"
-      },
-      "cost_if_wrong": "low",
       "verified": true
     }
   ]

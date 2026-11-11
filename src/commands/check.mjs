@@ -1,7 +1,7 @@
 // 交付前的门：check（校验台账）。hook（宿主接线）已拆到 ./hook.mjs——
 // 两者是两个关注点，而且放在一起会把本文件推过提交钩子的 20KB 上限。
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -14,7 +14,7 @@ import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince,
 import { readLog } from '../store.mjs';
 import { surfaceFiles } from '../audit.mjs';
 import { LEDGER_PATH, BASELINE_PATH } from '../paths.mjs';
-import { undeclaredBlock, isTemplateLedger } from '../undeclared.mjs';
+import { undeclaredBlock, isTemplateLedger, isProtocolPath } from '../undeclared.mjs';
 
 export { readJson, writeBaseline, readBaseline };
 
@@ -48,9 +48,23 @@ function makeCtx({ cwd, allowNet, changed }) {
   // ref 的落点必须在仓库内：resolve 后与仓库根做前缀比较，越界交 null（→ 证据失败）。
   // schema 只拦了段首的 ../；`a/../../etc/x.png` 这种段中 .. 能逃出仓库（审查实测）。
   // 判定层在 schema 之外再加这道闸：读不到就当证据不成立，绝不读仓库外的东西。
+  // 只做词法前缀不够：仓库内的 junction/symlink 可以指向仓库外（Windows junction
+  // 无需管理员），所以再对真实路径做一次 containment。
+  let realRoot = cwd;
+  try {
+    realRoot = realpathSync(cwd);
+  } catch {
+    /* 根目录不存在：下面的词法检查仍会拒绝越界 */
+  }
   const safeResolve = (p) => {
     const abs = resolve(cwd, String(p));
-    const rel = relative(cwd, abs);
+    let real = abs;
+    try {
+      real = realpathSync(abs);
+    } catch {
+      /* 文件还不存在（fresh 截图/报告）：词法检查足够，后面读取自然失败 */
+    }
+    const rel = relative(realRoot, real);
     if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null;
     return abs;
   };
@@ -229,7 +243,9 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       };
     }
 
-    const auditFiles = raw.value.forks.length === 0 ? surfaceFiles(raw.value.task_class, touched) : [];
+    const auditFiles = raw.value.forks.length === 0
+      ? surfaceFiles(raw.value.task_class, touched.filter((f) => !isProtocolPath(f)))
+      : [];
     const emptyDeclaration = auditFiles.length
       ? {
           reason: raw.value.no_fork_reason ?? null,

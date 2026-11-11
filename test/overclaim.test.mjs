@@ -27,6 +27,23 @@ test('已经逐条声明过的正文要被认出来（不许白拦一轮）', ()
   assert.equal(declaresUnverified('三条分叉全部核实完毕'), false);
 });
 
+// 公开版必须能接住英文交付：宿主和模型不保证用中文写总结。
+// 旧实现四组正则全是中文，英文"All sources were verified"不命中，
+// 英文"not verified"也不被认成声明——hook 会把诚实的英文交付无限拦下去。
+test('英文全称断言要能认出来，英文否定句不算断言', () => {
+  assert.equal(overclaims('All sources were verified.').length, 1);
+  assert.equal(overclaims('I verified everything.').length, 1);
+  assert.equal(overclaims('Every check was confirmed.').length, 1);
+  assert.deepEqual(overclaims('Not all sources were verified.'), []);
+  assert.deepEqual(overclaims('I did not verify everything.'), []);
+});
+
+test('英文诚实声明要能认出来，全称否认不算声明', () => {
+  assert.equal(declaresUnverified('This claim was not verified.'), true);
+  assert.equal(declaresUnverified('I could not verify the screenshot.'), true);
+  assert.equal(declaresUnverified('There are no unverified items.'), false);
+});
+
 test('事件里没有正文时不许瞎说"你一条都没提"', () => {
   assert.equal(readDelivery({}), null);
   assert.equal(readDelivery({ last_assistant_message: '  ' }), null);
@@ -153,6 +170,26 @@ test('诚实的声明优先放行；否认不算声明', async () => {
     });
     assert.equal(denial.code, 2, denial.text);
     assert.match(denial.text, /不能同时成立/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('hook：英文诚实声明放行，英文全称断言与未验证项矛盾要拦', async () => {
+  const dir = await repoWithUnverified();
+  try {
+    const honest = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: 'Done. The row-height claim was not verified because the design spec was unavailable.' },
+    });
+    assert.equal(honest.code, 0, honest.text);
+
+    const overclaim = await hook({
+      cwd: dir,
+      payload: { last_assistant_message: 'Done. All sources were verified.' },
+    });
+    assert.equal(overclaim.code, 2, overclaim.text);
+    assert.match(overclaim.text, /不能同时成立/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（396 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（406 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
@@ -30,7 +30,7 @@
 | 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`（`rgba(0,0,0,.05)` 不合成被当纯黑，76 处假红） |
 | 色值换算必须问浏览器本人 | `driver.mjs` 的 `window.__fk.rgbaOf`：老语法精确解析，现代色空间 canvas 画像素读回。真站实测 49/49、31 处真缺陷（最低 2.45:1） |
 | 认不出的色值整处不判，不许拿祖先的颜色冒充 | `web.mjs` 的 `bgOf`：某一层解析不出整处 null |
-| 交付正文里的全称断言要跟门里的未验证项对撞 | `overclaim.mjs` + `hook`：正文宣称"全部核实"而门里有未验证项 → 拦一轮摊开矛盾；否认句不算声明；读不到正文按"没提"处理 |
+| 交付正文里的全称断言要跟门里的未验证项对撞 | `overclaim.mjs` + `hook`：断言/否定/声明/否认四组模式中英双语；正文宣称"全部核实"而门里有未验证项 → 拦一轮摊开矛盾；读不到正文按"没提"处理（`test/overclaim.test.mjs`） |
 | 测量对象必须先证明成立 | `observe/index.mjs` 的 `targetResolves` + `git.mjs` 的 `fileRefs`：指向不存在的路径/符号时"0 处引用"是假零 → 判 null；文件级 fan-in 要认 `./helper.mjs` 相对写法 |
 | 非 git 目录是显式降级模式，不是实测 | `gitState` 三种话术分开（none 才叫"不是仓库"）；repo 档丢的是"先干后证" |
 | 退出码不许说谎 | `web.mjs`：五项全未判退出 1；`check` 退出 0 只在确有绿项；hook 的文本走 stderr、退出码才是接口 |
@@ -39,7 +39,9 @@
 | 判定要能结构化交出去 | `check.mjs` 返回 `data`（schema=1）；`--json` 打印它，文本是同一份决策的视图 |
 | 申报无分叉要留审计线索 | `audit.mjs` + `check.mjs`：`forks: []` 且 diff 落在该类文件面上 → 审计项 + `emptyDeclaration`，不参与退出码 |
 | 报告必须带 name | `evidence.mjs` render 档：工具产物永远带 name，"没写"只可能是手写报告在绕开 |
-| init 不许替目标仓库决定忽略什么 | `cli.mjs` 的 init 只写四条自有产物路径，不写 `*.png` 通配 |
+| init 不许替目标仓库决定忽略什么 | `cli.mjs` 的 init 只写五条自有产物路径（`memory/log.jsonl`、`memory/denied.json` 与 `.claimrail/` 三项），不用 `memory/` 吞掉目标仓库整个目录，也不写 `*.png` 通配 |
+| 协议指路必须能在任何目标仓库读到 | `claimrail skill` 从安装包自身打印 `skill/SKILL.md`；`init` 写的 AGENTS 指路段指向这个命令，不依赖目标仓库的 `node_modules`（`test/args.test.mjs`、`test/cli.test.mjs`） |
+| hook 的联网同意必须真的传下去 | `hook()` 把 `allowNet` 传给 `check()`；`test/hook-net.test.mjs` 用本地 HTTP 证明不传不外发、传了才回访 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `touchTargetsOk` 排除 |
 | 截图文件名必须带 URL 指纹 | `driver.mjs` 的 `nameFromUrl`（三个 index.html 收敛同名会覆盖证据） |
 | 设计类任务不许拿"一篇文章这么说"当依据 | `schema.mjs` 的 `evidence.design-needs-precedent`：`ui-new`/`docs-new`/`api-design` 用 `kind: 'web'` 直接拒 |
@@ -51,7 +53,8 @@
 | hook 只许拦一次，payload 必须真读 | `hook.mjs`：`stop_hook_active` 为真不再阻断（防死循环）；`readIncoming` 立即调用 IIFE、定时器 unref+清理——少括号曾让 payload 永远 null、每轮多等 5 秒（入口层用例钉住） |
 | 门只在"看得见工作区"时认证未申报 | `check.mjs` 的 `workVisible`：repo 里没有 baseline / git 读不出、或 git 本身 unknown → 模板台账直接拦；`none`（确实不是仓库）是显式降级，照旧放行。空 baseline 由 init 补写修复（`readBaseline ?? writeBaseline`） |
 | 一切路径以仓库根为基准 | `gitToplevel`：check/hook/init/web 都解析仓库根；台账可绝对路径、子目录找不到退回根；`--out` 必须在仓库内（仓库外写不出可回验 ref，早报错） |
-| ref 与 target 段中 `..` 一律拒收 | `schema.mjs` 的 `hasParentSegment`（三层入口：evidence.ref / target.file / options[].target.file）+ `check.mjs` 的 `safeResolve` 运行时兜底 |
+| ref 与 target 段中 `..` 一律拒收 | `schema.mjs` 的 `hasParentSegment`（三层入口：evidence.ref / target.file / options[].target.file）+ `check.mjs` 的 `safeResolve` 运行时兜底；后者再解析 realpath，仓库内 junction/symlink 指向仓库外也拒绝（`test/containment.test.mjs`） |
+| 审计面不许混进协议文件 | `check.mjs` 的 `emptyDeclaration` 先过滤 `isProtocolPath`（AGENTS.md / .gitignore / .claimrail），`test/audit.test.mjs` 钉住 |
 | stale 不误伤协议文件 | `hook.mjs`：touched 过滤后为 0 不进 stale 分支（只改 AGENTS.md/.gitignore 不再拦"改了 0 个文件"） |
 | 未申报本身也拦 | `undeclared.mjs`：工作区有改动、台账仍是 init 模板（哈希或占位理由）→ 退出 1；hook 快照 `{treeHash, ledgerHash}` 判沿用旧台账，第二次放行并落 `violations.jsonl` |
 | 自供字段一律拒收（含 evidence 内部） | `schema.mjs` 白名单：`confidence`/`rationale`/`options_cost` 进不去；`verified` 只作申报（`test/verified.test.mjs` 钉住） |

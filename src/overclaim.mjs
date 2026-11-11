@@ -11,16 +11,26 @@
 // 只在门里确实有未验证条目时才用这一套——没问题的时候不许拿它找茬。
 
 // 全称断言：把"全都核实过了"这类话认出来。刻意收窄，宁可漏也不误伤。
-const OVERCLAIM = /(全部|所有|均|都|逐条|一一)\s*(已|都)?\s*(当场)?\s*(核实|验证|确认|校验|检查|过了一遍|过一遍)/;
+// 中英双语：宿主和模型不保证用哪种语言写交付说明；只认中文会让英文交付
+// 既躲过"全称断言"又认不出"诚实的未验证声明"，钩子会一直拦。
+const OVERCLAIM = new RegExp(
+  [
+    '(全部|所有|均|都|逐条|一一)\\s*(已|都)?\\s*(当场)?\\s*(核实|验证|确认|校验|检查|过了一遍|过一遍)',
+    '\\b(?:all|every|each)\\s+(?:of\\s+)?(?:the\\s+)?(?:sources?|claims?|checks?|items?|findings?|references?)?\\s*(?:were|was|are|is|have\\s+been|has\\s+been)?\\s*(?:fully\\s+|thoroughly\\s+)?(?:verified|validated|checked|confirmed)\\b',
+    '\\b(?:i\\s+)?(?:have\\s+)?(?:verified|validated|checked|confirmed)\\s+(?:everything|all(?:\\s+of\\s+(?:it|them))?)\\b',
+    '\\b(?:fully|thoroughly)\\s+(?:verified|validated|checked|confirmed)\\b',
+  ].join('|'),
+  'i',
+);
 
 // 否定句不是宣称："不能直接说全部核实，因为只找到一个域名"是在反驳，不该被拦。
-// 只看断言前面那一小段：真模型会把结论引出来再否定。
-const NEGATED = /(不能|不该|别|不要|不是|没有|没|未|无法|不算)[^。；\n]{0,8}$/;
+// 只看断言前面那一小段：真模型会把结论引出来再否定。英文同理（Not all were verified）。
+const NEGATED = /(不能|不该|别|不要|不是|没有|没|未|无法|不算)[^。；\n]{0,8}$|(?:not|never|cannot|can't|could not|couldn't|unable to|no)\s+[^.;\n]{0,16}$/i;
 
 export function overclaims(text) {
   const s = String(text ?? '');
   const hits = [];
-  for (const m of s.matchAll(new RegExp(OVERCLAIM.source, 'g'))) {
+  for (const m of s.matchAll(new RegExp(OVERCLAIM.source, `${OVERCLAIM.flags}g`))) {
     if (NEGATED.test(s.slice(Math.max(0, m.index - 10), m.index))) continue;
     hits.push(m[0]);
   }
@@ -28,18 +38,26 @@ export function overclaims(text) {
 }
 
 // 正文里有没有老实声明。有就不必再拦一轮——这一条以前是靠猜的（"你一条都没提"），
-// 现在能按正文判，就不该继续猜。
-const DECLARED = /(未验证|未能验证|没能验证|无法验证|未核实|未能核实|没能核实|没法核实|拿不到证据|没拿到证据|无法核实)/;
+// 现在能按正文判，就不该继续猜。英文模式与中文并列，避免英文交付被无限拦。
+const DECLARED = new RegExp(
+  [
+    '(未验证|未能验证|没能验证|无法验证|未核实|未能核实|没能核实|没法核实|拿不到证据|没拿到证据|无法核实)',
+    '\\b(?:not|never)\\s+(?:verified|validated|checked|confirmed)\\b',
+    "\\b(?:could not|couldn't|unable to|failed to|not able to)\\s+(?:verify|validate|check|confirm)\\b",
+    '\\bunverified\\b',
+  ].join('|'),
+  'i',
+);
 
 // 但"本次交付没有任何未验证的事项"里也有"未验证"三个字——它说的是"没有这回事"。
 // 纯关键词存在性判断会被这句话骗过去，而且它出现的位置正好在放行分支上：
 // 一句否认就把"逐条声明"和"不得宣称全部核实"两道防线一起短路。所以要看关键词前面
-// 是不是一个全称否定。
-const VOID = /(没有|无|不存在|没有任何|一条也没|不属于|不算|并非|不是)[^。；\n]{0,6}$/;
+// 是不是一个全称否定。英文 "There are no unverified items." 同理。
+const VOID = /(没有|无|不存在|没有任何|一条也没|不属于|不算|并非|不是)[^。；\n]{0,6}$|(?:no|none|nothing|not any|not)\s+$/i;
 
 export function declaresUnverified(text) {
   const s = String(text ?? '');
-  for (const m of s.matchAll(new RegExp(DECLARED.source, 'g'))) {
+  for (const m of s.matchAll(new RegExp(DECLARED.source, `${DECLARED.flags}g`))) {
     if (VOID.test(s.slice(Math.max(0, m.index - 10), m.index))) continue;
     return true;
   }

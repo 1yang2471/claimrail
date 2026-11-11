@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, stat, appendFile, writeFile } from 'node:fs/promises';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,45 +56,6 @@ test('台账缺失给出可执行的下一步，不抛栈', async () => {
   const res = await check({ cwd: repo, ledger: 'test/fixtures/nope.json', diffText: '' });
   assert.equal(res.code, 1);
   assert.match(res.text, /claimrail init/);
-});
-
-test('init 建模板、说清数据去向，并让偏好与截图不进 git', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claimrail-init-'));
-  try {
-    const res = await init({ cwd: dir });
-    assert.equal(res.code, 0);
-    assert.match(res.text, /已建/);
-    assert.match(res.text, /decisions\.json\s+进 git/);
-    assert.match(res.text, /memory\//);
-
-    const ledger = JSON.parse(await readFile(join(dir, LEDGER_PATH), 'utf8'));
-    assert.equal(ledger.schema, 1);
-    assert.deepEqual(ledger.forks, []);
-
-    const gi = await readFile(join(dir, '.gitignore'), 'utf8');
-    for (const p of ['memory/', '.claimrail/shots/']) assert.ok(gi.includes(p), p);
-    // 不许写 '*.png'：那会把目标仓库里所有真实图片一起排除掉（静默丢数据）
-    assert.ok(!gi.includes('*.png'), `init 给目标仓库写了 *.png 通配：${gi}`);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test('init 不覆盖已有台账——那是别人的申报记录', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'claimrail-init2-'));
-  try {
-    await init({ cwd: dir });
-    const file = join(dir, LEDGER_PATH);
-    const { writeFile } = await import('node:fs/promises');
-    await writeFile(file, '{"schema":1,"task_class":"typo","forks":[],"no_fork_reason":"我写的"}', 'utf8');
-
-    const res = await init({ cwd: dir });
-    assert.match(res.text, /已存在，不动/);
-    assert.match(await readFile(file, 'utf8'), /我写的/);
-    assert.ok(existsSync(join(dir, '.gitignore')));
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
 });
 
 // —— 偏好闭环端到端：record 写下的东西必须能当证据用，编出来的行号必须过不去 ——

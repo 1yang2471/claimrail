@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { check, init, parse, help, unknownCmd, LEDGER_PATH } from '../src/cli.mjs';
+import { check, init, parse, help, unknownCmd, skill, LEDGER_PATH } from '../src/cli.mjs';
 
 // 参数解析、帮助、文档与命名的一致性。从 cli.test.mjs 拆出来：那个文件被 20KB
 // 提交钩子拒收，而这一组测试只关心"命令行长什么样、文档里写的名字对不对"。
@@ -39,6 +39,17 @@ test('parse：拼错的命令要报错，不许静默退化成 check', () => {
   assert.equal(r.flags.unknown, 'chekc');
 });
 
+test('parse：未知选项要报错，不许静默忽略——拼错的 --allow_net 会让证据悄悄失效', () => {
+  const r = parse(['check', '--allow_net']);
+  assert.deepEqual(r.flags.unknownFlags, ['--allow_net']);
+  const cli = spawnSync(process.execPath, [join(repo, 'src', 'cli.mjs'), 'check', '--allow_net'], {
+    cwd: repo,
+    encoding: 'utf8',
+  });
+  assert.equal(cli.status, 1, `${cli.stdout}${cli.stderr}`);
+  assert.match(`${cli.stdout}${cli.stderr}`, /没有这个选项/);
+});
+
 test('parse：合法命令与位置参数照旧', () => {
   assert.equal(parse([]).cmd, 'check', '无参数仍然是 check');
   const withLedger = parse(['check', 'custom.json']);
@@ -50,9 +61,20 @@ test('parse：合法命令与位置参数照旧', () => {
 test('帮助文本列出全部命令，且退出码 0', async () => {
   const r = await help({});
   assert.equal(r.code, 0);
-  for (const c of ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate']) {
+  for (const c of ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate', 'skill']) {
     assert.match(r.text, new RegExp(`\\b${c}\\b`), `帮助里没有 ${c}`);
   }
+});
+
+// 指路段必须能在任何目标仓库里工作：Python/Go 仓库没有 node_modules，
+// 全局 npm link 也不会在目标仓库里创建 node_modules/claimrail。协议改为由
+// `claimrail skill` 从安装包自身打印，目标仓库是什么语言、怎么装的都不影响。
+test('skill：从安装包自身打印协议，不依赖目标仓库的 node_modules', async () => {
+  const r = await skill({});
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.text, /name: claimrail/);
+  assert.match(r.text, /决策台账/);
+  assert.ok(r.text.length > 1000, `协议内容太短（${r.text.length}）`);
 });
 
 test('未知命令：退出码非 0，且明确说"没有这个命令"并给出 help 提示', async () => {

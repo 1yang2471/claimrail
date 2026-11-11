@@ -19,7 +19,7 @@ export { parse, help, unknownCmd, LEDGER_PATH, check, hook };
 
 const NOTICE = `数据去向：
   .claimrail/decisions.json  进 git（它是给你 review 的东西）
-  memory/                    不进 git（个人偏好，只在你机器上）
+  memory/log.jsonl、memory/denied.json  不进 git（个人偏好，只在你机器上）
   截图（.claimrail/shots/）      不进 git（真实产品画面）`;
 
 // 光靠技能 description 触发不了（真机实测：设计任务照做、台账一字不写），而宿主一定会读
@@ -32,7 +32,7 @@ const AGENTS_BLOCK = [
   AGENTS_BEGIN,
   '## claimrail',
   '',
-  '动界面、文档、接口之前，先读 `node_modules/claimrail/skill/SKILL.md`（没装成依赖就读仓库里的 `skill/SKILL.md`），',
+  '动界面、文档、接口之前，先跑 `claimrail skill` 读协议（它从安装包自身打印，不依赖本仓库的 node_modules），',
   '写 `.claimrail/decisions.json` 申报分叉与证据；',
   '交付前跑 `claimrail check`——结构不合规先修申报，红的不许交。',
   AGENTS_END,
@@ -63,7 +63,7 @@ export async function init({ cwd = process.cwd() } = {}) {
   const lines = existsSync(gi) ? (await readFile(gi, 'utf8')).split('\n') : [];
   // 只写自己产物所在的目录。曾经还写过 '*.png'：那会把目标仓库里所有真实图片
   // 一起排除在提交之外（静默丢数据），而 init 的本意只是别让截图进库。
-  const add = ['memory/', '.claimrail/shots/', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
+  const add = ['memory/log.jsonl', 'memory/denied.json', '.claimrail/shots/', '.claimrail/last-delivery.json', '.claimrail/violations.jsonl'].filter((p) => !lines.includes(p));
   if (add.length) await writeFile(gi, `${lines.join('\n').replace(/\n*$/, '')}\n${add.join('\n')}\n`, 'utf8');
 
   // baseline 在"文件存在但解析不出 sha"（init 跑在没有提交的仓库里，只写了个空文件）时
@@ -87,6 +87,19 @@ export async function init({ cwd = process.cwd() } = {}) {
 
 
 
+
+// 协议文件从安装包自身读：目标仓库可能是 Python/Go，根本没有 node_modules；
+// 全局 npm link 也不会在目标仓库里造一个 node_modules/claimrail。指路段指向
+// 这个命令，任何安装形态、任何技术栈都能拿到同一份 SKILL.md。
+const SKILL_FILE = fileURLToPath(new URL('../skill/SKILL.md', import.meta.url));
+
+export async function skill() {
+  try {
+    return { code: 0, text: await readFile(SKILL_FILE, 'utf8') };
+  } catch (err) {
+    return { code: 1, text: `读不到协议文件 ${SKILL_FILE}：${err.message}（安装包不完整，重新安装 claimrail）` };
+  }
+}
 
 export async function recordCmd({ cwd = process.cwd(), key, what, why, anchor = false } = {}) {
   if (!key || !what) {
@@ -142,7 +155,7 @@ export async function invalidateCmd({ cwd = process.cwd(), key } = {}) {
   }
 }
 
-const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd, help, unknown: unknownCmd };
+const HANDLERS = { init, check, web, hook, record: recordCmd, rules: rulesCmd, invalidate: invalidateCmd, skill, help, unknown: unknownCmd };
 
 // 主模块判断必须比真实路径：Windows 上 pnpm 把包装成 junction、POSIX 上 npm bin 是 symlink，
 // Node 按 realpath 解析主模块而 argv[1] 保留链接路径——字符串相等永远不成立，CLI 静默 exit 0。
@@ -160,9 +173,14 @@ if (isMainEntry()) {
   const { cmd, flags } = parse(process.argv.slice(2));
   let res;
   try {
-    // hook 的 payload 在 stdin：在入口读一次，保持 hook() 本身是纯函数、测试不会挂在等 EOF
-    const args = cmd === 'hook' ? { ...flags, payload: await readIncoming() } : flags;
-    res = await HANDLERS[cmd](args);
+    if (flags.unknownFlags?.length) {
+      // 拼错的开关以前被静默忽略：`--allow_net` 会让证据悄悄失效，用户还以为开了。
+      res = { code: 1, text: `没有这个选项：${flags.unknownFlags.join('、')}\n查看命令：claimrail --help` };
+    } else {
+      // hook 的 payload 在 stdin：在入口读一次，保持 hook() 本身是纯函数、测试不会挂在等 EOF
+      const args = cmd === 'hook' ? { ...flags, payload: await readIncoming() } : flags;
+      res = await HANDLERS[cmd](args);
+    }
   } catch (err) {
     // 兜底：log 损坏、权限问题这类必须报非零，不能静默当成"跑过了"
     res = { code: 1, text: `没跑成：${err.message}` };

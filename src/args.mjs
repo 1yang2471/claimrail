@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { LEDGER_PATH } from './paths.mjs';
 
-const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate'];
+const COMMANDS = ['init', 'check', 'web', 'hook', 'record', 'rules', 'invalidate', 'skill'];
 
 // 帮助。新用户第一屏就是 `claimrail --help`；没有它，拼错命令的人会看到"台账读不到"。
 const HELP = [
@@ -20,6 +20,7 @@ const HELP = [
   '  record --key <类别> --what <要什么> [--why <为什么>] [--anchor]   记一次否决或参照物',
   '  rules                      现行规则 + 原始否决 + 来源',
   '  invalidate <key 或 r:key>  作废一条规则（原始 log 不动）',
+  '  skill                      打印完整协议（从安装包自身读，不依赖目标仓库的 node_modules）',
   '',
   '选项：',
   '  --cwd <目录>      在指定目录工作（默认当前目录）',
@@ -76,6 +77,7 @@ export function parse(argv) {
     pixel: true,
     json: false,
     unknown: cmd === 'unknown' ? first : undefined,
+    unknownFlags: [],
   };
   let ledgerGiven = false;
   for (let i = opts.start; i < argv.length; i++) {
@@ -97,7 +99,8 @@ export function parse(argv) {
     else if (a === '--why') flags.why = argv[++i];
     else if (a === '--anchor') flags.anchor = true;
     else if (a === '--json') flags.json = true;
-    else if (!a.startsWith('--')) {
+    else if (a.startsWith('--')) flags.unknownFlags.push(a);
+    else {
       // check 的位置参数是台账，invalidate 的位置参数是被废的 key，两者不重叠
       if (cmd === 'check' && !ledgerGiven) {
         flags.ledger = a;
