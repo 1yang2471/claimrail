@@ -160,6 +160,9 @@ export const reportPathFor = (pngRef) => String(pngRef).replace(/\.png$/, '.repo
 // focusProbe 是回调而不是现成数据：必须先采到未聚焦基线样式，再走 Tab。
 // 顺序反过来（曾经就是反的）会让基线带着焦点，焦点检查一路判绿。
 export async function renderPage(page, { outDir, name, label = '', focusProbe = null, focusSamples = null, pixel = true } = {}) {
+  if (!name || typeof name !== 'string' || /[\\/]/.test(name) || name === '.' || name === '..' || name.includes('..')) {
+    throw new Error('name 不合法：必须是单个文件名，不能含路径分隔符或 ..');
+  }
   await mkdir(outDir, { recursive: true });
   const data = await page.evaluate(collectInPage);
   const png = join(outDir, `${name}.png`);

@@ -22,6 +22,15 @@ export async function web({
 } = {}) {
   if (!url) return { code: 1, text: '用法：claimrail web --url <地址> [--viewport 390x700,1280x800] [--state 登录态.json] [--out .claimrail/shots]' };
 
+  // --name 只是文件名前缀：含路径分隔符或 .. 时会落盘到 outDir 之外（截图与报告都写死 join）。
+  // 必须在浏览器启动前拒掉，不许 relying on 后面的 --out containment。
+  if (name !== undefined && name !== null && String(name).trim() !== '') {
+    const n = String(name).trim();
+    if (n.includes('/') || n.includes('\\') || n === '.' || n === '..' || n.includes('..')) {
+      return { code: 1, text: `--name 只能是单个文件名（不能含路径分隔符或 ..），收到 "${name}"` };
+    }
+  }
+
   // 截图目录与 ref 都以仓库根为基准：evidence 的 ref 必须是仓库根相对路径，
   // check 回验时才找得到它。--out 给绝对路径也行，但必须在仓库内——仓库外的
   // 绝对路径写不出可回验的 ref，早报错而不是让 mkdir 抛 ENOENT（审查实测）。

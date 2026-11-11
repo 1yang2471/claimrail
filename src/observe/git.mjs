@@ -12,7 +12,7 @@ const BASE = ['-c', 'core.quotepath=false'];
 
 export async function gitRaw(args, cwd) {
   try {
-    const { stdout, stderr } = await run('git', [...BASE, ...args], { cwd, maxBuffer: 32 * 1024 * 1024 });
+    const { stdout, stderr } = await run('git', [...BASE, ...args], { cwd, maxBuffer: 32 * 1024 * 1024, env: { ...process.env, LC_ALL: 'C', LANG: 'C' } });
     return { code: 0, stdout, stderr };
   } catch (err) {
     if (typeof err?.code === 'number') return { code: err.code, stdout: err.stdout ?? '', stderr: err.stderr ?? '' };

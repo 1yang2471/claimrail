@@ -25,7 +25,7 @@ const OVERCLAIM = new RegExp(
 
 // 否定句不是宣称："不能直接说全部核实，因为只找到一个域名"是在反驳，不该被拦。
 // 只看断言前面那一小段：真模型会把结论引出来再否定。英文同理（Not all were verified）。
-const NEGATED = /(不能|不该|别|不要|不是|没有|没|未|无法|不算)[^。；\n]{0,8}$|(?:not|never|cannot|can't|could not|couldn't|unable to|no)\s+[^.;\n]{0,16}$/i;
+const NEGATED = /(不能|不该|别|不要|不是|没有|没|未|无法|不算)[^。；\n]{0,24}$|(?:not|never|cannot|can't|could not|couldn't|unable to|no)\s+[^.;\n]{0,32}$/i;
 
 export function overclaims(text) {
   const s = String(text ?? '');
@@ -53,7 +53,7 @@ const DECLARED = new RegExp(
 // 纯关键词存在性判断会被这句话骗过去，而且它出现的位置正好在放行分支上：
 // 一句否认就把"逐条声明"和"不得宣称全部核实"两道防线一起短路。所以要看关键词前面
 // 是不是一个全称否定。英文 "There are no unverified items." 同理。
-const VOID = /(没有|无|不存在|没有任何|一条也没|不属于|不算|并非|不是)[^。；\n]{0,6}$|(?:no|none|nothing|not any|not)\s+$/i;
+const VOID = /(没有|无|不存在|没有任何|一条也没|不属于|不算|并非|不是)[^。；\n]{0,12}$|(?:no|none|nothing|not any|not)\s+$/i;
 
 export function declaresUnverified(text) {
   const s = String(text ?? '');

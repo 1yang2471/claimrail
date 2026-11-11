@@ -16,13 +16,9 @@ const LARGE_PX = 24;
 const LARGE_BOLD_PX = 18.66;
 const BAR_MIN_WIDTH_RATIO = 0.3; // 覆盖容器宽度不足三成的浮层不算"条"
 
-export const CHECK_IDS = [
-  'scrollbar-clears-text',
-  'touch-targets-ok',
-  'contrast-ok',
-  'focus-visible-ok',
-  'bottom-not-covered',
-];
+import { CHECK_IDS } from './check-ids.mjs';
+
+export { CHECK_IDS };
 
 // 返回 { rgb:[r,g,b], a } 而不是丢掉了 alpha：
 // 半透明的前景或背景都必须先合成再算比值，否则 rgba(0,0,0,.05) 会被当成纯黑。

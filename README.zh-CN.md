@@ -130,7 +130,7 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 ## 开发
 
 ```bash
-node --test    # 406 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 407 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

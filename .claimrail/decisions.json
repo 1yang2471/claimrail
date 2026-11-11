@@ -124,23 +124,123 @@
       "verified": true
     },
     {
-      "fork": "公开与发布：保持私有还是转 public + 双语 Release",
+      "fork": "web --name 路径穿越：记入边界还是在入口拒掉",
       "options": [
-        "保持私有，只本地修复",
-        "转 public + 双语 GitHub Release"
+        "记入已知边界",
+        "入口直接拒绝路径分隔符与 .."
       ],
-      "picked": "转 public + 双语 GitHub Release",
+      "picked": "入口直接拒绝路径分隔符与 ..",
       "evidence": {
         "kind": "memory",
-        "ref": "log#22",
+        "ref": "log#23",
         "asserts": [
-          "双语 GitHub Release"
+          "web --name"
         ]
       },
       "target": {
-        "file": "README.md"
+        "file": "src/commands/web.mjs"
       },
       "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "ctx.fetch 的 SSRF：保持 redirect:follow 还是手动跟随",
+      "options": [
+        "保持 redirect:follow",
+        "手动跟随，每跳重新主机检查"
+      ],
+      "picked": "手动跟随，每跳重新主机检查",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#24",
+        "asserts": [
+          "ctx.fetch"
+        ]
+      },
+      "target": {
+        "file": "src/commands/check.mjs"
+      },
+      "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "git 输出语言：信任 stderr 文本还是设 LC_ALL=C",
+      "options": [
+        "信任 stderr",
+        "设 LC_ALL=C 与 LANG=C"
+      ],
+      "picked": "设 LC_ALL=C 与 LANG=C",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#25",
+        "asserts": [
+          "LC_ALL=C"
+        ]
+      },
+      "target": {
+        "file": "src/observe/git.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "overclaim 否定窗口：8/16 字符还是 24/32",
+      "options": [
+        "8/16 字符",
+        "24/32 字符"
+      ],
+      "picked": "24/32 字符",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#26",
+        "asserts": [
+          "24/12"
+        ]
+      },
+      "target": {
+        "file": "src/overclaim.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "RENDER_CHECK_IDS 与 CHECK_IDS：各写一份还是合并",
+      "options": [
+        "各写一份",
+        "合并到 src/observe/check-ids.mjs"
+      ],
+      "picked": "合并到 src/observe/check-ids.mjs",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#27",
+        "asserts": [
+          "check-ids.mjs"
+        ]
+      },
+      "target": {
+        "file": "src/observe/check-ids.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "check 的两处 block 数据对象：手写两份还是提取工厂",
+      "options": [
+        "手写两份",
+        "提取 blockedData 工厂"
+      ],
+      "picked": "提取 blockedData 工厂",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#28",
+        "asserts": [
+          "blockedData 工厂"
+        ]
+      },
+      "target": {
+        "file": "src/commands/check.mjs"
+      },
+      "cost_if_wrong": "low",
       "verified": true
     }
   ]

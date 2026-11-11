@@ -44,6 +44,81 @@ async function readJson(path) {
   }
 }
 
+// SSRF 防线：ctx.fetch 是给台账里的 URL 用的，URL 由模型/用户填。
+// 默认 redirect: follow 会让一个 302 把请求送进内网；改成手动跟随，每跳都重新过主机检查。
+export function isPrivateHost(host) {
+  const h = String(host ?? '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h || h === '0.0.0.0' || h === '::') return true;
+  if (h === 'metadata.google.internal' || h === '169.254.169.254') return true;
+  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    // link-local（含云元数据）一律拒；其它私网/loopback 是用户自己的文档站，允许直连
+    if (a === 169 && b === 254) return true;
+    if (a === 0) return true;
+  }
+  return false;
+}
+
+// 重定向目标比直连更严格：公网上一个 URL 不该把请求送进用户的内网/本机。
+export function isPrivateRedirectTarget(host) {
+  const h = String(host ?? '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h || h === 'localhost' || h === '0.0.0.0' || h === '::' || h === '::1') return true;
+  if (h === 'metadata.google.internal' || h === '169.254.169.254') return true;
+  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+  }
+  return false;
+}
+
+async function fetchWithRedirects(url, allowNet) {
+  if (!allowNet) return null;
+  let current = url;
+  if (isPrivateHost(new URL(current).hostname)) throw new Error('私网/元数据地址，已拒绝');
+  for (let i = 0; i < 5; i += 1) {
+    const res = await globalThis.fetch(current, {
+      signal: AbortSignal.timeout(10_000),
+      redirect: 'manual',
+      headers: { 'accept-language': 'en' },
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) return { status: res.status, text: '' };
+      const next = new URL(loc, current);
+      if (isPrivateRedirectTarget(next.hostname)) throw new Error('重定向指向私网/元数据地址，已拒绝');
+      current = next.href;
+      continue;
+    }
+    return { status: res.status, text: await res.text() };
+  }
+  throw new Error('重定向次数过多');
+}
+
+function blockedData({ task_class, undeclared, noForkReason, degraded }) {
+  return {
+    schema: 1,
+    action: 'block',
+    task_class,
+    total: 0,
+    metrics: { interrupts: 0, unverified: 0, violations: 0, rule4NotEnabled: 0 },
+    degraded,
+    no_fork_reason: noForkReason ?? null,
+    emptyDeclaration: null,
+    undeclared,
+    overrides: [],
+    questions: [],
+    unverified: [],
+    violations: [],
+    notEnabled: [],
+  };
+}
 function makeCtx({ cwd, allowNet, changed }) {
   // ref 的落点必须在仓库内：resolve 后与仓库根做前缀比较，越界交 null（→ 证据失败）。
   // schema 只拦了段首的 ../；`a/../../etc/x.png` 这种段中 .. 能逃出仓库（审查实测）。
@@ -118,19 +193,7 @@ function makeCtx({ cwd, allowNet, changed }) {
         return null;
       }
     },
-    fetch: async (url) => {
-      if (!allowNet) return null;
-      // 死链/DNS 失败必须变成这一条证据失败，而不是把整份 check 炸掉：
-      // 没有 timeout 和 try/catch 时，一个不可达 URL 会让其余分叉的回验结果全部丢失
-      // accept-language 是实测补的：web.dev 对不带语言标的回访返回过法语页，英文引文因此在
-      // 自己刚引过的那篇上匹配不上——语言漂移不该算成"这个来源不成立"
-      const res = await globalThis.fetch(url, {
-        signal: AbortSignal.timeout(10_000),
-        redirect: 'follow',
-        headers: { 'accept-language': 'en' },
-      });
-      return { status: res.status, text: await res.text() };
-    },
+    fetch: async (url) => fetchWithRedirects(url, allowNet),
   };
 }
 
@@ -169,22 +232,13 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
         git === 'repo' && base === null
           ? '没有 baseline（init 跑在没有提交的仓库里，或 baseline 被删）：已提交的改动扫不到'
           : 'git 读不出仓库状态：工作区是否改过无从判断（查 GIT_DIR、safe.directory、git 是否可用）';
-      const data = {
-        schema: 1,
-        action: 'block',
+      const undeclared = { changed: [], changedTotal: 0, reason };
+      const data = blockedData({
         task_class: raw.value.task_class,
-        total: 0,
-        metrics: { interrupts: 0, unverified: 0, violations: 0, rule4NotEnabled: 0 },
+        undeclared,
+        noForkReason: raw.value.no_fork_reason ?? null,
         degraded: git === 'repo' ? null : git === 'none' ? 'no-git' : 'git-unknown',
-        no_fork_reason: raw.value.no_fork_reason ?? null,
-        emptyDeclaration: null,
-        undeclared: { changed: [], changedTotal: 0, reason },
-        overrides: [],
-        questions: [],
-        unverified: [],
-        violations: [],
-        notEnabled: [],
-      };
+      });
       return {
         code: 1,
         undeclared: data.undeclared,
@@ -220,27 +274,13 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       ledgerPath: ledgerRel,
     });
     if (undeclared) {
-      return {
-        code: 1,
+      const data = blockedData({
+        task_class: raw.value.task_class,
         undeclared,
-        data: {
-          schema: 1,
-          action: 'block',
-          task_class: raw.value.task_class,
-          total: 0,
-          metrics: { interrupts: 0, unverified: 0, violations: 0, rule4NotEnabled: 0 },
-          degraded: git === 'repo' ? null : git === 'none' ? 'no-git' : 'git-unknown',
-          no_fork_reason: raw.value.no_fork_reason ?? null,
-          emptyDeclaration: null,
-          undeclared,
-          overrides: [],
-          questions: [],
-          unverified: [],
-          violations: [],
-          notEnabled: [],
-        },
-        text: undeclared.text,
-      };
+        noForkReason: raw.value.no_fork_reason ?? null,
+        degraded: git === 'repo' ? null : git === 'none' ? 'no-git' : 'git-unknown',
+      });
+      return { code: 1, undeclared, data, text: undeclared.text };
     }
 
     const auditFiles = raw.value.forks.length === 0

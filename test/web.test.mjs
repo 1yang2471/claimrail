@@ -236,3 +236,14 @@ test('web --out：仓库外报错，仓库内绝对路径放行', async () => {
     assert.match(ok.text, /shots\/[A-Za-z0-9_-]+@390x700\.png/);
   });
 });
+
+test('web --name：路径穿越直接拒，不许落盘到仓库外', async () => {
+  const r = await web({
+    url: 'http://example.com/',
+    name: '../../evil',
+    launch: async () => { throw new Error('should not launch'); },
+    open: async () => ({ page: fakePage(defectData), context: { close: async () => {} }, focusProbe: async () => [] }),
+  });
+  assert.equal(r.code, 1, r.text);
+  assert.match(r.text, /路径分隔符|不许| traversal/, r.text);
+});

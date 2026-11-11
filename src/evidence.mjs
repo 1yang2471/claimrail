@@ -8,15 +8,9 @@
 //   precedent 编"业界都这么做"：条数凑够但同域转载、引文那页上根本没有、采纳度张口就来
 //   web       编一个 URL，或编一个"好评率高"这种没有量纲的数字
 
-// 与 observe/geometry.mjs 的 CHECK_IDS 同集合。写两遍是有意的：evidence 不该依赖
-// 浏览器层，否则纯逻辑测试要拖进 Playwright。test/redteam.test.mjs 钉住两边一致。
-export const RENDER_CHECK_IDS = [
-  'scrollbar-clears-text',
-  'touch-targets-ok',
-  'contrast-ok',
-  'focus-visible-ok',
-  'bottom-not-covered',
-];
+import { CHECK_IDS as RENDER_CHECK_IDS } from './observe/check-ids.mjs';
+
+export { RENDER_CHECK_IDS };
 
 const MIN_ASSERT = 3; // 单字符断言等于没断言：整文件里总能找到它
 const MAX_REPO_SPAN = 40; // 跨几十行就不是"那一处的做法"，是"这文件里出现过"
