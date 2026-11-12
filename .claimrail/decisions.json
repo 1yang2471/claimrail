@@ -81,6 +81,27 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "规则三的武装方式：协议层默认写法、schema 拒收、还是保持现状",
+      "options": [
+        "协议层武装（SKILL 默认写法）",
+        "schema 拒收设计类无 target",
+        "保持现状"
+      ],
+      "picked": "协议层武装（SKILL 默认写法）",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#44",
+        "asserts": [
+          "从未武装"
+        ]
+      },
+      "target": {
+        "file": "skill/SKILL.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }

@@ -47,7 +47,7 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 规则，不是建议：
 
 - `options` 至少两项。只写得出一种，说明你还没找到分叉，不是这里没有分叉。
-- 要程序比较候选的代价：候选写成 `{ "label": "覆盖式", "target": { "file": "src/Chat.tsx" } }`——**每个候选都带 target 才算得出**；缺一个，输出只报"候选代价未算出"（合法但逃逸可统计）。
+- **设计类分叉（`ui-new` / `docs-new` / `api-design`）默认按候选配 target**：候选写成 `{ "label": "覆盖式", "target": { "file": "src/Chat.tsx" } }`。"无证据却选了更贵做法就拦"这条规则（防塌缩到"见得最多的那个"）**只对配了 target 的分叉起作用**——不配 = 主动放弃这道防塌缩检查；真配不了就在交付说明里写明原因，别默默不配。
 - 每个字段一行，不许内联代码。台账要进 git 给人 review。
 - `cost_if_wrong` 你只能往高报。程序会算，你报低了会被覆写并打印出来——那次覆写就是你要重新想一遍的地方。
 - `evidence: null` 时 `verified` 必须是 `false`。"我还没来得及查"是合法状态，"我没查但我说查了"不是。
@@ -176,7 +176,7 @@ If the diff touches files of that task class (UI / docs / API), `check` also pri
 Rules, not suggestions:
 
 - `options` needs at least two entries. If you can only think of one, you haven't found the fork — it doesn't mean there isn't one.
-- To let the program compare option costs: write options as `{ "label": "overlay", "target": { "file": "src/Chat.tsx" } }` — **every option needs a target or the cost can't be computed**; with one missing, the output just says the option costs couldn't be computed (legal, but it goes on the escape tally).
+- **Design-class forks (`ui-new` / `docs-new` / `api-design`) default to per-candidate targets**: write options as `{ "label": "overlay", "target": { "file": "src/Chat.tsx" } }`. The rule "no evidence + picked the pricier option → blocked" (the anti-collapse guard against "the thing I've seen most") **only arms for forks with targets on every option** — skipping it means giving up that check; if you truly can't, say why in the delivery notes, don't skip it silently.
 - One field per line, no inline code. The ledger goes into git for humans to review.
 - `cost_if_wrong` can only be raised by you. The program computes its own grade; if yours is lower it gets overwritten and printed — that overwrite is the place to think again.
 - When `evidence` is `null`, `verified` must be `false`. "I haven't checked yet" is a legal state; "I didn't check but said I did" is not.
