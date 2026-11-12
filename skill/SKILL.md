@@ -84,6 +84,8 @@ description: 在规格没定的地方留下决策台账，交付前由程序算�
 
 够了就停：`repo → memory → render → precedent → web`。前四档能定案就不要往下走，`web` 之外都无依据时，答案是"去问人"，不是"照默认的来"。
 
+**钩子场景（Stop 钩子默认不联网）**：`precedent` / `web` 两档在钩子里回验不了（"未获同意"）→ 会被当成"没证据"。所以：设计类分叉**优先用本地三档**（repo/memory/render）取证；确实只有 precedent 可用时，在交付说明里写明"这条待用户跑 `claimrail check --allow-net` 核实"，别在钩子语境里硬写 precedent 然后反复被拦。
+
 ## 四、交付前必须过门
 
 ```
@@ -210,6 +212,8 @@ Then:
 - **web**: a supplementary single source. For `ui-new` / `docs-new` / `api-design` the schema **rejects** this tier outright: a design decision cannot rest on one article.
 
 Stop when you have enough: `repo → memory → render → precedent → web`. If the first four can settle it, don't go further; when none apply, the answer is "ask a human", not "go with the default".
+
+**Hook context (the Stop hook runs offline by default)**: `precedent` / `web` evidence cannot re-verify inside the hook ("not consented") → it counts as "no evidence". So: for design forks **prefer the three local tiers** (repo/memory/render); when only `precedent` can work, say so in the delivery ("this one needs the user to run `claimrail check --allow-net`") instead of hard-writing precedent and getting blocked on every delivery.
 
 ## 4. You must pass the gate before delivering
 

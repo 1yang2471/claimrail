@@ -4,28 +4,81 @@
   "forks": [
     {
       "fork": "hook 拦截文本超宿主窗口：在 hook 里按结构化数据压缩，还是靠宿主截断",
-      "options": ["hook 里 compactStopBlock 压缩", "靠宿主截断"],
+      "options": [
+        "hook 里 compactStopBlock 压缩",
+        "靠宿主截断"
+      ],
       "picked": "hook 里 compactStopBlock 压缩",
-      "evidence": { "kind": "memory", "ref": "log#42", "asserts": ["4000 字符"] },
-      "target": { "file": "src/commands/hook.mjs" },
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#42",
+        "asserts": [
+          "4000 字符"
+        ]
+      },
+      "target": {
+        "file": "src/commands/hook.mjs"
+      },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
       "fork": "hook 的仓库解析链被 CLI 短路：入口不传 cwd，还是保留现状靠 env 兜底",
-      "options": ["入口不传 cwd", "保留现状"],
+      "options": [
+        "入口不传 cwd",
+        "保留现状"
+      ],
       "picked": "入口不传 cwd",
-      "evidence": { "kind": "memory", "ref": "log#41", "asserts": ["静默放行"] },
-      "target": { "file": "src/cli.mjs" },
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#41",
+        "asserts": [
+          "静默放行"
+        ]
+      },
+      "target": {
+        "file": "src/cli.mjs"
+      },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
       "fork": "钩子崩溃时宿主 fail-open、以及工作区根会话全盲：记边界还是加防护",
-      "options": ["记入 BOUNDARIES", "在钩子里加防护"],
+      "options": [
+        "记入 BOUNDARIES",
+        "在钩子里加防护"
+      ],
       "picked": "记入 BOUNDARIES",
-      "evidence": { "kind": "memory", "ref": "log#41", "asserts": ["真实日志"] },
-      "target": { "file": "docs/FEEDBACK-2026-11-12.md" },
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#41",
+        "asserts": [
+          "真实日志"
+        ]
+      },
+      "target": {
+        "file": "docs/FEEDBACK-2026-11-12.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "钩子离线场景的取证指引：写进 SKILL 协议，还是只留在反馈报告里",
+      "options": [
+        "写进 SKILL.md",
+        "只留报告"
+      ],
+      "picked": "写进 SKILL.md",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#43",
+        "asserts": [
+          "优先本地三档"
+        ]
+      },
+      "target": {
+        "file": "skill/SKILL.md"
+      },
       "cost_if_wrong": "low",
       "verified": true
     }
