@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（417 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（419 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
@@ -61,6 +61,8 @@
 | 未申报本身也拦 | `undeclared.mjs`：工作区有改动、台账仍是 init 模板（哈希或占位理由）→ 退出 1；hook 快照 `{treeHash, ledgerHash}` 判沿用旧台账，第二次放行并落 `violations.jsonl` |
 | 自供字段一律拒收（含 evidence 内部） | `schema.mjs` 白名单：`confidence`/`rationale`/`options_cost` 进不去；`verified` 只作申报（`test/verified.test.mjs` 钉住） |
 | bench 陷阱任务不许编 | `bench/tasks/` 20 个，`trap.md` 都要写明出处与统计口径；`test/bench.test.mjs` 逐个查 |
+| hook 的仓库解析链必须完整 | CLI 入口对 `hook` **不传 cwd**：payload.cwd → `ZCODE_PROJECT_DIR` → 进程 cwd 按序解析（真实日志挖出的缺陷：flags.cwd 把前两条短路，手动跑会查错仓库静默放行，`test/hook.test.mjs` 三级顺序用例 + 变异验证） |
+| Stop 拦截文本必须装进宿主窗口 | 宿主截 4000 字符（zcode.cjs `KRa→kce` 实测）；`hook` 的 `compactStopBlock` 按结构化数据压缩到 ≤3600 预算、收尾指令必保（`test/hook.test.mjs`；变异：拆压缩 → 红）。别让模型只见到前一半问题 |
 
 ## 已知的检出边界
 

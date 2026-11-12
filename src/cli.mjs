@@ -180,8 +180,12 @@ if (isMainEntry()) {
       // 拼错的开关以前被静默忽略：`--allow_net` 会让证据悄悄失效，用户还以为开了。
       res = { code: 1, text: `没有这个选项：${flags.unknownFlags.join('、')}\n查看命令：claimrail --help` };
     } else {
-      // hook 的 payload 在 stdin：在入口读一次，保持 hook() 本身是纯函数、测试不会挂在等 EOF
-      const args = cmd === 'hook' ? { ...flags, payload: await readIncoming() } : flags;
+      // hook 的 payload 在 stdin：在入口读一次，保持 hook() 本身是纯函数、测试不会挂在等 EOF。
+      // cwd 必须留空让 hook() 按 payload.cwd → ZCODE_PROJECT_DIR → process.cwd() 解析：
+      // flags.cwd 默认是钩子进程自己的 process.cwd()，直接传下去会把 payload/env 两条路
+      // 短路掉——真实复现（2026-11-12 挖日志）：在 forklight 里手动跑 hook、payload 指向
+      // 永雏小菲，钩子却去查了 forklight 的台账并静默放行。真实宿主靠 env 兜底才没翻车。
+      const args = cmd === 'hook' ? { ...flags, cwd: undefined, payload: await readIncoming() } : flags;
       res = await HANDLERS[cmd](args);
     }
   } catch (err) {

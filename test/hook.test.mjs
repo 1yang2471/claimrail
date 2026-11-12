@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { check, hook, init } from '../src/cli.mjs';
@@ -123,7 +123,13 @@ test('hook：低代价未验证也要拦一轮，把条目递给模型去声明'
 // hook 的文本走 stderr（退出码才是宿主的接口），所以必须 stdout+stderr 都收，
 // 否则"放行但留了原因"的分支测不到输出（execFileSync 只在失败时给 stderr）。
 const runCli = (args, { cwd, stdin = '' }) => {
-  const r = spawnSync(process.execPath, [join(repo, 'src', 'cli.mjs'), ...args], { cwd, input: stdin, encoding: 'utf8' });
+  // 剥掉会话注入的 ZCODE_PROJECT_DIR / CLAUDE_PROJECT_DIR：真实宿主靠它指路，测试里
+  // 它是环境泄漏——不剥的话，钩子在 forklight 会话里跑测试会去查 forklight 的台账
+  // （2026-11-12 实测：cwd 短路修复后 env 优先级生效，这条泄漏让入口用例看错仓库）。
+  const env = { ...process.env };
+  delete env.ZCODE_PROJECT_DIR;
+  delete env.CLAUDE_PROJECT_DIR;
+  const r = spawnSync(process.execPath, [join(repo, 'src', 'cli.mjs'), ...args], { cwd, input: stdin, encoding: 'utf8', env });
   return { code: r.status ?? -1, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 
@@ -319,4 +325,63 @@ test('命令行入口：check --json 输出可解析的结构化判定', async (
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// 真实日志挖出的接线缺陷（2026-11-12）：CLI 入口把 flags.cwd（=钩子进程自己的
+// process.cwd()）传给 hook()，把 payload.cwd 与 ZCODE_PROJECT_DIR 两条解析路短路掉——
+// 在别的目录手动跑 hook 会去查错误仓库的台账并静默放行。真实宿主靠 env 兜底才没翻车。
+// 这里钉住解析顺序：payload.cwd > ZCODE_PROJECT_DIR > 进程 cwd。
+test('命令行入口：hook 的仓库解析顺序 payload.cwd > env > 进程 cwd', async () => {
+  const repoA = await repoWithTemplate(); // 无高代价分叉：放行（code 0）
+  const repoB = await mkdtemp(join(tmpdir(), 'fk-hook-cwdB-'));
+  try {
+    await mkdir(join(repoB, '.claimrail'), { recursive: true });
+    await writeFile(join(repoB, '.claimrail', 'decisions.json'), JSON.stringify({
+      schema: 1,
+      task_class: 'ui-new',
+      forks: [{ fork: '主视觉', options: ['A', 'B'], picked: 'A', evidence: null, cost_if_wrong: 'high', verified: false }],
+    }), 'utf8');
+
+    // ① payload.cwd 必须赢过进程 cwd：进程 cwd=repoA、payload 指向 repoB → 拦 repoB（code 2）
+    const viaPayload = runCli(['hook'], { cwd: repoA, stdin: JSON.stringify({ cwd: repoB.split(sep).join('/') }) });
+    assert.equal(viaPayload.code, 2, viaPayload.out);
+
+    // ② env 必须赢过进程 cwd：进程 cwd=repoA、ZCODE_PROJECT_DIR 指向 repoB → code 2
+    const env = { ...process.env, ZCODE_PROJECT_DIR: repoB };
+    const r = spawnSync(process.execPath, [join(repo, 'src', 'cli.mjs'), 'hook'], { cwd: repoA, input: '{}', encoding: 'utf8', env });
+    assert.equal(r.status, 2, `${r.stdout ?? ''}${r.stderr ?? ''}`);
+  } finally {
+    await rm(repoA, { recursive: true, force: true });
+    await rm(repoB, { recursive: true, force: true });
+  }
+});
+
+// 宿主把 Stop 拦截原因截到 4000 字符：真实台账（永雏小菲，37 条需你定）的 22.5KB
+// 全量文本会被腰斩，模型只见到前几条——"一次问完"做不到。压缩后必须装进预算。
+test('compactStopBlock：超预算文本按结构化数据重排，收尾指令必保', async () => {
+  const { compactStopBlock } = await import('../src/commands/hook.mjs');
+  const questions = Array.from({ length: 40 }, (_, i) => ({
+    fork: `分叉第 ${i + 1} 号：${'比较长的分叉描述文本'.repeat(12)}`,
+    picked: '候选甲',
+    why: '未获同意，不得外发查询',
+  }));
+  const r = {
+    text: ['任务类型 docs-new · 分叉 40 条 · 需你定 37 条', '✗ 交付被拦住（block）'].concat(
+      questions.map((q) => `  1. ${q.fork}\n     候选 甲 | 乙 → 已选 ${q.picked}\n     代价 high · 凭什么 ${q.why}`),
+    ).join('\n'),
+    data: {
+      task_class: 'docs-new', total: 40,
+      metrics: { interrupts: 37, unverified: 0 },
+      overrides: ['覆写一', '覆写二'],
+      questions: questions.map((q) => ({ fork: q.fork, picked: q.picked, why: q.why })),
+    },
+  };
+  const out = compactStopBlock(r, 3600);
+  assert.ok(out.length <= 3600, `压缩后仍超预算：${out.length}`);
+  assert.match(out, /还有 [0-9]+ 条需你定的分叉/);
+  assert.match(out, /一次问完用户/);
+  assert.match(out, /【程序覆写档位】2 条未展开/);
+  // 短文本原样返回：不做无谓重排
+  const short = compactStopBlock({ text: '短', data: null });
+  assert.equal(short, '短');
 });

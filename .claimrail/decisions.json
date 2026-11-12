@@ -3,29 +3,29 @@
   "task_class": "refactor",
   "forks": [
     {
-      "fork": "宿主噪音过滤放哪：各消费方各挡一次，还是下沉到 changedLines 源头",
-      "options": ["下沉到源头加剔 diff 文本", "各消费方各挡"],
-      "picked": "下沉到源头加剔 diff 文本",
-      "evidence": { "kind": "memory", "ref": "log#39", "asserts": ["diff 文本"] },
-      "target": { "file": "src/observe/git.mjs" },
+      "fork": "hook 拦截文本超宿主窗口：在 hook 里按结构化数据压缩，还是靠宿主截断",
+      "options": ["hook 里 compactStopBlock 压缩", "靠宿主截断"],
+      "picked": "hook 里 compactStopBlock 压缩",
+      "evidence": { "kind": "memory", "ref": "log#42", "asserts": ["4000 字符"] },
+      "target": { "file": "src/commands/hook.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "宿主目录名单收多宽：只收实测的 .mimosa，还是一串推测的宿主目录",
-      "options": ["只收实测的 .mimosa", "六个宿主目录一起收"],
-      "picked": "只收实测的 .mimosa",
-      "evidence": { "kind": "memory", "ref": "log#40", "asserts": ["只收实测过"] },
-      "target": { "file": "src/observe/git.mjs" },
+      "fork": "hook 的仓库解析链被 CLI 短路：入口不传 cwd，还是保留现状靠 env 兜底",
+      "options": ["入口不传 cwd", "保留现状"],
+      "picked": "入口不传 cwd",
+      "evidence": { "kind": "memory", "ref": "log#41", "asserts": ["静默放行"] },
+      "target": { "file": "src/cli.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "报告内容可被直接改（shot_sha256 不防）记成边界，还是算缺陷上去补",
-      "options": ["记成已知边界", "加报告完整性校验"],
-      "picked": "记成已知边界",
-      "evidence": { "kind": "memory", "ref": "log#38", "asserts": ["伪造证据不在防御范围"] },
-      "target": { "file": "docs/BOUNDARIES.md" },
+      "fork": "钩子崩溃时宿主 fail-open、以及工作区根会话全盲：记边界还是加防护",
+      "options": ["记入 BOUNDARIES", "在钩子里加防护"],
+      "picked": "记入 BOUNDARIES",
+      "evidence": { "kind": "memory", "ref": "log#41", "asserts": ["真实日志"] },
+      "target": { "file": "docs/FEEDBACK-2026-11-12.md" },
       "cost_if_wrong": "low",
       "verified": true
     }

@@ -123,7 +123,7 @@ claimrail invalidate <key>      # 作废一条规则；原始 log 一条不动�
 
 ## 数字
 
-- `node --test`：417 项，415 通过 + 2 skip（两条真网络烟测默认关），0 失败。
+- `node --test`：419 项，417 通过 + 2 skip（两条真网络烟测默认关），0 失败。
 - 基准：20 个陷阱任务 × 2 臂（普通提示 vs `init` + 协议提示），模型 `workbuddy-ai/deepseek-v4.1-flash-sg`。off 臂交付 12/20、静默塌缩 4/12；on 臂交付 6/20、静默塌缩 0/6、`check` 拦住 9/20。数据与口径见 `README.zh-CN.md` 的基准一节（单一模型、每对一次，是方向性数字，不是通用塌缩率）。
 
 ---

@@ -51,6 +51,34 @@ export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } =
   }
 }
 
+// 宿主把 Stop 拦截原因截到 4000 字符（zcode.cjs 的 KRa→kce，实测提取自宿主源码）。
+// 永雏小菲真实台账实测（2026-11-12）：40 条分叉、37 条需你定的全量文本 22.5KB，
+// 直接交出去模型只能见到前一半——SKILL.md 要求的"一次问完"做不到。
+// 用 check 的结构化数据重排：一行摘要 + 尽可能多的单行条目 + 必保的收尾指令。
+const REASON_BUDGET = 3600;
+
+export function compactStopBlock(r, budget = REASON_BUDGET) {
+  const text = r.text ?? '';
+  if (!r.data || text.length <= budget) return text;
+  const d = r.data;
+  const tail = '先去把证据拿到（precedent/web 要 --allow-net）；拿不到就把这些分叉一次问完用户。不要改台账措辞绕过。';
+  const items = (d.questions ?? []).map((q) => `  • ${q.fork}｜已选 ${q.picked}｜${q.why}`);
+  const head = `【claimrail 交付被拦】${d.task_class} · 分叉 ${d.total} 条 · 需你定 ${d.metrics.interrupts} 条 · 未验证 ${d.metrics.unverified} 条`;
+  const out = [head];
+  if (d.overrides?.length) out.push(`【程序覆写档位】${d.overrides.length} 条未展开（跑 claimrail check 看原因）`);
+  const reserve = tail.length + 80;
+  let shown = 0;
+  for (const line of items) {
+    if (out.join('\n').length + line.length + reserve > budget) break;
+    out.push(line);
+    shown += 1;
+  }
+  const rest = (d.questions?.length ?? 0) - shown;
+  if (rest > 0) out.push(`  …（还有 ${rest} 条需你定的分叉，完整清单跑 claimrail check）`);
+  out.push(tail);
+  return out.join('\n');
+}
+
 export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet = false } = {}) {
   const p = payload ?? {};
   const dir = cwd || p?.cwd || process.env.ZCODE_PROJECT_DIR || process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -100,9 +128,9 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
           changedTotal: r.undeclared.changedTotal,
         });
       }
-      return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
+      return { code: 0, text: `${compactStopBlock(r)}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
     }
-    return { code: 2, text: `${r.text}\n先修申报或去拿证据；拿不到就问人，不要改措辞绕过。` };
+    return { code: 2, text: `${compactStopBlock(r)}\n先修申报或去拿证据；拿不到就问人，不要改措辞绕过。` };
   }
 
   // 2. 指纹：工作区变了、台账没变 = 沿用上次申报。
@@ -147,7 +175,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
   // 3. 只拦一次：续过一轮就放行，但把仍未通过的检查原因留在输出里。
   if (continuedBefore) {
     await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
-    return { code: 0, text: `${r.text}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
+    return { code: 0, text: `${compactStopBlock(r)}\n（本轮已因 Stop 钩子续过一次，不再重复阻断；上面是仍未通过的原因）` };
   }
 
   // 4. 门放行了但有未验证条目：正文必须逐条声明。
