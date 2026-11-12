@@ -102,6 +102,26 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "评估轮的处置：只交报告，还是顺手做 S1 SKILL 双语拆分",
+      "options": [
+        "只交报告（改动需真机回归触发率，待拍板）",
+        "顺手做拆分"
+      ],
+      "picked": "只交报告（改动需真机回归触发率，待拍板）",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#45",
+        "asserts": [
+          "待用户拍板"
+        ]
+      },
+      "target": {
+        "file": "docs/EVAL-2026-11-13.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
