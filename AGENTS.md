@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（414 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（417 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
@@ -14,6 +14,7 @@
 | 采集不到数据不许判绿 | `src/observe/geometry.mjs` 三态 `null` + `src/evidence.mjs` 只认严格 `true`（报告全 null 或只有截图无报告都判失败） |
 | 视觉证据必须是新的，删除也算改动 | `evidence.mjs` render 档比较截图 mtime 与 `newestTrackedMtime`（含被删路径父目录 mtime；`.claimrail/`、`memory/` 从时间戳里排除，否则台账总在截图之后写） |
 | 不许伪造度量报告 | `evidence.mjs`：id ∈ `RENDER_CHECK_IDS`、五项齐全、schema 版本对、`name` 对应截图、`shot_sha256` 重算比对、断言严格 true（`test/redteam.test.mjs`） |
+| 报告的完整性边界 | 落盘链只挡"手写报告 / 旧报告换新图"（缺 `shot_sha256`、截图字节对不上）；**不挡直接改报告 JSON 的内容**——那是"伪造证据"，不在防御范围（见 `docs/BOUNDARIES.md`）。别把 `shot_sha256` 当报告完整性用 |
 | 不许引用本次刚写的代码冒充既有做法 | `git.mjs` 的 `changedLines`+`isChangedLine` 经 `ctx.isChanged` 注入；路径基准是仓库根（子目录运行照样生效） |
 | 未跟踪文件不能对档位隐身 | `observe/git.mjs` 的 `worktreeScanText` 把 `git status` 的 `??` 并进副作用扫描与 mtime |
 | 弱断言不算证据 | `evidence.mjs`：断言 ≥3 字符、区间 ≤40 行；schema 端 repo/memory/render/web 四档都必须带 asserts（与 verify 同一把尺） |
@@ -40,7 +41,7 @@
 | 申报无分叉要留审计线索 | `audit.mjs` + `check.mjs`：`forks: []` 且 diff 落在该类文件面上 → 审计项 + `emptyDeclaration`，不参与退出码 |
 | 报告必须带 name | `evidence.mjs` render 档：工具产物永远带 name，"没写"只可能是手写报告在绕开 |
 | init 不许替目标仓库决定忽略什么 | `cli.mjs` 的 init 只写六条自有产物路径（`memory/log.jsonl`、`memory/denied.json` 与 `.claimrail/` 四项，含登录态 `storage.json`——不忽略它，照协议做的用户会把 cookie 提交进 git），不用 `memory/` 吞掉目标仓库整个目录，也不写 `*.png` 通配 |
-| 宿主运行时状态不算工作改动 | `observe/git.mjs` 的 `HOST_NOISE`：`.mimosa`/`.claude`/`.zcode`/`.codebuddy`/`.trae`/`.cursor` 目录的未跟踪文件不进改动面、stale 与 mtime；名单只收实测过的宿主目录，用户源码目录永不收 |
+| 宿主运行时状态不算工作改动 | `observe/git.mjs` 的 `HOST_NOISE`＝**只收实测过的 `.mimosa`**（`.claude`/`.cursor` 等常被用户有意跟踪为配置，收了会把真活藏起来）。过滤必须贯穿 untracked、diff ranges、以及整段 diff 文本：`changedLines` 在源头剔除前两者，`stripHostNoiseDiff` 剔文本给 `treeHash`/副作用扫描——只挡一路就会漏（`test/host-noise.test.mjs`，含 `.claude` 仍算工作改动的反向用例） |
 | 协议指路必须能在任何目标仓库读到 | `claimrail skill` 从安装包自身打印 `skill/SKILL.md`；`init` 写的 AGENTS 指路段指向这个命令，不依赖目标仓库的 `node_modules`（`test/args.test.mjs`、`test/cli.test.mjs`） |
 | hook 的联网同意必须真的传下去 | `hook()` 把 `allowNet` 传给 `check()`；`test/hook-net.test.mjs` 用本地 HTTP 证明不传不外发、传了才回访 |
 | 行内文字链接不按控件标准考核 | `web.mjs` 采 `inline` 标记 + `touchTargetsOk` 排除 |

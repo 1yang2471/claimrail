@@ -10,7 +10,7 @@ import { grade, FAN_IN_HIGH } from '../cost.mjs';
 import { verifyAll } from '../evidence.mjs';
 import { enrich, decide, render } from '../gate.mjs';
 import { observe, whyUnknown } from '../observe/index.mjs';
-import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState, gitToplevel } from '../observe/git.mjs';
+import { newestTrackedMtime, changedLines, isChangedLine, resolveRef, diffSince, gitState, gitToplevel, stripHostNoiseDiff } from '../observe/git.mjs';
 import { readLog } from '../store.mjs';
 import { surfaceFiles } from '../audit.mjs';
 import { fetchWithRedirects } from './fetch-guard.mjs';
@@ -203,11 +203,17 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
 
     const ctx = makeCtx({ cwd: root, allowNet, changed: changedNow });
     ctx.lastChangeMs = (await newestTrackedMtime(root)) ?? undefined;
-    const diff = diffText ?? (await diffSince(root, base));
+    // 宿主状态文件的整块 diff 剔掉再往下传：副作用扫描读的是这段文本（不读 ranges），
+    // 被跟踪过的宿主文件不改剔的话会拿噪音内容判出 irreversible（审查 2026-11-12）。
+    // 保持 null：读不出 diff（非 git 目录）与"diff 是空串"是两回事，前者要报"改动内容取不到"。
+    const rawDiff = diffText ?? (await diffSince(root, base));
+    const diff = rawDiff == null ? rawDiff : stripHostNoiseDiff(rawDiff);
     const overrides = [];
 
     // 申报无分叉时的审计线索：台账说没有分叉，而改动落在该类的面上。
     // 只进输出与 --json，不参与 action/退出码——见 src/audit.mjs 顶部的说明。
+    // 宿主运行时状态（.mimosa）由 changedLines 在源头剔除（ranges/untracked/renamed 三处），
+    // 这里不再二次过滤——一件事只有一个地方负责。
     const touched = changedNow
       ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])]
       : [];

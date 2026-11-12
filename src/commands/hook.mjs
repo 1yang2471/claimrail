@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { check, readBaseline } from './check.mjs';
-import { changedLines, diffSince, gitToplevel } from '../observe/git.mjs';
+import { changedLines, diffSince, gitToplevel, stripHostNoiseDiff } from '../observe/git.mjs';
 import { readDelivery, overclaims, declaresUnverified } from '../overclaim.mjs';
 import { isProtocolPath } from '../undeclared.mjs';
 import { treeHash, ledgerHash, readSnapshot, writeSnapshot, recordViolation } from '../delivery.mjs';
@@ -109,13 +109,17 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
   const base = await readBaseline(root);
   const changedNow = await changedLines(root, base);
   // 自定义台账路径也要当协议文件排除：否则台账自己会被算成"这次改了 N 个文件"里的一条。
-  // 过滤用仓库根相对路径（changedLines 的键就是这个基准）。
+  // 过滤用仓库根相对路径（changedLines 的键就是这个基准）。宿主运行时状态（.mimosa）由
+  // changedLines 在源头剔除，这里不再二次过滤；台账路径不是宿主噪音，仍在这里挡。
   const touched = changedNow
     ? [...new Set([...changedNow.ranges.keys(), ...changedNow.untracked, ...(changedNow.renamed ?? [])])].filter(
         (f) => !isProtocolPath(f) && f !== ledgerRel,
       )
     : [];
-  const diff = await diffSince(root, base);
+  // treeHash 读的是整段 diff 文本：宿主状态文件的块要剔掉，否则被跟踪过的宿主文件一改，
+  // 指纹就变、stale 假拦（审查 2026-11-12 实测：只改 .claude 也会拦、还把没动的 app.ts 报成"这次改了"）。
+  const rawDiff = await diffSince(root, base);
+  const diff = rawDiff == null ? rawDiff : stripHostNoiseDiff(rawDiff);
   const tHash = treeHash({ touched, diffText: diff });
   const lHash = ledgerHash(await readFile(ledgerAbs, 'utf8'));
   const snap = await readSnapshot(root);

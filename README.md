@@ -1,5 +1,7 @@
 # claimrail
 
+> New here? Start with the [product introduction](docs/INTRO.md).
+
 English | [中文](README.zh-CN.md)
 
 A *claim* is what the AI says it did: it verified the design, checked the screenshot, followed the existing pattern. A *rail* is the bar it clears before shipping. The name is the mechanism.
@@ -129,12 +131,12 @@ Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/
 - A quote being present does not mean the page *recommends* the practice. Two real hits were exception clauses; `url + quote` exists so a reviewer can check the surrounding context. That human check is the only defence in this tier.
 - The logged-in flow is verified against a local login-gated site, and against a real third-party site (saucedemo.com, using the demo credentials it publishes on its own login page — gated behind `FK_NET=1` so nothing is sent by default). A page behind *your* real credentials has not been run.
 - `newestTrackedMtime` stats every tracked file. The cap is 200,000 — high enough that no real repo hits it (6000 files measured at 148ms); beyond it, render evidence is reported undecided rather than guessed.
-- Untracked files under agent-host runtime dirs (`.mimosa`, `.claude`, `.zcode`, `.codebuddy`, `.trae`, `.cursor`) don't count as work changes: host plugins drop state files on every tool call, and counting them made every block message list files the user never touched — and could fire a stale block on noise alone (measured 2026-11-11). This separates machine-written state from human/model work; it is not an escape hatch — real code files are never on this list.
+- Files under the host runtime-state dir `.mimosa/` (ZCode plugins drop `hook-state`/`hook-status` files there on every tool call) don't count as work changes: counting them made every block message list files the user never touched — and could fire a stale block on noise alone (measured 2026-11-11). The list keeps **only the measured `.mimosa`** — `.claude`/`.cursor` are commonly tracked as user config, and ignoring them would hide real work (review 2026-11-12). This separates machine-written runtime state from human/model work; it is not an escape hatch — user source files are never on this list.
 
 ## Development
 
 ```bash
-node --test    # 414 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 417 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

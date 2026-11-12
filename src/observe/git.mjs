@@ -24,10 +24,33 @@ const splitZ = (text) => text.split('\0').filter(Boolean);
 const toPosix = (p) => String(p).split(sep).join('/');
 
 // 宿主/代理的运行时状态目录：本机实测（2026-11-11 UX 审查），ZCode 插件每次工具调用都往仓库
-// 丢 .mimosa/hook-state/*.json，模型没碰它们。算进"工作区有改动"会让拦截消息列出用户没改的
-// 文件，甚至单独触发 stale 假拦截（抢在正文对撞之前）。名单只收 agent 宿主的运行时目录，
-// 一个个来：有实测才加；用户源码目录永远不收。
-const HOST_NOISE = /(^|\/)(\.mimosa|\.claude|\.zcode|\.codebuddy|\.trae|\.cursor)(\/|$)/;
+// 丢 .mimosa/hook-state/*.json、.mimosa/hook-status/*.json，模型没碰它们。算进"工作区有改动"
+// 会让拦截消息列出用户没改的文件，甚至单独触发 stale 假拦截（抢在正文对撞之前）。
+//
+// 名单只收**实测过**的宿主运行时目录，只有一个：.mimosa。曾经顺手加过 .claude/.cursor 等
+// "看起来也是宿主目录"的一串——但那些常被用户**有意跟踪**为配置（`.claude/settings.json`、
+// `.cursor/rules/*`），忽略它们等于把真活藏起来，比噪音本身更坏（2026-11-12 审查）。
+// 以后要加，先有实测：哪个宿主、往哪个子路径写、写的是不是可丢的运行态。
+// `i` 标志：Windows 文件系统大小写不敏感，.Mimosa 与 .mimosa 是同一个目录。
+const HOST_NOISE = /(^|\/)(\.mimosa)(\/|$)/i;
+
+// 同一份名单必须贯穿所有消费方：untracked、diff ranges、以及整段 diff 文本
+// （treeHash 与副作用扫描读的是 diff 文本，不读 ranges）。只在某一处过滤 = 别处照漏。
+const isHostNoise = (p) => HOST_NOISE.test(toPosix(p));
+
+// 从 unified diff 文本里剔掉宿主噪音文件的整块（`diff --git a/X b/Y` 到下一块之前）。
+// treeHash 与 effects 扫描都吃这段文本；不剔的话，被跟踪过的宿主状态文件一改，
+// 指纹就变、stale 假拦，或副作用扫描拿噪音内容判出 irreversible。
+export function stripHostNoiseDiff(diffText) {
+  const out = [];
+  let skip = false;
+  for (const line of String(diffText ?? '').split('\n')) {
+    const m = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
+    if (m) skip = isHostNoise(m[1]) || isHostNoise(m[2]);
+    if (!skip) out.push(line);
+  }
+  return out.join('\n');
+}
 
 // 这个目录到底在不在 git 里。用来把"降级模式"与"实测出的高代价"分开：
 // 两者在报告里长得一样（都是 high），但一个该去 `git init`，一个该去拆改动。
@@ -160,7 +183,9 @@ export async function changedLines(cwd, base = null) {
     for (const line of diffRes.stdout.split(/\r?\n/)) {
       const h = /^diff --git a\/(.+?) b\/(.+)$/.exec(line);
       if (h) {
-        file = h[2];
+        // 宿主运行时状态不进 ranges：下游的 touched / 审计面 / undeclared 都读这个 Map，
+        // 在这里挡住比在每个消费方各挡一次可靠（以前只在 untracked 一路挡，diff 一路漏）。
+        file = isHostNoise(h[2]) ? null : h[2];
         continue;
       }
       const at = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
@@ -178,10 +203,10 @@ export async function changedLines(cwd, base = null) {
   for (const entry of splitZ(statusRes.stdout)) {
     if (!entry.startsWith('??')) continue;
     const p = toPosix(entry.slice(2).split('\0')[0].trim());
-    if (p && !HOST_NOISE.test(p)) untracked.push(p);
+    if (p && !isHostNoise(p)) untracked.push(p);
   }
 
-  return { ranges, untracked, renamed: renames };
+  return { ranges, untracked, renamed: renames.filter((p) => !isHostNoise(p)) };
 }
 
 export const isChangedLine = (changed, file, from, to) => {

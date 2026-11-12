@@ -3,56 +3,29 @@
   "task_class": "refactor",
   "forks": [
     {
-      "fork": "噪音过滤的落点：改 changedLines 源头还是只在输出层过滤",
-      "options": ["改 changedLines 源头", "只在输出层过滤"],
-      "picked": "改 changedLines 源头",
-      "evidence": { "kind": "memory", "ref": "log#30", "asserts": ["宿主运行时状态"] },
+      "fork": "宿主噪音过滤放哪：各消费方各挡一次，还是下沉到 changedLines 源头",
+      "options": ["下沉到源头加剔 diff 文本", "各消费方各挡"],
+      "picked": "下沉到源头加剔 diff 文本",
+      "evidence": { "kind": "memory", "ref": "log#39", "asserts": ["diff 文本"] },
       "target": { "file": "src/observe/git.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "rule4NotEnabled 字段：更名还是保留加文档",
-      "options": ["更名为 optionsCostUnavailable", "保留并写文档"],
-      "picked": "更名为 optionsCostUnavailable",
-      "evidence": { "kind": "memory", "ref": "log#31", "asserts": ["规则四"] },
-      "target": { "file": "src/gate.mjs" },
+      "fork": "宿主目录名单收多宽：只收实测的 .mimosa，还是一串推测的宿主目录",
+      "options": ["只收实测的 .mimosa", "六个宿主目录一起收"],
+      "picked": "只收实测的 .mimosa",
+      "evidence": { "kind": "memory", "ref": "log#40", "asserts": ["只收实测过"] },
+      "target": { "file": "src/observe/git.mjs" },
       "cost_if_wrong": "low",
       "verified": true
     },
     {
-      "fork": "模板占位行改文案：怎么兼容老仓库里被重新序列化的旧模板",
-      "options": ["isTemplateReason 同时认旧占位串", "只认新串"],
-      "picked": "isTemplateReason 同时认旧占位串",
-      "evidence": { "kind": "memory", "ref": "log#32", "asserts": ["兼容旧占位串"] },
-      "target": { "file": "src/template.mjs" },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "schema 拒收的 --json：给结构化 errors 还是维持散文",
-      "options": ["给结构化 errors 数组", "维持散文 error 字符串"],
-      "picked": "给结构化 errors 数组",
-      "evidence": { "kind": "memory", "ref": "log#33", "asserts": ["structured verdict"] },
-      "target": { "file": "src/commands/check.mjs" },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "设计类整拒 web 档后的连坐报错：跳过还是保留",
-      "options": ["跳过该档的形状检查", "保留连坐报错"],
-      "picked": "跳过该档的形状检查",
-      "evidence": { "kind": "memory", "ref": "log#34", "asserts": ["连坐报错"] },
-      "target": { "file": "src/schema.mjs" },
-      "cost_if_wrong": "low",
-      "verified": true
-    },
-    {
-      "fork": "通过态改动面：新增统一一行还是复用审计项列表",
-      "options": ["新增改动面一行加 JSON changedFiles", "复用审计项列表"],
-      "picked": "新增改动面一行加 JSON changedFiles",
-      "evidence": { "kind": "memory", "ref": "log#35", "asserts": ["changedFiles"] },
-      "target": { "file": "src/commands/check.mjs" },
+      "fork": "报告内容可被直接改（shot_sha256 不防）记成边界，还是算缺陷上去补",
+      "options": ["记成已知边界", "加报告完整性校验"],
+      "picked": "记成已知边界",
+      "evidence": { "kind": "memory", "ref": "log#38", "asserts": ["伪造证据不在防御范围"] },
+      "target": { "file": "docs/BOUNDARIES.md" },
       "cost_if_wrong": "low",
       "verified": true
     }
