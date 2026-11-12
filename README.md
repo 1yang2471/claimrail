@@ -91,6 +91,18 @@ Stop hook (ZCode, `~/.zcode/cli/config.json`):
 
 `hook` reads the event from stdin; exit code 2 means "block and continue one more turn", with stderr handed to the model. Repos without a ledger pass silently; once a turn has already been continued, `stop_hook_active` prevents blocking again (otherwise it loops forever). Add `--allow-net` to the hook command only if your ledger uses `precedent`/`web` evidence and you consent to outbound fetches on every Stop.
 
+**Other hosts**: the hook exit-code semantics are host-generic — 0 pass, 2 = block-and-continue, block reason read from stderr, env supports `CLAUDE_PROJECT_DIR` / `ZCODE_PROJECT_DIR`. Claude Code and ZCode share the same semantics; for the hooks config shape follow each host's official docs (Claude Code: settings.json → hooks → Stop).
+
+**CI / unattended**: `node src/cli.mjs check --unattended --json` — high cost with no evidence halts (exit 1) instead of waiting for input; scripts consume the structured verdict. GitHub Actions example:
+
+```yaml
+- uses: actions/checkout@v4
+- run: git clone https://github.com/1yang2471/claimrail.git _claimrail && npm install --prefix _claimrail
+- run: node _claimrail/src/cli.mjs check --cwd . --unattended --json
+```
+
+(There is no Stop hook in CI: the `check` exit code IS the gate; the stale re-declaration check only exists at the hook layer.)
+
 ## Benchmarks: 20 trap tasks × 2 arms (measured 2026-11-11)
 
 `bench/tasks/` holds **20 trap tasks**, each documenting why it is not invented (pointing at real failures recorded in `docs/`: exception-clause quotes, SPA shells, `shot_sha256` binding, four truncation classes, the `git push origin HEAD:main` publication rule, etc.). `test/bench.test.mjs` checks that explanation and the counting rule for every task.
@@ -136,7 +148,7 @@ Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/
 ## Development
 
 ```bash
-node --test    # 419 tests: pure logic / real git repos / real Chromium / CLI loop
+node --test    # 422 tests: pure logic / real git repos / real Chromium / CLI loop
 ```
 
 The real-Chromium file skips entirely when Playwright is absent — never a fake green. Read `AGENTS.md` before changing code: every rule names what enforces it, and each new guard requires a mutation check (break it, watch it go red; restore, watch it go green).

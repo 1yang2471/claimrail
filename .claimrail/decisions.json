@@ -122,6 +122,46 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "G2 群体最大负担（双语协议同文件）：拆两份加 --en，还是保持单文件",
+      "options": [
+        "拆 SKILL.md + SKILL.en.md",
+        "保持单文件"
+      ],
+      "picked": "拆 SKILL.md + SKILL.en.md",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#46",
+        "asserts": [
+          "白读一半"
+        ]
+      },
+      "target": {
+        "file": "src/cli.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "多宿主接线文档：发明 Claude Code 的 JSON 形状，还是语义兼容加指官方文档",
+      "options": [
+        "语义兼容加指官方文档",
+        "发明 JSON 形状"
+      ],
+      "picked": "语义兼容加指官方文档",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#47",
+        "asserts": [
+          "只收实测过"
+        ]
+      },
+      "target": {
+        "file": "README.zh-CN.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }

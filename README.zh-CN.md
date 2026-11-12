@@ -89,6 +89,17 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 
 `hook` 从 stdin 读事件；退出码 2 = 拦住并续一轮，stderr 交给模型去修。没有台账的仓库静默放行；`stop_hook_active` 为真时不再重复阻断，否则会打成死循环。只有台账里用了 `precedent`/`web` 证据、且你同意每次 Stop 都外发查询时，才在钩子命令后面加 `--allow-net`。
 
+**其它宿主**：钩子的退出码语义是宿主通用的——0 放行、2 = 拦住并续一轮，拦截原因从 stderr 读，env 支持 `CLAUDE_PROJECT_DIR` / `ZCODE_PROJECT_DIR`。Claude Code 与 ZCode 是同一套语义；hooks 配置形状以各宿主官方文档为准（Claude Code：settings.json → hooks → Stop）。
+
+**CI / 无人值守**：`node src/cli.mjs check --unattended --json`——高代价无证据时 halt（退出 1）而不是等输入，结构化判定交给脚本判。GitHub Actions 示例：
+
+```yaml
+- uses: actions/checkout@v4
+- run: git clone https://github.com/1yang2471/claimrail.git _claimrail && npm install --prefix _claimrail
+- run: node _claimrail/src/cli.mjs check --cwd . --unattended --json
+```
+（CI 里没有 Stop 钩子：`check` 的退出码就是门，沿用旧台账的 stale 拦截只在钩子层成立。）
+
 ## 基准：20 个陷阱任务 × 2 臂（2026-11-11 实测）
 
 `bench/tasks/` 里是 **20 个陷阱任务**，每个都写明"为什么这不是编的任务"（指向 `docs/` 里记录过的真实事故：引文例外条款、SPA 壳页、`shot_sha256` 落盘链、四类采集截断、`git push origin HEAD:main` 的发布判据等），`test/bench.test.mjs` 会逐个检查这份说明与统计口径。
@@ -134,7 +145,7 @@ Stop 钩子（ZCode 的 `~/.zcode/cli/config.json`）：
 ## 开发
 
 ```bash
-node --test    # 419 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
+node --test    # 422 项：纯逻辑 / 真 git 仓库 / 真 Chromium / CLI 闭环
 ```
 
 真 Chromium 层在没装 Playwright 时整文件 skip，不伪绿。改代码前读 `AGENTS.md`：每条规则都标了由什么拦住，以及"改坏必须红"的变异验证要求。

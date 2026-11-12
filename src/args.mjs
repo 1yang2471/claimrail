@@ -20,7 +20,7 @@ const HELP = [
   '  record --key <类别> --what <要什么> [--why <为什么>] [--anchor]   记一次否决；--anchor 记参照物（照它做，不参与升格）',
   '  rules                      现行规则 + 原始否决 + 来源',
   '  invalidate <key 或 r:key>  作废一条规则（原始 log 不动）',
-  '  skill                      打印完整协议（从安装包自身读，不依赖目标仓库的 node_modules）',
+  '  skill [--en]                打印完整协议（中文默认；--en 打印英文版；从安装包自身读，不依赖目标仓库的 node_modules）',
   '',
   '选项：',
   '  --cwd <目录>      在指定目录工作（默认当前目录）',
@@ -74,6 +74,7 @@ export function parse(argv) {
     what: undefined,
     why: undefined,
     anchor: false,
+    en: false,
     pixel: true,
     json: false,
     unknown: cmd === 'unknown' ? first : undefined,
@@ -98,6 +99,7 @@ export function parse(argv) {
     else if (a === '--what') flags.what = argv[++i];
     else if (a === '--why') flags.why = argv[++i];
     else if (a === '--anchor') flags.anchor = true;
+    else if (a === '--en') flags.en = true;
     else if (a === '--json') flags.json = true;
     else if (a.startsWith('--')) flags.unknownFlags.push(a);
     else {

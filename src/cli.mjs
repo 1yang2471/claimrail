@@ -94,13 +94,16 @@ export async function init({ cwd = process.cwd() } = {}) {
 // 协议文件从安装包自身读：目标仓库可能是 Python/Go，根本没有 node_modules；
 // 全局 npm link 也不会在目标仓库里造一个 node_modules/claimrail。指路段指向
 // 这个命令，任何安装形态、任何技术栈都能拿到同一份 SKILL.md。
+// 中英拆两份：agent 每会话读一遍协议，双语同文件等于白读一半（G2 群体实测最大单笔负担）。
 const SKILL_FILE = fileURLToPath(new URL('../skill/SKILL.md', import.meta.url));
+const SKILL_EN_FILE = fileURLToPath(new URL('../skill/SKILL.en.md', import.meta.url));
 
-export async function skill() {
+export async function skill({ en = false } = {}) {
+  const file = en ? SKILL_EN_FILE : SKILL_FILE;
   try {
-    return { code: 0, text: await readFile(SKILL_FILE, 'utf8') };
+    return { code: 0, text: await readFile(file, 'utf8') };
   } catch (err) {
-    return { code: 1, text: `读不到协议文件 ${SKILL_FILE}：${err.message}（安装包不完整，重新安装 claimrail）` };
+    return { code: 1, text: `读不到协议文件 ${file}：${err.message}（安装包不完整，重新安装 claimrail）` };
   }
 }
 

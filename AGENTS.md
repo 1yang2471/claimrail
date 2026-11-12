@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（419 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（422 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
