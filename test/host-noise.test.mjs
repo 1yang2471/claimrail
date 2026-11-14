@@ -86,3 +86,32 @@ test('.claude 是被用户跟踪的配置，不算宿主噪音：它的改动仍
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// 根因：stripHostNoiseDiff 只剥离 .mimosa，不剥离 .claimrail/ 运行态产物。
+// 若 last-delivery.json 被 git 跟踪，钩子每轮自写快照就会把该文件的 diff 块留进
+// treeHash 的 diffText，使 tHash 轮轮漂移、stale 自指误拦（见 commit ef09f42 根因分析）。
+test('stripHostNoiseDiff：被跟踪的 .claimrail/last-delivery.json 块被剔出 diff 文本', async () => {
+  const { stripHostNoiseDiff } = await import('../src/observe/git.mjs');
+  const diff = [
+    'diff --git a/app.ts b/app.ts',
+    'index 1111111..2222222 100644',
+    '--- a/app.ts',
+    '+++ b/app.ts',
+    '@@ -1 +1 @@',
+    '-export const a = 1;',
+    '+export const a = 2;',
+    '',
+    'diff --git a/.claimrail/last-delivery.json b/.claimrail/last-delivery.json',
+    'index 3333333..4444444 100644',
+    '--- a/.claimrail/last-delivery.json',
+    '+++ b/.claimrail/last-delivery.json',
+    '@@ -1 +1 @@',
+    '-{"treeHash":"old","ledgerHash":"old"}',
+    '+{"treeHash":"new","ledgerHash":"old"}',
+    '',
+  ].join('\n');
+  const out = stripHostNoiseDiff(diff);
+  assert.ok(out.includes('app.ts'), '工作文件的 diff 块应保留');
+  assert.doesNotMatch(out, /last-delivery\.json/, '运行态快照的 diff 块应被剔出');
+  assert.doesNotMatch(out, /treeHash/, '运行态快照的内容不应残留在 diff 中');
+});

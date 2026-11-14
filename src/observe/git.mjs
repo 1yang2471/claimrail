@@ -27,12 +27,21 @@ const toPosix = (p) => String(p).split(sep).join('/');
 // 丢 .mimosa/hook-state/*.json、.mimosa/hook-status/*.json，模型没碰它们。算进"工作区有改动"
 // 会让拦截消息列出用户没改的文件，甚至单独触发 stale 假拦截（抢在正文对撞之前）。
 //
-// 名单只收**实测过**的宿主运行时目录，只有一个：.mimosa。曾经顺手加过 .claude/.cursor 等
-// "看起来也是宿主目录"的一串——但那些常被用户**有意跟踪**为配置（`.claude/settings.json`、
-// `.cursor/rules/*`），忽略它们等于把真活藏起来，比噪音本身更坏（2026-11-12 审查）。
-// 以后要加，先有实测：哪个宿主、往哪个子路径写、写的是不是可丢的运行态。
+// 名单收两类：
+//  1. 宿主运行时目录：实测过只有 .mimosa（ZCode 插件每次 Bash 都往里写 hook-state/*.json）。
+//  2. claimrail 自己的运行态产物：.claimrail/last-delivery.json（钩子每轮自写，at 戳每轮变）、
+//     .claimrail/violations.jsonl。若它们被 git 跟踪，钩子自写快照就会把该文件的 diff 块留进
+//     treeHash 的 diffText，使 tHash 轮轮漂移、stale 自指误拦（见 commit ef09f42 根因分析）。
+//
+// 决策台账 .claimrail/decisions.json 本身不是噪音：它被 isProtocolPath 在 changedLines 的 touched
+// 过滤里已当协议脚印处理，这里再把 .claimrail/ 整目录从 diff 文本剔出与之一致，且不影响
+// stale 判断（lHash 已独立捕获台账内容变化）。
+//
+// 曾经顺手加过 .claude/.cursor 等"看起来也是宿主目录"的一串——但那些常被用户**有意跟踪**为
+// 配置（`.claude/settings.json`、`.cursor/rules/*`），忽略它们等于把真活藏起来，比噪音本身
+// 更坏（2026-11-12 审查）。以后要加，先有实测：哪个宿主、往哪个子路径写、写的是不是可丢的运行态。
 // `i` 标志：Windows 文件系统大小写不敏感，.Mimosa 与 .mimosa 是同一个目录。
-const HOST_NOISE = /(^|\/)(\.mimosa)(\/|$)/i;
+const HOST_NOISE = /(^|\/)(\.mimosa|\.claimrail)(\/|$)/i;
 
 // 同一份名单必须贯穿所有消费方：untracked、diff ranges、以及整段 diff 文本
 // （treeHash 与副作用扫描读的是 diff 文本，不读 ranges）。只在某一处过滤 = 别处照漏。
