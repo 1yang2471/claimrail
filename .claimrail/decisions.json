@@ -19,7 +19,7 @@
       "target": {
         "file": "src/commands/hook.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -39,7 +39,7 @@
       "target": {
         "file": "src/cli.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -59,7 +59,7 @@
       "target": {
         "file": "docs/FEEDBACK-2026-11-12.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -79,7 +79,7 @@
       "target": {
         "file": "skill/SKILL.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -100,7 +100,7 @@
       "target": {
         "file": "skill/SKILL.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -120,7 +120,7 @@
       "target": {
         "file": "docs/EVAL-2026-11-13.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -140,7 +140,7 @@
       "target": {
         "file": "src/cli.mjs"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
       "verified": true
     },
     {
@@ -160,7 +160,28 @@
       "target": {
         "file": "README.zh-CN.md"
       },
-      "cost_if_wrong": "low",
+      "cost_if_wrong": "high",
+      "verified": true
+    },
+    {
+      "fork": "stripHostNoiseDiff 不剥离 .claimrail/ 运行态产物：钩子自写 last-delivery.json 会把该文件的 diff 块留进 treeHash，使 tHash 轮轮漂移、stale 自指误拦",
+      "options": [
+        "把 .claimrail/ 并入 HOST_NOISE 从 diff 文本剔出",
+        "只剥离 .mimosa，保持现状"
+      ],
+      "picked": "把 .claimrail/ 并入 HOST_NOISE 从 diff 文本剔出",
+      "evidence": {
+        "kind": "repo",
+        "ref": "src/observe/git.mjs:51-52",
+        "asserts": [
+          "不剔的话，被跟踪过的宿主状态文件一改",
+          "指纹就变、stale 假拦"
+        ]
+      },
+      "target": {
+        "file": "src/observe/git.mjs"
+      },
+      "cost_if_wrong": "high",
       "verified": true
     }
   ]
