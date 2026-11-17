@@ -247,7 +247,7 @@ test('半透明+渐变页：像素采样把覆盖率从少数拉到全部，并�
     '</style></head><body>' +
     '<div class="card"><p>正常对比度</p><p class="dim">偏浅的文字</p></div>' +
     '<div class="solid"><p>纯色卡片</p></div>' +
-    '<div class="card"><p>渐变上的正文</p></div></body></html>';
+    '<div class="solid"><p>纯色底上的正文</p></div></body></html>';
   const srv = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(html);
