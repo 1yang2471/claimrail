@@ -210,8 +210,13 @@ export async function renderPage(page, { outDir, name, label = '', focusProbe = 
   trunc('interactive', '可交互元素');
   trunc('scrollContainers', '滚动容器');
   trunc('fixedRects', '固定元素');
-  const noBg = texts.filter((t) => !t.background).length;
-  if (noBg) limitations.push(`${noBg} 处文本没有可判定的底色，对比度未判`);
+  const noBgTexts = texts.filter((t) => !t.background);
+  if (noBgTexts.length) {
+    // 未判要指名：只报"N 处未判"时读者没法定位是哪一处（2026-11-18 CI 实测跨平台排查 5 轮）。
+    limitations.push(
+      `${noBgTexts.length} 处文本没有可判定的底色，对比度未判（${noBgTexts.map((t) => t.selector).join('、')}）`,
+    );
+  }
   if (pixelFill?.inkSuspected) limitations.push(`${pixelFill.inkSuspected} 处像素采样疑似压到字形，退回未判`);
   if (pixelFill?.error) limitations.push(`像素采样失败（${pixelFill.error}），图片/渐变背景未补`);
   if (!pixel) limitations.push('像素采样被关闭（--no-pixel），渐变/图片背景未补');

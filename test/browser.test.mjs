@@ -276,7 +276,7 @@ test('半透明+渐变页：像素采样把覆盖率从少数拉到全部，并�
       // 本行与下一行：关像素时有未判、开像素后一个不剩。filled>=1 只证像素层真的救了。
       assert.equal(withPixel.pixelBackgrounds.inkSuspected, 0);
       assert.ok(withPixel.pixelBackgrounds.filled >= 1, `像素层没救回任何未判项：${JSON.stringify(withPixel.pixelBackgrounds)}`);
-      assert.doesNotMatch(onDetail, /处未判（底色/, `开像素后仍有未判：${onDetail}`);
+      assert.doesNotMatch(onDetail, /处未判（底色/, `开像素后仍有未判：${onDetail}｜报告 limitations：${JSON.stringify(withPixel.limitations)}`);
       // 补上之后必须抓到真实的浅字，而不是"全部合格"
       assert.match(onDetail, /对比度不足 4\.5:1/, `浅灰字没被抓到：${onDetail}`);
     });
