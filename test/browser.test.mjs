@@ -270,10 +270,12 @@ test('半透明+渐变页：像素采样把覆盖率从少数拉到全部，并�
       const onDetail = withPixel.checks.find((c) => c.id === 'contrast-ok').detail;
 
       // 关掉像素：有文本判不了（这正是不开 v2 时的假绿来源）
-      assert.match(offDetail, /另有 \d+ 处未判（底色或色值采不到/, `关像素时应当有未判项，实得：${offDetail}`);
-      // 开像素：全部判上，且补的处数等于刚才未判的处数
+      assert.match(offDetail, /另有 \d+ 处未判（底色或色值采不到/, `关像素层时应当有未判项，实得：${offDetail}`);
+      // 开像素：全部判上。"补的处数"不钉死下限——CSS 直采在跨平台下解析的集合不同
+      // （CI 实测 ubuntu/chromium 上 filled=2 也能全判），把"覆盖率拉到全部"交给
+      // 本行与下一行：关像素时有未判、开像素后一个不剩。filled>=1 只证像素层真的救了。
       assert.equal(withPixel.pixelBackgrounds.inkSuspected, 0);
-      assert.ok(withPixel.pixelBackgrounds.filled >= 3, `补的处数太少：${JSON.stringify(withPixel.pixelBackgrounds)}`);
+      assert.ok(withPixel.pixelBackgrounds.filled >= 1, `像素层没救回任何未判项：${JSON.stringify(withPixel.pixelBackgrounds)}`);
       assert.doesNotMatch(onDetail, /处未判（底色/, `开像素后仍有未判：${onDetail}`);
       // 补上之后必须抓到真实的浅字，而不是"全部合格"
       assert.match(onDetail, /对比度不足 4\.5:1/, `浅灰字没被抓到：${onDetail}`);
