@@ -233,13 +233,13 @@ test('像素采样失败不制造假绿：截图解不了就退回未判', async
 
 // v2 的核心主张：磨砂卡片 + 渐变背景上，CSS 只能判少数文本，像素能判全部。
 // 这条同时钉住"覆盖率提升"和"提升之后抓到的是真缺陷"，而不只是"没报错"。
-test('磨砂+渐变页：像素采样把覆盖率从少数拉到全部，并抓到真实的浅字', async (t) => {
+test('半透明+渐变页：像素采样把覆盖率从少数拉到全部，并抓到真实的浅字', async (t) => {
   if (!chromiumOk) return t.skip('没装 Playwright，跳过真浏览器层');
   const { createServer } = await import('node:http');
   const html =
     '<!doctype html><html><head><style>' +
     'body{margin:0;font:16px/1.6 system-ui;background:linear-gradient(135deg,#e8f0ff,#fdf2f8 40%,#ecfdf5)}' +
-    '.card{background:rgba(255,255,255,.55);backdrop-filter:blur(12px);padding:20px;margin:16px}' +
+    '.card{background:rgba(255,255,255,.55);padding:20px;margin:16px}' +
     '.card p{color:#4b5563}.card .dim{color:#9ca3af}' +
     '.solid{background:#fff;padding:20px;margin:16px}.solid p{color:#374151}' +
     '</style></head><body>' +

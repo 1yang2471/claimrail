@@ -145,7 +145,9 @@ test('非 ASCII 路径必须参与时间戳计算（承重是 -z：git 在该格
 
     const { newestTrackedMtime } = await import('../src/observe/git.mjs');
     const newest = await newestTrackedMtime(dir);
-    assert.ok(typeof newest === 'number' && newest >= future.getTime(), `中文名文件的 mtime 没被算进去：newest=${newest} < ${future.getTime()}（多半是 git 把路径八进制转义后 stat 失败被吞掉了）`);
+    // 1ms 容差：Linux utimes 把 Date 分解成 s+µs 时会截掉 1µs（CI 实测 newest=…7938.999
+    // < future=…7939）。文件被真排除时 newest 会差好几秒，1ms 容差不损失判别力。
+    assert.ok(typeof newest === 'number' && newest >= future.getTime() - 1, `中文名文件的 mtime 没被算进去：newest=${newest} < ${future.getTime()}（超出 1ms 容差，说明路径转义 bug 真的存在）`);
   });
 });
 test('候选代价由程序逐候选算：选更贵的那个照样被拦，自填字段连台账都进不去', async () => {

@@ -24,11 +24,19 @@ export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } =
   // 仍然持有事件循环，实测 `sleep 12 | hook` 会一直等到 stdin 关闭（宿主那边就是 30s
   // 超时），注释里承诺的 5 秒上限形同虚设（2026-11-10 真机复现）。
   let timer;
-  const readAll = (async () => {
+  // 事件式读取：end/close/error 三条路都落定。不用 for await——CI 实测（2026-11-17，
+  // ubuntu/node22）销毁 PassThrough 后异步迭代器的 Promise 可能永不落定，事件循环先
+  // 清空，node:test 在进程退出时报 "Promise resolution is still pending"，
+  // 连带取消同文件余下 8 个用例；Windows 上 destroy 后迭代器正常抛错，所以本地一直绿。
+  const readAll = new Promise((resolve) => {
     let buf = '';
-    for await (const chunk of stdin) buf += chunk;
-    return buf;
-  })().catch(() => ''); // 超时销毁流会让迭代器抛错；这是预期路径，不是异常
+    stdin.on('data', (chunk) => {
+      buf += chunk;
+    });
+    stdin.once('end', () => resolve(buf));
+    stdin.once('close', () => resolve(buf));
+    stdin.once('error', () => resolve(buf));
+  });
   const timeout = new Promise((resolve) => {
     // unref：流读完时定时器不许拖住进程——实测少这一步，每轮 Stop 钩子多等 5 秒
     timer = setTimeout(() => {
