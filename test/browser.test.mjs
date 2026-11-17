@@ -238,7 +238,9 @@ test('半透明+渐变页：像素采样把覆盖率从少数拉到全部，并�
   const { createServer } = await import('node:http');
   const html =
     '<!doctype html><html><head><style>' +
-    'body{margin:0;font:16px/1.6 system-ui;background:linear-gradient(135deg,#e8f0ff,#fdf2f8 40%,#ecfdf5)}' +
+    // 行高取 2.6：采样点内缩 2px 落在行框上下留白处。默认 1.6 时 Linux（DejaVu）
+    // 字形更满，角点会压到字形上导致簇不齐、填充失败（CI 实测 filled=2/4）。
+    'body{margin:0;font:16px/2.6 system-ui;background:linear-gradient(135deg,#e8f0ff,#fdf2f8 40%,#ecfdf5)}' +
     '.card{background:rgba(255,255,255,.55);padding:20px;margin:16px}' +
     '.card p{color:#4b5563}.card .dim{color:#9ca3af}' +
     '.solid{background:#fff;padding:20px;margin:16px}.solid p{color:#374151}' +

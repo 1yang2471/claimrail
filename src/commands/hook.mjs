@@ -38,7 +38,10 @@ export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } =
     stdin.once('error', () => resolve(buf));
   });
   const timeout = new Promise((resolve) => {
-    // unref：流读完时定时器不许拖住进程——实测少这一步，每轮 Stop 钩子多等 5 秒
+    // 定时器保持 ref'd：测试场景（空闲 PassThrough，无数据无 end）在 Linux 上不持有
+    // 事件循环，unref 的定时器撑不住窗口，进程会提前退出并把余下用例连带取消
+    // （CI 实测 2026-11-17）。流读完立即返回的约束由 finally 的 clearTimeout 保证，
+    // 并有专门用例守着（"hook 在流读完时立即返回，不吊着 5 秒定时器"）。
     timer = setTimeout(() => {
       try {
         stdin.destroy?.();
@@ -47,7 +50,6 @@ export async function readIncoming({ stdin = process.stdin, timeoutMs = 5000 } =
       }
       resolve('');
     }, timeoutMs);
-    timer.unref?.();
   });
   try {
     const raw = await Promise.race([readAll, timeout]);

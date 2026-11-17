@@ -131,7 +131,8 @@ test('文件数超过旧上限时仍然给出时间戳，而不是 null', async 
 
     const newest = await newestTrackedMtime(dir);
     assert.equal(typeof newest, 'number', `超过 5000 文件就返回了 ${newest}，大仓库的 render 证据会全失效`);
-    assert.ok(newest >= future.getTime(), `最新时间戳没被算进去：${newest} < ${future.getTime()}`);
+    // 1ms 容差：Linux utimes 的 s+µs 分解会截掉 1µs（与 redteam.test 同族，CI 实测）。
+    assert.ok(newest >= future.getTime() - 1, `最新时间戳没被算进去：${newest} < ${future.getTime()}`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -193,7 +194,8 @@ test('删除文件也抬升"最后改动时间"', async () => {
     await utimes(join(dir, 'a'), future, future);
     const newest = await newestTrackedMtime(dir);
     assert.equal(typeof newest, 'number', `删除路径的父目录没被纳入：返回 ${newest}`);
-    assert.ok(newest >= future.getTime(), `删除没有抬升最后改动时间：${newest} < ${future.getTime()}`);
+    // 1ms 容差：同 redteam.test，Linux utimes 的 µs 截断（CI 实测）。
+    assert.ok(newest >= future.getTime() - 1, `删除没有抬升最后改动时间：${newest} < ${future.getTime()}`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
