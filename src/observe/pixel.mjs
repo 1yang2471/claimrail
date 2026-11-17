@@ -47,6 +47,22 @@ export function pixelAt(img, p) {
 
 const dist = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
 
+// 点到三维线段（a→b）的最短距离。AA 混合像素（bg 与 ink 的过渡色）落在这条线附近，
+// 是抗锯齿噪声而不是"另一块底色"。ubuntu/DejaVu 的 FreeType AA 会把字形边缘染出
+// 色彩斑，纯 ink 容差拦不住——CI 实测（2026-11-18）：4b5563 文字的采样点既不像
+// ink 也不像底色 → 被判 stray → 对比度永远未判。Windows 的 AA 不出彩色斑，所以本地一直绿。
+function distToSegment(p, a, b) {
+  const ab0 = b[0] - a[0];
+  const ab1 = b[1] - a[1];
+  const ab2 = b[2] - a[2];
+  const denom = ab0 * ab0 + ab1 * ab1 + ab2 * ab2;
+  const t = denom
+    ? ((p[0] - a[0]) * ab0 + (p[1] - a[1]) * ab1 + (p[2] - a[2]) * ab2) / denom
+    : 0;
+  const k = Math.min(1, Math.max(0, t));
+  return dist(p, [a[0] + ab0 * k, a[1] + ab1 * k, a[2] + ab2 * k]);
+}
+
 // 采样点离多数色簇多远，就说明"这里不是同一块底色"了。
 // 实测分界：缓变渐变里的偏差只有几十（跨 140px 变 8 阶 ≈ 12/通道 = 距离 36），
 // 而 10px 棋盘上采样点会在 58 与 255 之间跳（距离 591）。120 落在两者中间偏保守一侧。
@@ -77,8 +93,9 @@ export function backgroundAt(img, rect, { tolerance = 24, minAgree = 3, textColo
   const ink = textColor ? parseRgba(textColor)?.rgb ?? null : null;
   const stray = pts.some((o) => {
     if (dist(o, best) <= foreign) return false; // 渐变里的偏差，认
-    if (ink && dist(o, ink) <= tolerance) return false; // 落在文字笔画上，不算底色
-    return true;
+    if (!ink) return true;
+    // ink↔best 连线附近的过渡像素是 AA 噪声，认（见 distToSegment 注释）。
+    return distToSegment(o, ink, best) > tolerance;
   });
   if (stray) return null;
 
