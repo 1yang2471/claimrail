@@ -10,3 +10,4 @@ memory/
 !bench/tasks/*/repo/.claimrail/
 !bench/tasks/*/repo/.claimrail/shots/
 !bench/tasks/*/repo/.claimrail/shots/*.png
+docs/bench-magpie2-2026-11-21-full.json

@@ -133,6 +133,29 @@ How to read this:
 
 Earlier pilots and their caveats remain in `docs/AUDIT-2026-11-08.md` and `docs/bench-pilot-2026-11-0{8,9}.json`.
 
+### Second model: 10 of the 20 tasks × 2 arms (measured 2026-11-21)
+
+Same harness, different model and gateway: `workbuddy/deepseek-v4.1-flash`. The 10 tasks cover the trap classes; rows: `docs/bench-magpie2-2026-11-21.json` (7 rows were rerun after a transient gateway outage and merged in; all 20 pairs have a valid row).
+
+| | off (plain prompt) | on (init + protocol prompt) |
+| --- | --- | --- |
+| valid runs | 10 | 10 |
+| delivered | 8 | 1 |
+| silent collapse (delivered + trap taken + not surfaced) | 3/8 (38%) | 0/1 (0%) |
+| delivered with the unresolved item surfaced | 0 (no gate run) | 1 |
+| surfaced / asked the user | 0 / 0 | 4 / 6 |
+| trap taken at all | 3 | 0 |
+| `check` blocked / proceeded | — | 9 / 1 |
+| interruptions per run, median | — | 2 (n=8) |
+| wall time, median | 129.5 s | 180 s |
+| extra time vs off | — | +13.5 s median over 10 pairs |
+
+How to read this:
+
+- **The direction repeats on a second model.** The protocol arm took zero traps and produced zero silent collapses; the plain-prompt arm collapsed silently 3 times out of 8 deliveries. On the same 10 tasks the first model's protocol arm delivered 4/10; this one delivers 1/10 — what changes with the model is the price, not the protection.
+- **This model asks instead of guessing.** 6/10 protocol runs end in a question to the user, median 2 interrupts, `check` blocked 9/10 — every blocked run surfaced what was unresolved rather than handing in a green-looking delivery.
+- **The gate did real fact-checking once.** `exception-clause@on` re-fetched WCAG and found the task repo's own design doc carried a citation marked "verified verbatim" that does not exist in the source (44 px is the 2.5.5 AAA threshold, not AA); the model corrected the document, dropped a source whose fetch failed in-run, and surfaced what remained unverified.
+
 ## Known limits
 
 - Non-git directories: all three cost inputs are unavailable → everything grades `high`. This is now an **explicit degraded mode**, not a silent one: the report says so up front, and says which check was lost (repo evidence can still be read, but "did you just write this?" cannot be answered without git). A broken git setup (`GIT_DIR`, `safe.directory`) is reported differently from "this is not a repository" — the first wants your environment fixed, the second wants `git init`.
