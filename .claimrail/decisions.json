@@ -243,6 +243,26 @@
       },
       "cost_if_wrong": "low",
       "verified": true
+    },
+    {
+      "fork": "第二模型对照的规模：沿用 11-11 的全 20 任务，还是 10 任务抽样覆盖陷阱类别",
+      "options": [
+        "沿用全 20 任务",
+        "10 任务抽样覆盖陷阱类别"
+      ],
+      "picked": "10 任务抽样覆盖陷阱类别",
+      "evidence": {
+        "kind": "repo",
+        "ref": "README.md:106-110",
+        "asserts": [
+          "20-step budget"
+        ]
+      },
+      "target": {
+        "file": "README.md"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
