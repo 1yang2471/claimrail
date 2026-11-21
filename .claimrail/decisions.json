@@ -183,6 +183,66 @@
       },
       "cost_if_wrong": "high",
       "verified": true
+    },
+    {
+      "fork": "precedent 档被三个 loopback 别名凑齐三票：整拒内网回访，还是归并成一票保留内网文档站直连",
+      "options": [
+        "整拒内网/环回回访",
+        "归并成一票+DNS 归并"
+      ],
+      "picked": "归并成一票+DNS 归并",
+      "evidence": {
+        "kind": "memory",
+        "ref": "log#2",
+        "asserts": [
+          "显式降级"
+        ]
+      },
+      "target": {
+        "file": "src/evidence.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "src/./x.ts 绕过先干后证：只改 schema 拒收，还是加运行时归一化双保险",
+      "options": [
+        "只 schema 拒收",
+        "schema+运行时归一化双保险"
+      ],
+      "picked": "schema+运行时归一化双保险",
+      "evidence": {
+        "kind": "repo",
+        "ref": "src/observe/git.mjs:196-197",
+        "asserts": [
+          "isHostNoise"
+        ]
+      },
+      "target": {
+        "file": "src/observe/git.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
+    },
+    {
+      "fork": "第一例拦截的闭环缺口：只写复盘文档，还是改 hook 续轮文案强制补申报",
+      "options": [
+        "只写复盘文档",
+        "改续轮文案+复盘文档"
+      ],
+      "picked": "改续轮文案+复盘文档",
+      "evidence": {
+        "kind": "repo",
+        "ref": "docs/VIOLATIONS-2026-11-20.md:21",
+        "asserts": [
+          "补申报才是"
+        ]
+      },
+      "target": {
+        "file": "src/commands/hook.mjs"
+      },
+      "cost_if_wrong": "low",
+      "verified": true
     }
   ]
 }
