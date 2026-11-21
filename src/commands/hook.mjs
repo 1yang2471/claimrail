@@ -167,7 +167,16 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
     if (continuedBefore) {
       await logViolation({ at, reason: 'stale', changed: touched.slice(0, 5), changedTotal: touched.length });
       await saveSnapshot({ at, treeHash: tHash, ledgerHash: lHash });
-      return { code: 0, text: '工作区有改动，但台账自上次放行后未变；本轮已续过一次，不再重复阻断。' };
+      // 第一例真实拦截的复盘（2026-11-20，docs/VIOLATIONS-2026-11-20.md）：旧文案到此为止，
+      // 模型把"不再重复阻断"当成"等待就过"，台账从未补申报。放行必须说清两件事：
+      // 这不是通过，以及下轮要做什么。
+      return {
+        code: 0,
+        text: [
+          '工作区有改动，但台账自上次放行后未变；本轮已续过一次，不再重复阻断——已记入 .claimrail/violations.jsonl。',
+          '这不是"通过"：下轮开工前先补申报——更新 .claimrail/decisions.json（有分叉写 forks，没有写 "forks": [] 加 no_fork_reason），否则下次交付还会以同样原因拦。',
+        ].join('\n'),
+      };
     }
     return {
       code: 2,
@@ -220,7 +229,7 @@ export async function hook({ cwd, ledger = LEDGER_PATH, payload = null, allowNet
       code: 2,
       text: [
         r.text,
-        `交付说明必须逐条声明未验证项（${delivery ? '你的交付说明里一条都没提' : '没能读到交付正文，按"没提"处理'}）：`,
+        `交付说明必须逐条声明未验证项（你的交付说明里一条都没提）：`,
         ...r.unverified.map((u) => `  • ${u.fork}｜已选 ${u.picked}｜${u.why}`),
         '在正文里写清"哪条没能验证、原因是什么"，然后结束本轮。',
       ].join('\n'),

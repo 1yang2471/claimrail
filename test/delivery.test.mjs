@@ -83,6 +83,7 @@ test('第二次仍沿用旧台账：放行，但落一条 stale 记录', async (
 
     const passed = await hook({ cwd: dir, payload: { stop_hook_active: true } });
     assert.equal(passed.code, 0, passed.text);
+    assert.match(passed.text, /补申报/, '续轮放行必须要求补申报，这是第一例真实拦截复盘的修复（docs/VIOLATIONS-2026-11-20.md）');
 
     const rows = await violations(dir);
     assert.equal(rows.length, 1, JSON.stringify(rows));

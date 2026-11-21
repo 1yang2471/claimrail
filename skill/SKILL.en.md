@@ -115,6 +115,8 @@ claimrail record --key card-gap --what "card vertical gap at least 16px" --why "
 
 A key must be hit twice before it becomes a rule; `claimrail invalidate <key>` retracts a rule, and the raw log stays untouched (the log is truth, rules are cache).
 
+Before recording, run `claimrail rules` and reuse an existing key: the same preference class reuses the same key (say, `nav-height` for every navbar-height complaint), never a fresh name per incident. Promotion counts hits **per key** — a one-off event name means the same preference never accumulates two hits (47 real rejections in this repo had zero repeated keys; promotion never fired once — retrospective 2026-11-21).
+
 When the user says "not this", record **what they want** (`--what`), not their complaint verbatim. Run `claimrail rules` before your next change.
 
 `--anchor` records a **reference** (positive example): when the user points at something to imitate ("follow our repo's convention"). It never becomes a rule — its use is naming it next time ("do it like reference log#n"), listed separately in `claimrail rules`.

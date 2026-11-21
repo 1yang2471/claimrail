@@ -31,7 +31,7 @@
 | 半透明层要合成后再比 | `geometry.mjs` 的 `parseRgba`/`over`（`rgba(0,0,0,.05)` 不合成被当纯黑，76 处假红） |
 | 色值换算必须问浏览器本人 | `driver.mjs` 的 `window.__fk.rgbaOf`：老语法精确解析，现代色空间 canvas 画像素读回。真站实测 49/49、31 处真缺陷（最低 2.45:1） |
 | 认不出的色值整处不判，不许拿祖先的颜色冒充 | `web.mjs` 的 `bgOf`：某一层解析不出整处 null |
-| 交付正文里的全称断言要跟门里的未验证项对撞 | `overclaim.mjs` + `hook`：断言/否定/声明/否认四组模式中英双语；正文宣称"全部核实"而门里有未验证项 → 拦一轮摊开矛盾；读不到正文按"没提"处理（`test/overclaim.test.mjs`） |
+| 交付正文里的全称断言要跟门里的未验证项对撞 | `overclaim.mjs` + `hook`：断言/否定/声明/否认四组模式中英双语；正文宣称"全部核实"而门里有未验证项 → 拦一轮摊开矛盾；宿主没给交付正文时跳过"逐条声明"检查（拦会在不提供正文的宿主上死循环），未验证项仍留在 check 输出（`test/overclaim.test.mjs`、`test/hook.test.mjs`） |
 | 测量对象必须先证明成立 | `observe/index.mjs` 的 `targetResolves` + `git.mjs` 的 `fileRefs`：指向不存在的路径/符号时"0 处引用"是假零 → 判 null；文件级 fan-in 要认 `./helper.mjs` 相对写法 |
 | 非 git 目录是显式降级模式，不是实测 | `gitState` 三种话术分开（none 才叫"不是仓库"）；repo 档丢的是"先干后证" |
 | 退出码不许说谎 | `web.mjs`：五项全未判退出 1；`check` 退出 0 只在确有绿项；hook 的文本走 stderr、退出码才是接口 |
