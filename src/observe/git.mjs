@@ -220,7 +220,12 @@ export async function changedLines(cwd, base = null) {
 
 export const isChangedLine = (changed, file, from, to) => {
   if (!changed) return false;
-  const f = toPosix(file);
+  // 归一化后再匹配：schema 已拒 "."/空段，但这里是最后一道闸——旧台账或外部 --ledger
+  // 给出的非规范路径（src/./x.ts）不能让"先干后证"失配（审查 2026-11-21 实测的绕法）。
+  const f = toPosix(file)
+    .split('/')
+    .filter((s, i) => s !== '.' && (s !== '' || i === 0))
+    .join('/');
   if (changed.untracked.includes(f)) return true;
   for (const [a, b] of changed.ranges.get(f) ?? []) {
     if (from <= b && to >= a) return true;

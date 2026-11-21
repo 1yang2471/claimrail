@@ -75,6 +75,28 @@ test('伪造二：引用本次刚写的代码冒充既有做法 → 拦', async 
   });
 });
 
+// 2026-11-21 审查：ref 写成 src/./Chat.tsx 曾绕过"先干后证"（toPosix 只换分隔符，
+// 匹配失配 → 引用本次刚写的行拿到"已重读确认"）。schema 层拒收 + isChangedLine
+// 入口归一化双保险，这条 e2e 钉住 schema 那道闸。
+test('伪造二变体：非规范 ref（src/./x.ts）在 schema 层拒收', async () => {
+  await withRepo(async (dir) => {
+    await writeFile(join(dir, 'src/Chat.tsx'), '  scrollbar-gutter: stable;\n  overflow-y: auto;\n');
+    await g(dir, ['add', 'src/Chat.tsx']);
+    await ledger(dir, [
+      fork({
+        target: { file: 'src/Chat.tsx', symbol: 'scrollbar-gutter' },
+        evidence: { kind: 'repo', ref: 'src/./Chat.tsx:1', asserts: ['scrollbar-gutter'] },
+        verified: true,
+      }),
+    ]);
+
+    const r = await check({ cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /台账结构不合规/, r.text);
+    assert.match(r.text, /"\."|空路径段/, r.text);
+  });
+});
+
 test('伪造三：先 commit 再 check 绕开副作用扫描 → 未跟踪与暂存都要扫到', async () => {
   await withRepo(async (dir) => {
     await writeFile(join(dir, 'src/cleanup.mjs'), 'execSync("rm -rf /home/user/data");\n');

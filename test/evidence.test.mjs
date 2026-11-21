@@ -233,3 +233,15 @@ test('报告必须与截图哈希绑定：换图或换报告都会露馅', async
   const noShot = await verify(bundle, renderCtx({ shotHash: async () => null }));
   assert.equal(noShot.ok, false);
 });
+
+// 2026-11-21 审查（P1）：git 读不出仓库状态时，"引用的行是不是本次刚写的"无从核实，
+// 旧实现静默乐观放行——整扇门对"带证据的台账"失效。unknown ≠ none：none 是写明的
+// 降级模式，unknown 要查环境。按不成立处理，不许降级成乐观值。
+test('git 读不出状态（changedUnknown）时 repo 档按不成立处理', async () => {
+  const r = await verify(
+    { kind: 'repo', ref: 'src/x.ts:1-2', asserts: ['anything'] },
+    { readRange: async () => 'anything', isChanged: async () => false, changedUnknown: 'git 读不出仓库状态，无法核实"先干后证"' },
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.why, /先干后证/);
+});

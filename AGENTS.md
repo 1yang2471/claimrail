@@ -1,6 +1,6 @@
 # claimrail 项目规则
 
-新 agent 进来先跑 `node --test`（422 项，约 20 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
+新 agent 进来先跑 `node --test`（437 项，约 25 秒），再读 `docs/PRD.md`。PRD 是需求源头；它没写的范围，v1 不做。每条规则的完整实测故事在 `docs/HANDOFF.md` 与 `docs/BOUNDARIES.md`，本表只留「规则 → 由什么拦住」。
 
 ## 规则表
 
@@ -55,7 +55,7 @@
 | hook 只许拦一次，payload 必须真读 | `hook.mjs`：`stop_hook_active` 为真不再阻断（防死循环）；`readIncoming` 立即调用 IIFE、定时器 unref+清理——少括号曾让 payload 永远 null、每轮多等 5 秒（入口层用例钉住） |
 | 门只在"看得见工作区"时认证未申报 | `check.mjs` 的 `workVisible`：repo 里没有 baseline / git 读不出、或 git 本身 unknown → 模板台账直接拦；`none`（确实不是仓库）是显式降级，照旧放行。空 baseline 由 init 补写修复（`readBaseline ?? writeBaseline`） |
 | 一切路径以仓库根为基准 | `gitToplevel`：check/hook/init/web 都解析仓库根；台账可绝对路径、子目录找不到退回根；`--out` 必须在仓库内（仓库外写不出可回验 ref，早报错） |
-| ref 与 target 段中 `..` 一律拒收 | `schema.mjs` 的 `hasParentSegment`（三层入口：evidence.ref / target.file / options[].target.file）+ `check.mjs` 的 `safeResolve` 运行时兜底；后者再解析 realpath，仓库内 junction/symlink 指向仓库外也拒绝（`test/containment.test.mjs`） |
+| ref 与 target 段中 `..`/`.`/空段一律拒收（`..` 越界，`.`/空段让"先干后证"匹配失配；URL 类 ref 不在此列，由 fetch 层管） | `schema.mjs` 的 `pathSegmentIssue`（三层入口：evidence.ref / target.file / options[].target.file）+ `observe/git.mjs` 的 `isChangedLine` 入口归一化 + `check.mjs` 的 `safeResolve` 运行时兜底；后者再解析 realpath，仓库内 junction/symlink 指向仓库外也拒绝（`test/containment.test.mjs`、`test/schema.test.mjs`、`test/observe.test.mjs`） |
 | 审计面不许混进协议文件 | `check.mjs` 的 `emptyDeclaration` 先过滤 `isProtocolPath`（AGENTS.md / .gitignore / .claimrail），`test/audit.test.mjs` 钉住 |
 | stale 不误伤协议文件 | `hook.mjs`：touched 过滤后为 0 不进 stale 分支（只改 AGENTS.md/.gitignore 不再拦"改了 0 个文件"） |
 | 未申报本身也拦 | `undeclared.mjs`：工作区有改动、台账仍是 init 模板（哈希或占位理由）→ 退出 1；hook 快照 `{treeHash, ledgerHash}` 判沿用旧台账，第二次放行并落 `violations.jsonl` |

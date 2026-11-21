@@ -41,8 +41,16 @@ const ASSERTS_REQUIRED = ['repo', 'memory', 'render', 'web'];
 const MAX_TEXT = 120; // 一屏清单要三秒读完；800 字符的单行"清单"没人读
 
 // 段中 `..` 同样要拦：`a/../../etc/x.png` 不以 ../ 开头，正则放行，join 后逃出仓库
-// （审查实测）。render/repo 的 ref 与 target.file 都拿它去 join cwd，必须整段拒绝。
-const hasParentSegment = (p) => String(p).split(/[\\/]/).includes('..');
+// （审查实测）。段中 `.` 与空段也拦：不越界，但 isChangedLine 的规范化匹配会把
+// src/./x.ts 与 git 输出的 src/x.ts 判成两个文件——"先干后证"守卫被两个字符绕过
+// （审查 2026-11-21 实测）。台账只收规范相对路径；段首空段（绝对路径 /src/x）不在此拦，
+// 交 safeResolve 的 realpath containment 管。
+const pathSegmentIssue = (p) => {
+  const segs = String(p).split(/[\\/]/);
+  if (segs.includes('..')) return '".." 路径段';
+  if (segs.some((s, i) => i > 0 && (s === '.' || s === ''))) return '"." 或空路径段';
+  return null;
+};
 
 // 设计类任务：产出形态由人的偏好决定，"最常见"不等于"最好"。
 // 这几类不允许用单一网页转述收场（见 checkFork 里的 design-needs-precedent）。
@@ -122,7 +130,7 @@ function checkFork(fork, i, taskClass) {
         } else {
           const te = badText(t.file);
           if (te) at(`options[${n}].target.file`, te);
-          else if (hasParentSegment(t.file)) at(`options[${n}].target.file`, 'target 不许包含 ".." 路径段：越界即拒绝');
+          else if (pathSegmentIssue(t.file)) at(`options[${n}].target.file`, 'target 不许包含 ".."、"." 或空路径段：越界与绕过路径匹配的写法一律拒绝');
         }
       }
     }
@@ -164,8 +172,10 @@ function checkFork(fork, i, taskClass) {
       for (const [rule, msg] of errs) at(rule, msg);
     } else if (designRejected) {
       /* 整档已拒：ref/asserts 的形状错不再报，别让人修不该存在的字段 */
-    } else if (hasParentSegment(evidence.ref ?? '')) {
-      at('evidence.ref', 'ref 不许包含 ".." 路径段：ref 会被 join 到仓库根上，越界即拒绝');
+    } else if ((evidence.kind === 'repo' || evidence.kind === 'render') && pathSegmentIssue(evidence.ref ?? '')) {
+      // web/precedent 的 ref 是 URL（https:// 自带的空段不在此列，越界由 fetch 层管）；
+      // 文件路径类 ref 会被 join 到仓库根上——越界即逃逸，非规范路径让"先干后证"失配。
+      at('evidence.ref', 'ref 不许包含 ".."、"." 或空路径段：ref 会 join 到仓库根上——越界即逃逸，非规范路径让"先干后证"的路径匹配失配，一律拒绝');
     } else if (!REF_PATTERNS[evidence.kind].test(String(evidence.ref ?? ''))) {
       at('evidence.ref', `${evidence.kind} 的 ref 格式不符：${evidence.ref ?? '(空)'}`);
     }
@@ -197,7 +207,7 @@ function checkFork(fork, i, taskClass) {
     } else {
       const err = badText(fork.target.file ?? '');
       if (err) at('target.file', `target.file ${err}`);
-      else if (hasParentSegment(fork.target.file)) at('target.file', 'target.file 不许包含 ".." 路径段：target 会被 join 到仓库根上，越界即拒绝');
+      else if (pathSegmentIssue(fork.target.file)) at('target.file', 'target.file 不许包含 ".."、"." 或空路径段：target 会 join 到仓库根上，越界即拒绝');
       if ('symbol' in fork.target) {
         const e2 = badText(fork.target.symbol);
         if (e2) at('target.symbol', `target.symbol ${e2}`);

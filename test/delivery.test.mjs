@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -200,6 +201,36 @@ test('自定义台账路径：stale 与删台账的提示都写实际路径', as
     assert.equal(gone.code, 2, gone.text);
     assert.match(gone.text, /custom-ledger\.json/);
     assert.doesNotMatch(gone.text, /\.claimrail\/decisions\.json/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// 2026-11-21 审查：半截快照 JSON 曾被静默当"没有快照"。抛错会让钩子崩溃、宿主 fail-open，
+// 比 stale 失明更糟；降级放行但必须喊出来，且放行时原子重写自愈。
+test('快照损坏：不崩、喊出失效，放行时原子重写自愈', async () => {
+  const dir = await repoWithLedger();
+  try {
+    assert.equal((await hook({ cwd: dir })).code, 0);
+    await writeFile(join(dir, '.claimrail', 'last-delivery.json'), '{"treeHash": "half', 'utf8');
+
+    const lines = [];
+    const orig = process.stderr.write;
+    let r;
+    try {
+      process.stderr.write = (chunk) => {
+        lines.push(String(chunk));
+        return true;
+      };
+      r = await hook({ cwd: dir });
+    } finally {
+      process.stderr.write = orig;
+    }
+    assert.equal(r.code, 0, r.text);
+    assert.ok(lines.join('').includes('快照损坏'), lines.join('\n'));
+    const healed = JSON.parse(await readFile(join(dir, '.claimrail', 'last-delivery.json'), 'utf8'));
+    assert.ok(healed.treeHash, '放行后重写自愈');
+    assert.ok(!existsSync(join(dir, '.claimrail', 'last-delivery.json.tmp')), '原子写不许留 .tmp 残留');
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

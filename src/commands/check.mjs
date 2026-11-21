@@ -3,6 +3,7 @@
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { existsSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { promises as dnsPromises } from 'node:dns';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { validateLedger } from '../schema.mjs';
@@ -63,7 +64,7 @@ function blockedData({ task_class, undeclared, noForkReason, degraded }) {
     notEnabled: [],
   };
 }
-function makeCtx({ cwd, allowNet, changed }) {
+function makeCtx({ cwd, allowNet, changed, changedUnknown }) {
   // ref 的落点必须在仓库内：resolve 后与仓库根做前缀比较，越界交 null（→ 证据失败）。
   // schema 只拦了段首的 ../；`a/../../etc/x.png` 这种段中 .. 能逃出仓库（审查实测）。
   // 判定层在 schema 之外再加这道闸：读不到就当证据不成立，绝不读仓库外的东西。
@@ -90,6 +91,11 @@ function makeCtx({ cwd, allowNet, changed }) {
   return {
     allowNet,
     lastChangeMs: undefined, // 下面异步补
+    // DNS 归并给 verifyPrecedent 用：公网域名解析进内网段时不算独立来源（审查 2026-11-21）。
+    // 只在 precedent 档被调用，而那档需要 --allow-net——离线 check 不碰 DNS。
+    lookup: dnsPromises.lookup,
+    // git 读不出仓库状态时给一句话，repo 档证据按不成立处理（evidence.mjs 消费）。
+    changedUnknown,
     // 先干后证：引用本次新增/修改的行，不能算"仓库里本来就这么做"。
     // 没有这一条，写完代码再补一条 repo 证据就能免掉一次提问。
     isChanged: async (file, from, to) => isChangedLine(changed, file, from, to),
@@ -201,7 +207,16 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
       };
     }
 
-    const ctx = makeCtx({ cwd: root, allowNet, changed: changedNow });
+    const ctx = makeCtx({
+      cwd: root,
+      allowNet,
+      changed: changedNow,
+      // unknown ≠ none：none 是写明的降级模式，unknown 是环境坏了（GIT_DIR/safe.directory）——
+      // 此时"引用的行是不是本次刚写的"无从核实，repo 档证据按不成立处理，不许乐观放行。
+      changedUnknown: git === 'unknown'
+        ? 'git 读不出仓库状态，无法核实引用的行不是本次刚写的（先干后证失效）——repo 档证据按不成立处理'
+        : null,
+    });
     ctx.lastChangeMs = (await newestTrackedMtime(root)) ?? undefined;
     // 宿主状态文件的整块 diff 剔掉再往下传：副作用扫描读的是这段文本（不读 ranges），
     // 被跟踪过的宿主文件不改剔的话会拿噪音内容判出 irreversible（审查 2026-11-12）。
@@ -265,7 +280,7 @@ export async function check({ cwd = process.cwd(), ledger = LEDGER_PATH, unatten
     } else if (git === 'unknown') {
       // "仓库读不出来"和"这里不是仓库"要分开说：后者该 git init，前者该查环境
       overrides.push(
-        '⚠ git 读不出仓库状态（这不等于"这里不是 git 仓库"：查 GIT_DIR、safe.directory、git 是否可用）：三项代价输入都取不到，所有分叉按 high 处理',
+        '⚠ git 读不出仓库状态（这不等于"这里不是 git 仓库"：查 GIT_DIR、safe.directory、git 是否可用）：三项代价输入都取不到，所有分叉按 high 处理；repo 档的"先干后证"也一并失效——引用本次刚写行的证据按不成立处理',
       );
     }
     // 这一句只在真仓库里成立：没有仓库时说"没跑过 init"会把人指错方向

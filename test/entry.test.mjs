@@ -146,3 +146,42 @@ test('--ledger 接受绝对路径', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+// P1（2026-11-21 审查）：git 读不出状态时，带 repo 证据的台账以前照样放行——
+// evidenceOk 跳过代价拦截 + isChangedLine(null) 恒 false，"先干后证"静默关闭。
+// 现在 changedUnknown 让 repo 档按不成立处理：门对"带证据的台账"不再失效。
+test('git 读不出状态：带 repo 证据的台账也不许放行', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fk-unknown-ev-'));
+  const env = process.env.GIT_DIR;
+  try {
+    const g = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    g(['init', '-q']);
+    g(['config', 'user.email', 't@t']);
+    g(['config', 'user.name', 't']);
+    await writeFile(join(dir, 'src.md'), 'pattern: gutter\n', 'utf8');
+    g(['add', '-A']);
+    g(['commit', '-qm', 'init']);
+    await init({ cwd: dir });
+    await writeFile(join(dir, '.claimrail', 'decisions.json'), JSON.stringify({
+      schema: 1,
+      task_class: 'refactor',
+      forks: [{
+        fork: '沿用仓库既有写法',
+        options: ['沿用', '新写'],
+        picked: '沿用',
+        evidence: { kind: 'repo', ref: 'src.md:1', asserts: ['pattern'] },
+        cost_if_wrong: 'low',
+        verified: true,
+      }],
+    }, null, 2), 'utf8');
+
+    process.env.GIT_DIR = 'C:/definitely-not-a-repo/nope.git';
+    const r = await check({ cwd: dir });
+    assert.equal(r.code, 1, r.text);
+    assert.match(r.text, /先干后证/, r.text);
+  } finally {
+    if (env === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = env;
+    await rm(dir, { recursive: true, force: true });
+  }
+});

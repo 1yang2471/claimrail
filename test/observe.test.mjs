@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { observe, whyUnknown } from '../src/observe/index.mjs';
 import { grade } from '../src/cost.mjs';
+import { isChangedLine } from '../src/observe/git.mjs';
 
 // 这一层按 PRD 不做逐命令 mock，直接对一个真 git 仓库跑。
 // 不能拿 claimrail 自己的仓库当样本：本仓库发过 0.1.0 之后就有 tag 了，
@@ -199,4 +200,16 @@ test('删除文件也抬升"最后改动时间"', async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+// 2026-11-21 审查：src/./x.ts 这类非规范 ref 曾绕过"先干后证"（toPosix 只换分隔符，
+// 匹配失配 → 引用本次刚写的行拿到"已重读确认"）。schema 层拒收是第一道闸；这里是
+// 最后一道闸：任何入口给出的非规范路径都不能让变更比对失配。
+test('isChangedLine 对非规范路径仍然命中（归一化后匹配）', () => {
+  const changed = { ranges: new Map([['src/Chat.tsx', [[1, 2]]]]), untracked: [], renamed: [] };
+  assert.equal(isChangedLine(changed, 'src/Chat.tsx', 1, 2), true);
+  assert.equal(isChangedLine(changed, 'src/./Chat.tsx', 1, 2), true);
+  assert.equal(isChangedLine(changed, 'src//Chat.tsx', 1, 2), true);
+  assert.equal(isChangedLine(changed, 'src\\Chat.tsx', 1, 2), true);
+  assert.equal(isChangedLine(changed, 'src/other.ts', 1, 2), false);
 });

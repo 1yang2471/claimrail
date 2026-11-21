@@ -214,3 +214,21 @@ test('未知字段报错把合法字段清单真的列出来', () => {
   assert.ok(err, JSON.stringify(v.errors));
   assert.match(err.msg, /fork\/options\/picked\/evidence\/target\/cost_if_wrong\/verified/);
 });
+
+// 2026-11-21 审查：src/./x.ts 与 src//x.ts 不越界，但 isChangedLine 的路径匹配会把它们
+// 与 git 输出的 src/x.ts 判成两个文件——"先干后证"被两个字符绕过。schema 层先拦。
+test('ref/target 段中 "./" 与空段拒收：这两个字符能让"先干后证"失配', () => {
+  const cases = [
+    { evidence: { kind: 'repo', ref: 'src/./Chat.tsx:1', asserts: ['scrollbar-gutter'] } },
+    { evidence: { kind: 'repo', ref: 'src//Chat.tsx:1', asserts: ['scrollbar-gutter'] } },
+    { target: { file: 'src/./a.ts' } },
+    { options: [{ label: 'A', target: { file: 'a/../b.ts' } }, { label: 'B', target: { file: 'src/ok.ts' } }] },
+  ];
+  for (const over of cases) {
+    const r = validateLedger(ledger({ forks: [fork(over)] }));
+    assert.equal(r.ok, false, JSON.stringify(over));
+    assert.ok(r.errors.some((e) => /evidence\.ref|target\.file|options\[\d\]\.target\.file/.test(e.rule)), JSON.stringify(r.errors));
+  }
+  // 规范路径不受影响
+  assert.equal(validateLedger(ledger({ forks: [fork({ target: { file: 'src/ok.ts' } })] })).ok, true);
+});

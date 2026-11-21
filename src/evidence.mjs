@@ -9,6 +9,7 @@
 //   web       编一个 URL，或编一个"好评率高"这种没有量纲的数字
 
 import { CHECK_IDS as RENDER_CHECK_IDS } from './observe/check-ids.mjs';
+import { isIntranetHost, isPrivateAddress } from './commands/fetch-guard.mjs';
 
 export { RENDER_CHECK_IDS };
 
@@ -46,11 +47,18 @@ const basename = (ref) => String(ref).split(/[\\/]/).pop().replace(/\.png$/i, ''
 const MIN_SOURCES = 3;
 const MIN_QUOTE = 12;
 
+// 内网/环回地址在"业界收敛"里只能算同一票：localhost / 127.0.0.1 / [::1] 指向的是
+// 同一台机器上的服务，不是三个独立来源——旧实现把三种拼法算成三个注册域，模型自起
+// 一个本地服务就能凑齐 ≥3 独立域名，precedent 档被合法形状整体绕过（审查 2026-11-21）。
+// 域名指向内网 IP 的归并（DNS 层）在 verifyPrecedent 里做，这里先按主机名归并。
+const INTRANET = '(内网)';
+
 // 按注册域去重的同一份实现：bench 的"同域转载不算三票"判定也用它，
 // 两处各写一份迟早会漂（一处认 www、一处不认，判定就对不上）。
 export const registrableDomain = (url) => {
   try {
     const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    if (isIntranetHost(host)) return INTRANET;
     const parts = host.split('.');
     if (parts.length <= 2) return host;
     // 两段公共后缀（co.uk / com.cn 之类）取三段，粗但够用
@@ -92,17 +100,27 @@ async function verifyPrecedent(evidence, ctx) {
   const sources = Array.isArray(evidence.sources) ? evidence.sources : [];
   if (sources.length < MIN_SOURCES) return { ok: false, why: `业界收敛需要 ≥${MIN_SOURCES} 个独立来源，给了 ${sources.length} 个` };
 
-  const hosts = new Set();
   const confirmed = [];
   const problems = [];
 
   for (const s of sources) {
-    const host = registrableDomain(s.url);
+    let host = registrableDomain(s.url);
     if (!host) {
       problems.push(`URL 不合法：${s.url}`);
       continue;
     }
-    hosts.add(host);
+    // 公网域名还要问 DNS：指向内网 IP 的域名不是独立来源——攻击者可把自己注册的
+    // 域名解析到本机，三个"公网域名"就能凑齐三票（审查 2026-11-21）。DNS 失败不拦：
+    // 回访本身马上也会失败，问题会在那里浮出来。lookup 由 makeCtx 注入；只在
+    // precedent 档触发，而那档需要 --allow-net——离线 check 不碰 DNS。
+    if (host !== INTRANET && ctx.lookup) {
+      try {
+        const addrs = await ctx.lookup(new URL(s.url).hostname.replace(/^\[|\]$/g, ''), { all: true });
+        if (Array.isArray(addrs) && addrs.some((a) => isPrivateAddress(a.address))) host = INTRANET;
+      } catch {
+        /* DNS 失败不拦：回访马上也会失败，问题会在那里浮出来 */
+      }
+    }
 
     let res = null;
     try {
@@ -177,6 +195,11 @@ export async function verify(evidence, ctx) {
   if (kind === 'repo') {
     const weak = assertShape(asserts);
     if (weak) return { ok: false, why: `repo 档${weak}` };
+
+    // git 读不出仓库状态时，"引用的行不是本次刚写的"无从核实——按不成立处理，不许降级成乐观值。
+    // unknown ≠ none：none 是文档写明的降级模式，unknown 要查环境（GIT_DIR/safe.directory）；
+    // 乐观放行等于整扇门对"带证据的台账"失效（审查 2026-11-21）。
+    if (ctx.changedUnknown) return { ok: false, why: ctx.changedUnknown };
 
     const loc = parseRepoRef(ref);
     if (!loc) return { ok: false, why: `ref 不可用：${ref}（要 file:line 或 file:from-to，且不超过 ${MAX_REPO_SPAN} 行）` };
